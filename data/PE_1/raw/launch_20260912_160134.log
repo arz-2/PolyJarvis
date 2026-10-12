@@ -1,0 +1,4 @@
+{"event": "resume", "at": "2026-09-12T20:01:35.227252+00:00", "at_node": "execute", "workflow_status": null, "node": "entry_resolve"}
+{"event": "cost_admitted", "at": "2026-09-12T20:01:35.228077+00:00", "gpu_hours": 1.6988, "ceiling": 40.0, "unpriced": ["equil"], "note": "total_gpu_hours is a LOWER bound; unpriced stages are excluded", "node": "cost_guard_post"}
+{"event": "execute", "at": "2026-09-12T20:01:45.832934+00:00", "status": "accepted", "stage": null, "finding": null, "resumed": true, "node": "execute"}
+{"event": "done", "status": "accepted", "exit_code": 0, "run_name": "PE_1", "polymer_class": "PHYC", "class_source": "radonpy_polyinfo", "plan_path": "/home/alexzhao/PolyJarvis/data/PE_1/raw/run_plan.json", "confidence": "high", "plan_mode": "reasoned", "gpu_hours": 1.6988, "unpriced": ["equil"], "critic_verdict": "agrees", "stage": null, "finding": null, "detail": "", "resumable": false}

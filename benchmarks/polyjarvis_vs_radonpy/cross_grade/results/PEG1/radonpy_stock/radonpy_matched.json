@@ -1,0 +1,110 @@
+{
+  "log": "/home/arz2/PolyJarvis_v2/benchmarks/polyjarvis_vs_radonpy/preserved_artifacts/PEG1/radonpy/PEG1/eq3.log",
+  "units": "real",
+  "rows_in_log": 5001,
+  "rows_graded": 2001,
+  "tail_rows": 2001,
+  "width": 800,
+  "window_fully_defined": true,
+  "criteria": {
+    "totene": {
+      "status": "PASS",
+      "value": 43.24380172132794,
+      "threshold": 74.056729559745,
+      "column": "TotEng",
+      "mean": 148113.45911949,
+      "crit": 0.0005,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "kinene": {
+      "status": "PASS",
+      "value": 3.5928329294024697,
+      "threshold": 15.163466744580504,
+      "column": "KinEng",
+      "mean": 30326.933489161005,
+      "crit": 0.0005,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "ebond": {
+      "status": "PASS",
+      "value": 2.710999420557439,
+      "threshold": 6.768522626349,
+      "column": "E_bond",
+      "mean": 6768.522626349,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "eangle": {
+      "status": "PASS",
+      "value": 4.823610043305766,
+      "threshold": 24.209910351449007,
+      "column": "E_angle",
+      "mean": 24209.910351449005,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "edihed": {
+      "status": "PASS",
+      "value": 18.63943009988263,
+      "threshold": 50.594177566244,
+      "column": "E_dihed",
+      "mean": 25297.088783122,
+      "crit": 0.002,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "evdw": {
+      "status": "PASS",
+      "value": 24.377078350978913,
+      "threshold": 30.0,
+      "column": "E_vdwl",
+      "mean": -17668.920994296,
+      "crit": 30.0,
+      "rule": "sma_sd > crit"
+    },
+    "ecoul": {
+      "status": "NOT_GATED",
+      "value": 7.7064498191909205,
+      "threshold": null,
+      "column": "E_coul",
+      "mean": 195277.25242279,
+      "crit": null,
+      "rule": "sma_sd > crit"
+    },
+    "elong": {
+      "status": "PASS",
+      "value": 1.4280946148089348,
+      "threshold": 116.09732749371003,
+      "column": "E_long",
+      "mean": -116097.32749371002,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "dens": {
+      "status": "PASS",
+      "value": 0.0006402107843131807,
+      "threshold": 0.0011044199298749998,
+      "column": "Density",
+      "mean": 1.104419929875,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "rg": {
+      "status": "UNMEASURED",
+      "reason": "no rg.profile, and RadonPy's stored Rg statistic was computed at width 2000 on the full log -- it cannot be re-windowed",
+      "crit": 0.01,
+      "rule": "sd_max > mean_mean*crit"
+    }
+  },
+  "verdict": "INCOMPLETE",
+  "failing": [],
+  "not_evaluated": [
+    "rg"
+  ],
+  "radonpy_check_eq_returned": true,
+  "radonpy_check_eq_passes_an_unevaluable_window": false,
+  "radonpy_check_eq_agrees": true,
+  "radonpy_check_eq_skipped_rg": true,
+  "radonpy_warnings": [
+    "RadonPy warning: Can not obtain the data of radius of gyration. Skip to check the Rg convergence."
+  ]
+}

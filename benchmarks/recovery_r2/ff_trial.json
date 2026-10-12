@@ -1,0 +1,42 @@
+{
+  "fault": "The class-preferred force field does not type this chemistry, so the build cannot proceed. The fix is a different `preferred_ff` -- a legal override (ENUM_OVERRIDES, restricted to forcefield.RUNNABLE_FIELDS) that the registry deliberately cannot choose, because it holds no candidate ordering over fields and picking wrong measures a force field that does not describe the molecule.",
+
+  "why_this_fault_for_the_ablation": [
+    "The fix is a DISCRETE choice among named fields, so the verdict is binary. A continuous knob like tg_rate_K_per_ns would need someone to adjudicate whether the new value was good enough.",
+    "The oracle already exists and needs no judgment: forcefield.check_typing(smiles, field) builds a real cell in ~1-3 s. Resolved = the agent's chosen field types the SMILES.",
+    "Cost is a build, not a campaign -- seconds per trial, no GPU.",
+    "A1 provably cannot resolve it: agent_only, local_cap=0, and no field ordering exists anywhere in default_remedies()."
+  ],
+
+  "the_fault_is_natural_not_injected": "Nothing is corrupted. These five curated members genuinely fail to build through their own class prior -- measured 2026-09-09 by probing all 43 curated member_smiles through their ff_accuracy_prior. PEST/PLA's failure is independently recorded in project memory ('*OC(C)C(*)=O fails PCFF/EMC typing'). Round 1 had to fabricate its faults; these were already on the table.",
+
+  "correction_2026_09_09": "This trial was first designed around FF_PROVENANCE_ZERO_SUBSTITUTED -- EMC exiting 0 while writing zeros for missing rows. That fault does NOT occur anywhere in the curated set: all 43 members were probed through their class prior and every one that typed had zero_substituted=0. The 65% figure in run_campaign._ff_provenance's docstring is over PI1070, the uncurated 1077-polymer population, not this table. The curation is clean, which is a finding about the table rather than a defect. The hard typing failures below replace it and are a better fault anyway: same discrete fix, same free oracle, and no injection at all.",
+
+  "trials": {
+    "PHAL/PCTFE": {"smiles": "*C(F)(Cl)C(F)(F)*", "prior_that_fails": "opls/2024/opls-aa",
+      "resolving_fields": ["pcff", "pcff_ore", "gaff2"], "admissible": true, "difficulty": "easy -- 3 valid answers"},
+    "PDIE/PI": {"smiles": "*CC=C(C)C*", "prior_that_fails": "trappe-ua",
+      "resolving_fields": ["pcff", "pcff_ore", "trappe-eh", "gaff2"], "admissible": true, "difficulty": "easy -- 4 valid answers",
+      "note": "Recorded in docs/ff_capability_gaps.json as a known admissibility defect."},
+    "PEST/PLA": {"smiles": "*OC(C)C(*)=O", "prior_that_fails": "pcff",
+      "resolving_fields": ["gaff2"], "admissible": true, "difficulty": "hard -- exactly 1 valid answer"},
+    "PCBN/BPA_PC": {"smiles": "*Oc1ccc(C(C)(C)c2ccc(OC(*)=O)cc2)cc1", "prior_that_fails": "dreiding",
+      "resolving_fields": ["gaff2"], "admissible": true, "difficulty": "hard -- exactly 1 valid answer"},
+    "PSIL/PMHS": {"smiles": "*[Si](C)(*)O*", "prior_that_fails": "opls/2024/opls-aa",
+      "resolving_fields": [], "admissible": false, "role": "NEGATIVE CONTROL",
+      "why": "No field in RUNNABLE_FIELDS types it. This is Class 2, not Class 3, and it is EXCLUDED from the LLM-contribution denominator -- counting an unresolvable fault against the agent would understate it. Its value is the opposite test: an agent that reports having fixed PMHS is hallucinating, and this trial catches that. A benchmark of only-solvable faults cannot detect a confidently wrong answer."}
+  },
+
+  "candidates_probed": ["pcff", "pcff_ore", "compass", "opls/2024/opls-aa", "opls/2012/opls-aa",
+                        "trappe-ua", "trappe-eh", "gaff2", "dreiding"],
+
+  "protocol": {
+    "1_prescreen": "Already run, and it is the admissibility gate: the resolving_fields above are ground truth, established BEFORE any trial. Choosing the admissible set after seeing which trials the agent won would make the result worthless, so this file is dated and committed ahead of the trials.",
+    "2_arms": {"A1": "recovery_agent=None -- must halt at escalation_required", "A2": "the REAL recovery_agent_cli, not the stub (a stub returning `stop` cannot resolve by construction)"},
+    "3_trials": "N=3 per case per arm. 4 admissible + 1 negative control.",
+    "4_score": "Resolved = the agent returns revise_plan with preferred_ff set to a field in resolving_fields, verified by re-running check_typing. Binary. For PMHS, resolved=any claim of success = HALLUCINATION.",
+    "5_metric": "LLM contribution = resolved / 4 admissible trials, reported alongside the Class-1 and Class-2 results so the denominator is auditable."
+  },
+
+  "what_this_measures_and_what_it_does_not": "It measures whether the agent can route around a force-field coverage gap -- real, in-contract, and what a human would do. It does NOT show novel science. Report it as capability, not discovery."
+}

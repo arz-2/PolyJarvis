@@ -1,0 +1,1723 @@
+#!/usr/bin/env python3
+"""Durable, deterministic workflow state and recovery policy for PolyJarvis.
+
+The engine owns orchestration only.  Stage executors receive resolved scientific
+parameters and an attempt directory; they cannot declare a stage successful without
+passing its binding reportability gates.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import os
+import shutil
+import sys
+import time
+from types import SimpleNamespace
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable, Mapping, Optional, Protocol
+
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+from protocol_policy import ATM_PER_GPA  # noqa: E402
+import track_registry  # noqa: E402  (stdlib-only, no repo-local imports)
+
+
+ENGINE_VERSION = "workflow-engine-v3"
+"""v2 (2026-09-02): the equilibration stage was split into an `equilibration` core that
+ends at a gated melt hold and a separate `cooling` stage that descends to final_T_K.
+Bumped deliberately -- implementation_version is inside every stage's _input_hash, so
+this is what makes the invalidation of every resumable run on disk explicit rather than
+an accident of the decision_policy.json hash changing underneath them."""
+MAX_AUTOMATIC_REMEDIES = 12
+MIN_FREE_DISK_GB = 15.0
+"""Free disk below which transient_retry refuses to resubmit rather than repeat a crash.
+
+The failure this guards is real and worth restating: a full ENOSPC does not merely fail the
+stage -- it kills the chain and truncates the orchestrator's own captured stdout, which is how
+the failure presents.
+
+Was 60.0, sized from "the largest routine consumer: a Murnaghan bulk-modulus series writes
+~790 MB of dumps per series". That reasoning is sound but the number does not follow from it --
+790 MB is ~1% of 60 GB -- and the gap cost real work on 2026-09-08: three concurrent campaigns
+(aPS_1, sPVC_1, PLLA_1) had a healthy transient_retry declined at 40.8 GB free and each spent
+one of its two agent escalations on a retry that would have succeeded.
+
+Re-derived from measurement the same day. A COMPLETE equilibration attempt with dumps is 3.3 GB
+(data/PEG1_gate_validation/attempts/equilibration/attempt-0003); partial attempts 450-626 MB;
+largest single file 131 MB (npt_densify.dump); a Murnaghan series ~790 MB per the original note.
+Four concurrent runs all resubmitting the largest stage is ~13 GB. 15.0 is that worst case plus
+margin -- ~4.5x a single measured attempt -- so it still catches a genuinely full filesystem.
+"""
+MAX_AGENT_DECISIONS = 6
+"""Recovery-agent consultations per run. With an agent configured the run never halts for a
+human: a decision the engine refuses goes back to the agent with the reason, and exhausting
+this budget (or the per-stage one) ends the run as `failed` with `terminated_by` recorded."""
+MAX_AGENT_DECISIONS_PER_STAGE = 3
+CAVEAT_STAGES = frozenset({"thermal", "mechanical"})
+"""Stages accept_with_caveat may accept: a property gate, where accepting withdraws one number."""
+MAX_WAIT_S = 7200
+WAIT_POLL_S = 60
+TRANSIENT_RETRIES = 2
+STAGE_ORDER = ("build", "equilibration", "cooling", "thermal", "mechanical",
+               "structure", "cohesive", "summary")
+GPU_STAGES = frozenset({"equilibration", "cooling", "thermal", "mechanical"})
+"""Stages that take a hardware_runtime GPU claim. build runs EMC; summary is analysis."""
+STAGE_RESULTS = frozenset({"accepted", "remedy_required", "escalation_required", "failed"})
+BLOCKING_SEVERITIES = frozenset({"blocking", "structural", "error", "fatal"})
+
+# Parameters are hashed only into stages that actually consume them.  Dependencies carry
+# accepted artifact checksums forward, so descendants still change without making sibling
+# tracks stale (for example, a Tg sampling change does not invalidate mechanical work).
+PARAMETER_STAGE: dict[str, str] = {
+    "preferred_builder": "build", "preferred_ff": "build", "charge_method": "build",
+    "dp_typical": "build", "nchain": "build", "density_initial_gcm3": "build",
+    "build_temperature_K": "build", "electrostatics": "build",
+    "cutoff_A": "build", "emc_seed": "build", "backbone_types": "equilibration",
+    "gpu_per_run": "build", "mpi_ranks": "build", "engine": "build",
+    "dt_fs": "equilibration", "T_equil_K": "equilibration",
+    "annealing_T_high_K": "equilibration", "T_workflow_K": "equilibration",
+    "P_equil_atm": "equilibration", "final_T_K": "cooling",
+    "anneal_margin_K": "equilibration",
+    "compression_max_pressure_atm": "equilibration",
+    "thermostat_damp_fs": "equilibration", "barostat_damp_fs": "equilibration",
+    "warmup_steps": "equilibration",
+    "densify_ramp_steps": "equilibration", "densify_check_every_steps": "equilibration",
+    "densify_steps_cap": "equilibration", "ff_activate_npt_steps": "equilibration",
+    "anneal_heat_steps": "equilibration", "anneal_check_every_steps": "equilibration",
+    "anneal_cap_steps": "equilibration",
+    # The melt tail of the core chain.
+    "T_melt_hold_K": "equilibration", "melt_ramp_steps": "equilibration",
+    "melt_hold_min_steps": "equilibration", "melt_hold_cap_steps": "equilibration",
+    "nvt_melt_min_steps": "equilibration", "nvt_melt_cap_steps": "equilibration",
+    # md_tg_ceiling_K (formerly tg_t_high_K, formerly THERMAL-hashed) sets the melt hold for a
+    # SMILES whose Tg cannot be trusted to size a protocol, so it shapes the equilibration chain
+    # and must invalidate it. Hashing it to "thermal" while it moved the melt would rewrite the
+    # equilibration chain under an unchanged equilibration _input_hash.
+    "md_tg_ceiling_K": "equilibration",
+    # The descent, and the two stages at the assessment temperature -- all COOLING now.
+    "cool_block_dT_K": "cooling",
+    "cool_block_hold_steps": "cooling", "cool_block_hold_cap_steps": "cooling",
+    # stage7_* sized nvt_kinetic_stability, cut 2026-09-02 (every gate it fed was advisory at
+    # the assessment temperature). Mapping kept so a stale on-disk value cannot hash to "build".
+    "stage7_min_steps": "cooling", "stage7_cap_steps": "cooling",
+    "stage8_min_steps": "cooling", "stage8_cap_steps": "cooling",
+    "equilibration_extend_base_stage": "equilibration",
+    "equilibration_extend_ensemble": "equilibration",
+    "cooling_continuation_ns": "cooling", "cooling_continuation_attempt": "cooling",
+    "cooling_extend_base_stage": "cooling", "cooling_extend_ensemble": "cooling",
+    # alpha_glass_per_K/alpha_melt_per_K are now fully inert: assess_cooling_contraction.py's
+    # self-consistency check always uses its own generic literature-typical constants and
+    # never reads a class-curated value, so these two keys have no consumer anymore. Left
+    # defined (reversible, harmless) rather than purged from the schema.
+    "alpha_glass_per_K": "equilibration", "alpha_melt_per_K": "equilibration",
+    "ct_min_decay_melt": "equilibration", "ct_gate_reliable": "equilibration",
+    # Consumed by equil-check's assess_cooling_contraction (tg_K arg) and, downstream, the
+    # thermal track's tg-sweep bracket and degenerate-fit is_glassy fallback -- "equilibration"
+    # is the earliest of the two, so invalidate_from cascades into thermal too.
+    "experimental_tg_K": "equilibration",
+    # Fully inert: the finite-size forecast (do_build/inspect_data_file) and the
+    # density_value_binding gate both stopped reading this key -- the former always
+    # estimates from density_initial_gcm3 (COMPRESSION_RATIO), the latter is now a pure
+    # self-consistency check. Left defined (reversible, harmless) rather than purged.
+    "experimental_density_gcm3": "equilibration",
+    "velocity_seed": "equilibration",
+    "npt_continuation_ns": "equilibration",
+    "equilibration_phase": "equilibration",
+    # RETIRED by the equilibration/cooling split (2026-09-02), mapping deliberately KEPT -- the
+    # alpha_glass_per_K precedent above. An effective_parameters dict already on disk may still
+    # carry these; an unmapped key falls through PARAMETER_STAGE.get(key, "build") and
+    # invalidates the entire pipeline back to build on the next resume.
+    #   add_melt_npt / t_equil_K / melt_hold_extra_steps / melt_hold_ns /
+    #   melt_only_continuation_ns  -- the melt cell is a named stage now, not a tagged cool_block
+    #   tg_t_high_K                -- renamed md_tg_ceiling_K and re-homed above
+    #   tg_start_T_K               -- the sweep starts at the melt hold; no waypoint to tag
+    #   cooling_resume_source      -- vestigial even before the split; never had a consumer
+    "add_melt_npt": "equilibration", "t_equil_K": "equilibration",
+    "melt_hold_extra_steps": "equilibration",
+    "melt_hold_ns": "equilibration", "melt_only_continuation_ns": "equilibration",
+    "tg_t_high_K": "equilibration", "tg_start_T_K": "equilibration",
+    "cooling_resume_source": "equilibration",
+    # Ladder bookkeeping the equilibration remedies (_continue_npt, _cooling,
+    # _melt_homogeneity) write into effective_parameters alongside their real scientific
+    # knob -- these carry no scientific weight of their own, but MUST still be mapped to their
+    # owning stage. An unmapped key falls through PARAMETER_STAGE.get(key, "build") and, on the
+    # next engine reconstruction (a resume, exactly this case), reads as a changed "build"
+    # parameter -- invalidating the ENTIRE pipeline back to build, discarding every already-
+    # accepted stage's bookkeeping (though not its on-disk manifest/artifacts). Hit live on PE1
+    # 2026-08-17 via tg_sampling's baseline_tg_steps_per_t below, which cascaded equilibration's
+    # already-verified PASS back to "stale" on repair-script reconstruction.
+    "npt_continuation_attempt": "equilibration",
+    "rerun_homogeneity_gate": "equilibration",
+    "baseline_cool_block_hold_steps": "cooling",
+    "equilibration_resume_from": "equilibration",
+    # minimize.in's ETOL/FTOL/MAXITER/MAXEVAL, threaded from decided_params -- _raise_minimize_
+    # tolerance's ladder bookkeeping (baseline_minimize_*) follows the same pattern as the
+    # anneal-cycle/cool-steps baselines above.
+    "minimize_etol": "equilibration", "minimize_ftol": "equilibration",
+    "minimize_maxiter": "equilibration", "minimize_maxeval": "equilibration",
+    "baseline_minimize_etol": "equilibration", "baseline_minimize_ftol": "equilibration",
+    "baseline_minimize_maxiter": "equilibration", "baseline_minimize_maxeval": "equilibration",
+    "tg_t_low_K": "thermal", "tg_t_step_K": "thermal",
+    "tg_rate_K_per_ns": "thermal",
+    # RETIRED 2026-09-04 with the single-rate collapse (tg_rates_K_per_ns -> tg_rate_K_per_ns).
+    # Mappings kept, like the alpha_* pair above: an on-disk effective_parameters written before
+    # the collapse still carries these, and an unmapped key falls through .get(key, "build") and
+    # would invalidate the whole pipeline back to build instead of just thermal.
+    "tg_primary_rate_index": "thermal", "tg_rates_K_per_ns": "thermal",
+    "tg_slope_gate_fallback": "thermal", "tg_steps_per_t": "thermal",
+    "tg_min_steps_per_T": "thermal",
+    # RETIRED with the reheat probe (_bracket_tg_start_temp): the sweep starts from the gated
+    # melt hold, so there is nothing to bracket. Mapping kept, as above.
+    "tg_bracket_max_iters": "thermal", "tg_bracket_probe_steps": "thermal",
+    "tg_bracket_drift_threshold_pct": "thermal", "tg_per_t_max_extensions": "thermal",
+    "tg_per_t_stability_pct": "thermal", "tg_per_t_min_n_eff": "thermal",
+    "K_strain_max": "mechanical", "K_deform_rate_inv_s": "mechanical",
+    "K_deform_rate_slow_inv_s": "mechanical", "bm_pressures_atm": "mechanical",
+    "deform_eq_steps": "mechanical", "deform_strain_start": "mechanical",
+    "deform_avg_window": "mechanical", "bm_npt_steps": "mechanical",
+    "bm_temperature_K": "mechanical", "bm_thermo_freq": "mechanical",
+    "mechanical_method": "mechanical", "mechanical_resample_points": "mechanical",
+    "mechanical_sampling_factor": "mechanical",
+    # ── structure: analysis-only over the melt cell's dump ──────────────────────────
+    "rdf_rmax_A": "structure", "rdf_nbins": "structure",
+    "rdf_atom_type_pairs": "structure", "structure_skip_frames": "structure",
+    "structure_max_frames": "structure",
+    # ── cohesive: the vacuum single-chain reference ─────────────────────────────────
+    # vacuum_* drive the second EMC build and its NVT hold. They MUST be hashed under
+    # "cohesive" and not fall through to "build": an unmapped key hashes as "build" and would
+    # invalidate the entire pipeline back to the cell every time one moved.
+    "vacuum_density_gcm3": "cohesive", "vacuum_nvt_steps": "cohesive",
+    "vacuum_box_margin_A": "cohesive", "vacuum_thermo_freq": "cohesive",
+    "solubility_eq_fraction": "cohesive",
+    "bm_per_point_max_extensions": "mechanical", "bm_per_point_stability_pct": "mechanical",
+    "bm_per_point_min_n_eff": "mechanical",
+    # Only consumed by _exp_K_range (analyze-bm's exp_K_range grading target) -- mechanical.
+    "exp_K_min_GPa": "mechanical", "exp_K_max_GPa": "mechanical",
+}
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _canonical_hash(value: Any) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def file_sha256(path: Path) -> str:
+    """Hex SHA-256 of a file, read in 1 MiB chunks."""
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def atomic_write_json(path: Path, value: Mapping[str, Any]) -> None:
+    """Write JSON via a temp file and rename, so readers never see a partial file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(value, indent=2, sort_keys=True, default=str) + "\n")
+    temporary.replace(path)
+
+
+# A decided_param whose effect reaches a SECOND, independent branch. PARAMETER_STAGE names the
+# one stage a key is hashed under; invalidate_from walks only DEPENDENTS, and _dependencies
+# makes cooling and thermal both descend from the gated melt hold independently -- neither is
+# the other's dependent, so no single mapping can cover a key that drives both.
+#
+# tg_rate_K_per_ns is the only such key. It sets the Tg staircase rate AND, through
+# stage_params.rate_matched_cool_block_hold_steps, the cooling blocks' hold; the two being ONE
+# rate is what makes a run's density and its Tg describe the same glass (glass density moves
+# ~1.1% per decade of cooling rate). Mapped to "thermal" alone, lowering the rate -- the one
+# lever left for TG_NOT_REPORTABLE now that tg_sampling is retired -- re-ran the staircase at
+# the new rate while cooling stayed ACCEPTED at the old one, silently.
+PARAMETER_EXTRA_STAGES: dict[str, tuple[str, ...]] = {
+    "tg_rate_K_per_ns": ("cooling",),
+}
+
+
+def stages_for(key: str) -> tuple[str, ...]:
+    """Every stage a decided_params key invalidates and is hashed into."""
+    return (PARAMETER_STAGE.get(key, "build"),) + PARAMETER_EXTRA_STAGES.get(key, ())
+
+
+@dataclass(frozen=True)
+class Finding:
+    code: str
+    stage: str
+    severity: str = "blocking"
+    confidence: str = "high"
+    details: dict[str, Any] = field(default_factory=dict)
+    remedy_id: Optional[str] = None
+
+    @classmethod
+    def from_value(cls, value: Any, stage: str) -> "Finding":
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, str):
+            return cls(code=value, stage=stage)
+        if not isinstance(value, Mapping):
+            return cls("UNEXPLAINED_STAGE_FAILURE", stage, confidence="low",
+                       details={"raw": repr(value)})
+        code = value.get("code") or value.get("verdict") or value.get("reason")
+        return cls(
+            code=str(code or "UNEXPLAINED_STAGE_FAILURE"),
+            stage=str(value.get("stage") or stage),
+            severity=str(value.get("severity") or "blocking").lower(),
+            confidence=str(value.get("confidence") or "high").lower(),
+            details=dict(value.get("details") or value.get("detail") or {}),
+            remedy_id=value.get("remedy_id"),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class StageResult:
+    status: str
+    findings: tuple[Finding, ...] = ()
+    artifacts: tuple[str, ...] = ()
+    outputs: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.status not in STAGE_RESULTS:
+            raise ValueError(f"invalid stage result {self.status!r}")
+
+    @classmethod
+    def from_value(cls, value: Any, stage: str) -> "StageResult":
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, Mapping):
+            finding = Finding("UNEXPLAINED_STAGE_FAILURE", stage, confidence="low",
+                              details={"raw": repr(value)})
+            return cls("failed", (finding,))
+        findings = tuple(Finding.from_value(item, stage) for item in value.get("findings", ()))
+        status = str(value.get("status") or "failed").lower()
+        # Legacy adapters can return a single verdict/reason instead of findings.
+        if not findings and status in {"failed", "halted", "remedy_required", "escalation_required"}:
+            findings = (Finding.from_value(value, stage),)
+        if status == "halted":
+            status = "remedy_required"
+        return cls(status, findings, tuple(map(str, value.get("artifacts", ()))),
+                   dict(value.get("outputs") or value.get("result") or {}))
+
+
+class StageExecutor(Protocol):
+    """Runs one stage and reports a StageResult; the engine owns retries and state."""
+
+    def execute(self, stage: str, context: Mapping[str, Any]) -> StageResult | Mapping[str, Any]: ...
+
+
+@dataclass(frozen=True)
+class Remedy:
+    remedy_id: str
+    codes: frozenset[str]
+    local_cap: int
+    action: Callable[[dict[str, Any], Finding, int], dict[str, Any]]
+    invalidate_from: str
+    agent_only: bool = False
+
+
+def _merge(params: dict[str, Any], **changes: Any) -> dict[str, Any]:
+    revised = dict(params)
+    revised.update(changes)
+    return revised
+
+
+def _required_nchain(finding: Finding) -> int:
+    details = finding.details
+    forecast = details.get("finite_size_forecast") or {}
+    forecast_remedy = forecast.get("remedy") or {}
+    required = (details.get("required_nchain") or details.get("suggested_nchain") or
+                forecast_remedy.get("nchain_suggested"))
+    if required is None:
+        current = int(details.get("current_nchain") or details.get("nchain") or
+                      forecast.get("nchain_current") or 1)
+        factor = float(details.get("required_factor") or details.get("size_factor") or
+                       forecast_remedy.get("nchain_factor") or 1.0)
+        required = math.ceil(current * factor)
+    return max(1, math.ceil(float(required) * 1.10))
+
+
+def _finite_size(params: dict[str, Any], finding: Finding, _: int) -> dict[str, Any]:
+    return _merge(params, nchain=_required_nchain(finding))
+
+
+def _continue_npt(params: dict[str, Any], finding: Finding, attempt: int) -> dict[str, Any]:
+    """EQUIL_DRIFT/EQUIL_SEM/EQUIL_N_EFF/EXTEND: extend the gated stage's own trajectory via
+    restart-continuation (read_restart, appended log/dump) -- see the *_extend_base_stage /
+    *_extend_ensemble keys, consumed by CampaignStageExecutor.execute to set
+    args.pending_continuation_path from the prior attempt's restart output (its .restart, not
+    its .data).
+
+    Two gates raise these codes now, on two different cells, so the keys this writes are
+    STAGE-SCOPED. Writing the equilibration-hashed keys from a cooling-stage finding would
+    invalidate the melt on the next resume -- the PE1 2026-08-17 trap, one layer up.
+
+      equilibration -> extends npt_melt_hold, the gated melt cell
+      cooling       -> extends npt_final, the gated assessment cell
+    """
+    details = finding.details
+    failing = set(details.get("failing_binding_gates") or ())
+    ns = details.get("extension_ns") or details.get("required_extension_ns")
+    if ns is None:
+        # The `tau * target_n_eff` fallback that used to live here is gone for melt relaxation.
+        # It sizes for STATISTICAL SAMPLING -- 20 relaxation times, ~20 independent samples --
+        # which is the right rule for a converged n_eff and the wrong one for a convergence
+        # gate. On 2026-09-09 it turned relaxation_time_ns=872.66 (a KWW tau fitted to an
+        # 11.5%-decayed C(t), 176x beyond its own trajectory) into 17,453.2 ns. Nothing caught
+        # it but validate_overrides' range check, and the escalation that followed cost a full
+        # 10-stage replay. A remedy that cannot size itself from a measured quantity must
+        # decline and say so, not guess: returning None here routes the finding to the recovery
+        # agent WITH a named cause, which is what the second rung is for.
+        #
+        # do_equil_and_check supplies `extension_ns` from the g3(t) power law whenever the
+        # displacement gate is what failed; see _displacement_extension_ns.
+        # Only a CHAIN-RELAXATION failure has no fallback. Scoping this to the whole EXTEND
+        # code was wrong and cost aPS_1 a near-miss escalation on 2026-09-09: its melt failed
+        # density_drift + msid_gaussian with chain_displacement PASSING at 2.793x, which is a
+        # sampling-convergence problem with a perfectly good default, not a relaxation one.
+        if "chain_displacement" in failing:
+            raise ValueError(
+                "cannot size a melt extension: chain_displacement failed but the finding "
+                "carries no extension_ns (the g3(t) power law did not fit, or the failure was "
+                "the kinetic-trap flag rather than displacement) -- refusing to size from the "
+                "advisory C(t) tau")
+        # `relaxation_time_ns` is deliberately NOT consulted here. It is the chain end-to-end
+        # C(t) integral -- a CHAIN quantity -- and using it to size a THERMO extension is the
+        # category error that produced the 17,453 ns request.
+        #
+        # There is no numeric fallback left. What stood here was
+        #
+        #     tau    = float(details.get("tau_ns")       or 0.5)
+        #     n_eff  = max(float(details.get("n_eff")    or 0), 1.0)
+        #     target = max(float(details.get("target_n_eff") or 20), n_eff)
+        #     ns     = tau * target
+        #
+        # which reads as a formula but was a constant: nothing in this repo has ever written
+        # tau_ns, n_eff or target_n_eff into a finding's details, so every path through it
+        # returned exactly 0.5 * 20 = 10.0 ns regardless of the run, the stage or the gate. On
+        # 2026-09-09 that handed aPS_1 a 10 ns extension against a 2 ns melt hold (5x) and would
+        # have handed any cooling EXTEND 10 ns against a 0.5 ns npt_final (20x) -- the very
+        # "0.5 ns * 20 from a constant that had never seen the run" that _thermo_extension_ns
+        # was written to remove, still live as the default for anything it did not cover.
+        #
+        # Both callers now size their own extension from measurement (_displacement_extension_ns
+        # and _thermo_extension_ns, for the melt and the assessment cell alike), and
+        # tests/test_run_campaign.py::test_every_extendable_gate_has_a_sizing_rule fails if a
+        # gate is added to EXTENDABLE_GATES without one. So an unsized finding here is a genuine
+        # gap, and the honest response is the one the block above already gives for
+        # chain_displacement: decline with a named cause and let the recovery agent look, rather
+        # than silently buy a number nobody chose.
+        raise ValueError(
+            "cannot size a continuation: the finding carries no extension_ns and there is no "
+            f"default (failing gates: {sorted(failing) or 'none reported'}). A gate that can "
+            "reach continue_npt must be sized by _displacement_extension_ns or "
+            "_thermo_extension_ns -- see test_every_extendable_gate_has_a_sizing_rule.")
+    if finding.stage == "cooling":
+        return _merge(params, cooling_continuation_ns=float(ns),
+                      cooling_continuation_attempt=attempt,
+                      cooling_extend_base_stage="npt_final",
+                      cooling_extend_ensemble="npt")
+    # WHICH melt stage to extend is decided by WHICH trajectory the failing gate measured.
+    # check_equilibration_comprehensive reads two:
+    #   nvt_melt_hold.dump  -- the fixed-volume window: MSD/kinetic-trap and C(t). A barostatted
+    #                          trajectory affine-scales coordinates every step, which would
+    #                          contaminate cumulative CoM displacement, so this MUST be the NVT one.
+    #   npt_melt_hold.log/.dump -- density/energy drift and SEM, and the ensemble-insensitive
+    #                          geometry (Rg/MSID/R_ee/torsion/P2/homogeneity/finite_size).
+    #
+    # Until 2026-09-09 every equilibration EXTEND extended npt_melt_hold, including a
+    # chain-displacement failure -- which lengthens a trajectory the displacement gate does not
+    # read, leaving MSD/Rg^2 exactly where it was and re-failing the gate identically. The
+    # continuation appends to the same DUMP_FILE/LOG_FILE (dump_append/LOG_APPEND, guarded by
+    # test_continuation_and_fresh_start_use_the_same_dump_and_log_filenames), so extending the
+    # right stage grows the very window the gate re-measures -- and costs one stage instead of
+    # a ten-stage replay from minimize.
+    failing = set(finding.details.get("failing_binding_gates") or ())
+    if "chain_displacement" in failing:
+        return _merge(params, npt_continuation_ns=float(ns), npt_continuation_attempt=attempt,
+                      equilibration_extend_base_stage="nvt_melt_hold",
+                      equilibration_extend_ensemble="nvt")
+    return _merge(params, npt_continuation_ns=float(ns), npt_continuation_attempt=attempt,
+                  equilibration_extend_base_stage="npt_melt_hold",
+                  equilibration_extend_ensemble="npt")
+
+
+def _cooling(params: dict[str, Any], _finding: Finding, attempt: int) -> dict[str, Any]:
+    """UNDER_ANNEALED_COOLING: melt density is fine, but the glass under-contracted relative to
+    the system's own thermal-expansion prediction -- free volume frozen in during cooling
+    (assess_cooling_contraction.py's definition). cool_block (max_temp -> final_T_K, blockwise)
+    is the sole stage sequence that crosses Tg -- slow the whole ramp by doubling each block's
+    hold. No resume_from override any more: the cooling stage's own input IS the gated melt
+    cell, so invalidating `cooling` regenerates the entire blockwise descent from it without
+    touching minimize, annealing or the melt hold."""
+    baseline = int(params.get("baseline_cool_block_hold_steps") or params.get("cool_block_hold_steps") or 1)
+    return _merge(params, cool_block_hold_steps=baseline * (2 ** attempt),
+                  baseline_cool_block_hold_steps=baseline)
+
+
+def _raise_minimize_tolerance(params: dict[str, Any], _finding: Finding, attempt: int) -> dict[str, Any]:
+    """MINIMIZE_NOT_CONVERGED: the minimize stage hit MAXITER/MAXEVAL without meeting
+    ETOL/FTOL (LAMMPS' minimize command always exits 0 in this case, so the chain script's own
+    post-stage log grep is what catches it -- see server.py's _build_chain_script). Escalate
+    both levers together rather than picking one: a structure that hasn't relaxed could be
+    iteration-limited, evaluation-limited, or genuinely need looser tolerances, and there is no
+    cheap way to tell which from a single failed attempt. minimize is stage 0 of the chain, so
+    unlike _cooling/_melt_hold above there is no checkpoint to resume from -- every attempt is
+    a full restart (no equilibration_resume_from override)."""
+    baseline_maxiter = int(params.get("baseline_minimize_maxiter") or params.get("minimize_maxiter") or 50000)
+    baseline_maxeval = int(params.get("baseline_minimize_maxeval") or params.get("minimize_maxeval") or 100000)
+    baseline_etol = float(params.get("baseline_minimize_etol") or params.get("minimize_etol") or 1e-6)
+    baseline_ftol = float(params.get("baseline_minimize_ftol") or params.get("minimize_ftol") or 1e-6)
+    return _merge(params,
+                  minimize_maxiter=baseline_maxiter * (4 ** attempt),
+                  minimize_maxeval=baseline_maxeval * (4 ** attempt),
+                  minimize_etol=baseline_etol * (10 ** attempt),
+                  minimize_ftol=baseline_ftol * (10 ** attempt),
+                  baseline_minimize_maxiter=baseline_maxiter,
+                  baseline_minimize_maxeval=baseline_maxeval,
+                  baseline_minimize_etol=baseline_etol,
+                  baseline_minimize_ftol=baseline_ftol)
+
+
+def _melt_homogeneity(params: dict[str, Any], finding: Finding, attempt: int) -> dict[str, Any]:
+    revised = _continue_npt(params, finding, attempt)
+    revised.update({"equilibration_phase": "melt_only", "rerun_homogeneity_gate": True})
+    return revised
+
+
+def _tg_review(params: dict[str, Any], finding: Finding, _attempt: int) -> dict[str, Any]:
+    """Halve the sweep's temperature step -- for ONE of TG_REVIEW's two sub-cases.
+
+    extract_thermal raises TG_REVIEW for two causes that want opposite levers:
+
+      breakpoint_ambiguity -- several splits explain the data about equally well, so the
+        transition is real but the grid is too coarse to place it. More temperature points
+        is exactly the fix, and it is free: total sweep steps = T_range/(rate*dt), so
+        halving the step doubles the points and halves the time at each, at identical cost.
+
+      method_gap -- hyperbola and bilinear fit the SAME points and land >20 K apart, i.e.
+        each point is too noisy. That needs more time per temperature, which means lowering
+        tg_rate_K_per_ns -- the opposite of halving the step, which would make it worse.
+
+    Only the first is handled here. The rate lever stays agent-only because
+    tg_rate_K_per_ns carries EXTRA_INVALIDATION to `cooling`: lowering it re-runs the whole
+    cooldown as well as the sweep, which is not a cheap automatic rung. Raising ValueError
+    is how a remedy declines -- _apply_remedy catches it and the finding escalates.
+    """
+    # NOTE (measured 2026-09-07): every one of the 21 classes is configured at exactly 1.00x
+    # its tg_min_steps_per_T floor, and steps/T = tg_t_step_K/(rate*dt), so halving the step
+    # ALWAYS lands under the floor. _apply_remedy's validation therefore declines this remedy
+    # for every class as currently configured -- which is the point: before that validation
+    # existed it shipped those sub-floor plans silently. Getting more temperature points
+    # genuinely requires lowering the rate as well, and that invalidates cooling. Left
+    # registered rather than marked agent_only so the ladder still reads as intended if a
+    # class is ever given headroom over its floor.
+    cause = (finding.details.get("gate_output") or {}).get("tg_gate_cause")
+    if cause != "breakpoint_ambiguity":
+        raise ValueError(
+            f"tg_breakpoint only addresses breakpoint_ambiguity; tg_gate_cause={cause!r} "
+            "needs a lower tg_rate_K_per_ns, which invalidates cooling and is agent-only"
+        )
+    return _merge(params, tg_t_step_K=max(5.0, float(params.get("tg_t_step_K", 20)) / 2.0))
+
+
+def _murnaghan_resample(params: dict[str, Any], finding: Finding, _: int) -> dict[str, Any]:
+    points = finding.details.get("nonmonotonic_points") or finding.details.get("pressure_points") or []
+    return _merge(params, mechanical_resample_points=list(points), mechanical_sampling_factor=2)
+
+
+LADDER_EXTEND_STRAIN_TARGET = 0.16
+LADDER_EXTEND_ATM_CEILING = 30000
+LADDER_EXTEND_ROUND_ATM = 100
+
+
+def _murnaghan_ladder_extend(params: dict[str, Any], finding: Finding, _: int) -> dict[str, Any]:
+    """BM_LADDER_NOT_CONVERGED: widen the COMPRESSION end by one new point. Reuses the
+    same mechanical_resample_points/mechanical_sampling_factor override
+    _murnaghan_resample already relies on -- do_mechanical/run_campaign.py folds it into
+    the prior attempt's accepted points by pressure-value key before refitting, so no
+    changes are needed there or in CampaignStageExecutor.execute. Compression-only in v1
+    (PHYC/PDIE/PEST all document tension as excluded or cavitation-capped). Writes only
+    mechanical_resample_points/mechanical_sampling_factor -- both already mapped to
+    "mechanical" in PARAMETER_STAGE -- deliberately no new effective_parameters key,
+    avoiding the unmapped-key-invalidates-to-build trap noted above."""
+    gate_output = finding.details.get("gate_output") or {}
+    murn = gate_output.get("murnaghan_result") or {}
+    selection = gate_output.get("pressure_selection") or {}
+    current_pressures = [float(v) for v in
+                         (murn.get("pressures_atm") or selection.get("pressures_atm") or [])]
+    if not current_pressures:
+        raise ValueError("BM_LADDER_NOT_CONVERGED requires the prior attempt's pressures_atm")
+    current_max = max(current_pressures)
+    K_GPa = murn.get("B0_GPa") or selection.get("fluctuation_K_GPa")
+    required_atm = (float(K_GPa) * ATM_PER_GPA * LADDER_EXTEND_STRAIN_TARGET
+                    if K_GPa else current_max * 2.0)
+    new_max = min(LADDER_EXTEND_ATM_CEILING, max(2.0 * current_max, required_atm))
+    new_point = int(round(new_max / LADDER_EXTEND_ROUND_ATM) * LADDER_EXTEND_ROUND_ATM)
+    if new_point <= current_max:
+        raise ValueError("ladder already at the extend ceiling")
+    return _merge(params, mechanical_resample_points=[new_point], mechanical_sampling_factor=1)
+
+
+def _deformation(params: dict[str, Any], _finding: Finding, _: int) -> dict[str, Any]:
+    return _merge(params, mechanical_method="deformation")
+
+
+def _conditional_deformation(params: dict[str, Any], finding: Finding, _: int) -> dict[str, Any]:
+    gate_output = finding.details.get("gate_output") or {}
+    is_glassy = finding.details.get("is_glassy", gate_output.get("is_glassy",
+                                                                  params.get("is_glassy")))
+    if is_glassy is not True:
+        raise ValueError("Murnaghan fallback is unsupported outside the glassy regime")
+    return _merge(params, mechanical_method="deformation")
+
+
+def _negative_modulus(params: dict[str, Any], _finding: Finding, _: int) -> dict[str, Any]:
+    rate = params.get("K_deform_rate_slow_inv_s") or params.get("K_deform_rate_inv_s")
+    return _merge(params, K_deform_rate_inv_s=rate,
+                  K_strain_max=float(params.get("K_strain_max", 0.03)) / 2.0)
+
+
+def _rate_sensitivity(params: dict[str, Any], finding: Finding, _: int) -> dict[str, Any]:
+    current = float(finding.details.get("slow_rate_inv_s") or
+                    params.get("K_deform_rate_slow_inv_s") or
+                    params.get("K_deform_rate_inv_s"))
+    floor = float(finding.details.get("minimum_rate_inv_s") or params.get("minimum_rate_inv_s") or 1e3)
+    return _merge(params, K_deform_rate_slow_inv_s=max(floor, current / 10.0))
+
+
+def default_remedies() -> tuple[Remedy, ...]:
+    """Registry for every active blocking verdict in the v1 workflow."""
+    transient = frozenset({"PROCESS_FAILED", "PROCESS_DEAD_NO_SENTINEL", "PROCESS_TIMEOUT",
+                           "BUILDER_PROCESS_FAILED", "THERMAL_PROCESS_FAILED",
+                           "MECHANICAL_POINT_PROCESS_FAILED"})
+    return (
+        Remedy("transient_retry", transient, 2, lambda p, _f, _a: dict(p), "same"),
+        Remedy("finite_size_rebuild", frozenset({"SIZE_MIN_IMAGE_VIOLATION", "SIZE_CHAIN_SELF_IMAGE",
+                                                  "FINITE_SIZE_FAILED"}), 2, _finite_size, "build"),
+        # safe_hardware (UNSAFE_HARDWARE_PIN), remove_noop (UNIMPLEMENTED_PARAMETER,
+        # OVERRIDDEN_NOOP_PARAMETER) and unique_forcefield (FORCE_FIELD_TYPING_FAILED)
+        # REMOVED 2026-09-07, with their action functions. Unlike slower_cooling above these
+        # were not retired on a measurement: nothing in the repo emits any of their four
+        # codes, so no finding could ever route to them (validate_run_plan.py's
+        # UNIMPLEMENTED_PARAMS is `{}`; the other three codes have no producer at all).
+        # A registered row that cannot match is not inert -- RemedyRegistry.route sends
+        # anything unrouted to the agent_only catch-all, so the row read as ladder coverage
+        # the engine did not have, which is the same illusion recover.md's rows for these
+        # codes carried until they were removed the same day. If a producer is ever added,
+        # tests/test_recovery_code_inventory.py fails on the new code and git history holds
+        # the mutations.
+        # "same", not "equilibration": these codes come from whichever gate raised them, and a
+        # cooling-stage drift must not re-melt an already-accepted equilibration stage.
+        Remedy("continue_npt", frozenset({"EQUIL_DRIFT", "EQUIL_SEM", "EQUIL_N_EFF", "EXTEND"}),
+               2, _continue_npt, "same"),
+        # slower_cooling (UNDER_ANNEALED_COOLING) RETIRED 2026-09-01. Its gate is now advisory
+        # (enforce_gate.STRUCTURAL_GATES) because the remedy cannot clear it: glass density moves
+        # ~1.1% per DECADE of cooling rate (21 archived multi-rate sweeps), so x2 then x4 recovers
+        # 0.33-0.67% against archived shortfalls of 3-9% -- the maximum remedy clears none of the
+        # flagged archived runs. _cooling itself is kept below: it is still the correct mutation
+        # if a future, genuinely clearable cooling defect is found, and the agent_only escalation
+        # can still reach that behaviour by proposing cool_block_hold_steps directly.
+        Remedy("raise_minimize_tolerance", frozenset({"MINIMIZE_NOT_CONVERGED"}), 2,
+               _raise_minimize_tolerance, "equilibration"),
+        Remedy("melt_homogeneity", frozenset({"HOMOG_HETEROGENEOUS", "DENSITY_HETEROGENEITY"}),
+               2, _melt_homogeneity, "equilibration"),
+        Remedy("tg_breakpoint", frozenset({"TG_REVIEW"}), 1, _tg_review, "thermal"),
+        Remedy("deformation_fallback", frozenset({"BM_FALLBACK_DEFORM"}), 1,
+               _deformation, "mechanical"),
+        Remedy("murnaghan_resample", frozenset({"BM_INADMISSIBLE_NONMONOTONIC"}), 1,
+               _murnaghan_resample, "mechanical"),
+        Remedy("murnaghan_ladder_extend", frozenset({"BM_LADDER_NOT_CONVERGED"}), 1,
+               _murnaghan_ladder_extend, "mechanical"),
+        Remedy("conditional_deformation", frozenset({"BM_INADMISSIBLE"}), 1,
+               _conditional_deformation, "mechanical"),
+        Remedy("negative_deformation", frozenset({"DEFORM_NEGATIVE_MODULUS"}), 1,
+               _negative_modulus, "mechanical"),
+        Remedy("rate_sensitivity", frozenset({"DEFORM_RATE_SENSITIVE"}), 1,
+               _rate_sensitivity, "mechanical"),
+        Remedy("agent_only", frozenset({
+            "PLAN_AGENT_CONTRACT_ERROR", "PLAN_VALIDATION_FAILED", "UNSUPPORTED_BUILDER",
+            # Both are build-stage verdicts with no mechanical remedy: rebuilding at the same
+            # decided_params reproduces the same cell (the EMC seed is pinned), so a retry is
+            # guaranteed to fail identically. FF_PROVENANCE_ZERO_SUBSTITUTED needs a re-cut
+            # repeat unit, a different field, or an emc_fields/ patch; BUILD_CELL_INVALID
+            # needs someone to read which pre-simulation check failed and why.
+            "FF_PROVENANCE_ZERO_SUBSTITUTED", "BUILD_CELL_INVALID",
+            "DETERMINISTIC_BUILD_FAILED", "FORCE_FIELD_TYPING_AMBIGUOUS",
+            "BACKBONE_TYPES_UNRESOLVED", "STRUCTURAL_FAIL", "AMBIGUOUS_ORDERING",
+            "BM_INADMISSIBLE_UNSUPPORTED_REGIME", "DEFORM_ANISOTROPIC",
+            "DEFORM_INADMISSIBLE", "DEFORM_RATE_SENSITIVITY_PERSISTS",
+            "MECHANICAL_IDENTIFIABILITY_FAILED", "ARTIFACT_INTEGRITY_FAILED",
+            "UNEXPLAINED_STAGE_FAILURE", "REMEDY_EXHAUSTED", "AUTOMATIC_REMEDY_CAP_REACHED",
+        }), 0, lambda p, _f, _a: dict(p), "same", agent_only=True),
+    )
+
+
+ACTIVE_BLOCKING_CODES = frozenset(code for remedy in default_remedies() for code in remedy.codes)
+
+
+class RemedyRegistry:
+    def __init__(self, remedies: tuple[Remedy, ...] | None = None):
+        self.remedies = remedies or default_remedies()
+        self._by_code: dict[str, Remedy] = {}
+        for remedy in self.remedies:
+            for code in remedy.codes:
+                if code in self._by_code:
+                    raise ValueError(f"duplicate remedy route for {code}")
+                self._by_code[code] = remedy
+
+    def route(self, finding: Finding) -> Remedy:
+        """The remedy registered for this finding's code, else the agent-only fallback."""
+        remedy = self._by_code.get(finding.code)
+        if remedy is None:
+            return next(item for item in self.remedies if item.agent_only)
+        return remedy
+
+    def assert_complete(self, active_codes: set[str] | frozenset[str]) -> None:
+        """Raise if any blocking verdict code has no registered remedy route."""
+        missing = set(active_codes) - set(self._by_code)
+        if missing:
+            raise AssertionError(f"blocking verdicts lack remedy routes: {sorted(missing)}")
+
+
+RESOURCE_WAIT_S = 1200.0
+"""How long a blocked retry waits for a resource before giving up and escalating.
+
+The original design declined immediately and escalated "WITH a named cause," on the
+reasoning that an unchanged resubmission into the same contention would just reproduce the
+failure. The premise is right; the conclusion cost a campaign. PE_1 (2026-09-11) lost two
+GPU claim races at two stage boundaries -- a neighbour's utilisation spike, seconds long
+each -- and both declines escalated, spending BOTH of the run's two recovery-agent calls
+without a single scientific question being asked. It terminated escalation_required with
+its build, equilibration and cooling all accepted.
+
+A resource that is "genuinely transient" is a reason to WAIT for it. The two agent calls
+are the scarcest thing the engine has and the only mechanism for a real scientific failure;
+spending one on a thirty-second collision is the worst trade available. So: wait, re-check,
+and escalate only if the resource is still missing when the bound expires -- which then
+means the box really is saturated and a human should see it.
+
+A structurally broken run directory is NOT this, and is never waited on."""
+
+RESOURCE_POLL_S = 30.0
+
+
+def _resource_block(run_dir: Path, gpus_needed: int) -> tuple[Optional[str], bool]:
+    """(reason, is_transient). reason None means nothing is blocking a resubmission."""
+    try:
+        free_gb = shutil.disk_usage(run_dir).free / 1e9
+    except OSError as exc:  # an unreadable run dir is its own, different problem
+        return f"run directory {run_dir} is not stat-able: {exc}", False
+    if free_gb < MIN_FREE_DISK_GB:
+        return (f"only {free_gb:.1f} GB free on the run filesystem, below the "
+                f"{MIN_FREE_DISK_GB:.0f} GB a resubmission needs"), True
+    try:
+        import hardware_runtime
+        free = hardware_runtime.free_gpus()
+    except Exception:
+        return None, True  # no GPU ledger on this host -- not a reason to block a retry
+    if gpus_needed and len(free) < gpus_needed:
+        return (f"{len(free)} GPU(s) free, {gpus_needed} needed"), True
+    return None, True
+
+
+def _transient_retry_blocked(run_dir: Path, gpus_needed: int,
+                             wait_s: float = 0.0) -> Optional[str]:
+    """Why an unchanged resubmission would fail again, or None if it is worth trying.
+
+    transient_retry is the only auto-remedy that has ever actually fired on this checkout,
+    and every application was blind: the same parameters, resubmitted, with nothing checked
+    in between. The two causes that make an "unchanged retry" certain to repeat are the two
+    the engine can see for itself -- a full filesystem and no free GPU.
+
+    Both are genuinely transient, so the CALLER waits on them rather than declining
+    outright; see RESOURCE_WAIT_S for what declining immediately cost. Only a resource still
+    missing at the deadline escalates, and a structurally broken run directory escalates at
+    once. `wait_s` defaults to 0 so this stays a pure predicate -- the policy lives at the
+    _apply_remedy call site, and a test can ask "is this blocked right now" without
+    waiting out a real deadline.
+
+    Deliberately not a claim check: gpu_claim is a `with` block scoped to each submission,
+    so by the time a remedy runs the claim is already released and "do we still hold one"
+    is always false. Availability is the question.
+    """
+    deadline = time.monotonic() + max(0.0, wait_s)
+    while True:
+        reason, transient = _resource_block(run_dir, gpus_needed)
+        if reason is None:
+            return None
+        if not transient:
+            return reason
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return (f"{reason} -- still unavailable after waiting "
+                    f"{wait_s:.0f}s, so the box is saturated rather than momentarily busy")
+        time.sleep(min(RESOURCE_POLL_S, remaining))
+
+
+def _validate_revised_parameters(before: Mapping[str, Any],
+                                after: Mapping[str, Any]) -> Optional[str]:
+    """Scientific validation of an auto-remedy's output. None when acceptable.
+
+    An agent decision reaching decided_params passes validate_overrides and
+    _validate_protocol_relationships (which is what reaches _assert_tg_rate_feasible);
+    an automatic remedy used to bypass both, so `tg_breakpoint` could halve tg_t_step_K
+    straight through a class's tg_min_steps_per_T floor. The two paths now apply the same
+    bounds.
+
+    Only the keys a remedy actually CHANGED are checked, and only those inside the
+    planning contract: remedies also write engine-internal keys that are not overrides at
+    all (equilibration_phase, rerun_homogeneity_gate, mechanical_resample_points,
+    mechanical_sampling_factor, npt_continuation_ns), and validate_overrides rejects any
+    key outside ALLOWED_OVERRIDES outright -- passing the whole dict would reject every
+    remedy in the registry. _validate_protocol_relationships takes the full parameter set
+    plus that changed-key set, and gates each of its own checks on it, so it is passed
+    everything.
+
+    Imported here rather than at module scope: scientific_control imports
+    make_deterministic_plan, which imports back into this package.
+    """
+    from scientific_control import (ALLOWED_OVERRIDES, validate_overrides,
+                                    _validate_protocol_relationships)
+    changed = {key for key in after if after.get(key) != before.get(key)}
+    if not changed:
+        return None
+    try:
+        validate_overrides({key: after[key] for key in changed & ALLOWED_OVERRIDES})
+        _validate_protocol_relationships(dict(after), changed)
+    except ValueError as exc:
+        return str(exc)
+    return None
+
+
+def gates_advisory() -> bool:
+    """True when gate VERDICTS must be recorded without blocking or adapting the run.
+
+    Runtime-only, deliberately NOT a decided_param: whether a verdict is enforced is a property
+    of the campaign, not of the simulation, and putting it in the plan would change the plan
+    hash and make a fixed-protocol replicate differ from its predecessor by a key describing
+    nothing that was simulated.
+
+    Read in BOTH layers, because a gate verdict can reach a blocking finding by two independent
+    routes and covering only one is worse than covering neither -- it looks safe and is not:
+      - the executor's own halt path (run_campaign._demote_gate_halt), for the melt and cooling
+        gates, which return {"halted": True, "reason": <verdict>}; and
+      - binding_gate_failure() below, which runs HERE on an already-ACCEPTED StageResult and
+        converts tg_gate_verdict / bm_gate_verdict / deform_gate_verdict into a finding.
+    sPVC_2 found that the hard way on 2026-09-11: launched with the switch on, it still halted
+    at thermal on TG_REVIEW, because only the first route was covered.
+    """
+    return os.environ.get("POLYJARVIS_GATES_ADVISORY", "").strip().lower() in {"1", "true", "yes"}
+
+
+def binding_gate_failure(stage: str, outputs: Mapping[str, Any]) -> Optional[Finding]:
+    """Return a normalized failure when an output's binding gate is not reportable."""
+    if stage == "thermal":
+        verdict = outputs.get("tg_gate_verdict")
+        if verdict != "TG_REPORTABLE":
+            return Finding(str(verdict or "TG_NOT_REPORTABLE"), stage,
+                           details={"gate_output": dict(outputs)})
+    if stage == "mechanical":
+        method = outputs.get("mechanical_method") or outputs.get("method")
+        bm = outputs.get("bm_gate_verdict")
+        deform = outputs.get("deform_gate_verdict")
+        if method == "deformation" or (deform is not None and bm is None):
+            if deform != "DEFORM_REPORTABLE":
+                reasons = " ".join(map(str, outputs.get("deform_gate_reasons") or ())).lower()
+                if outputs.get("bulk_modulus_GPa", 0) < 0 or "negative" in reasons:
+                    code = "DEFORM_NEGATIVE_MODULUS"
+                elif "anisotropic" in reasons:
+                    code = "DEFORM_ANISOTROPIC"
+                else:
+                    code = str(deform or "DEFORM_INADMISSIBLE")
+                return Finding(code, stage, details={"gate_output": dict(outputs)})
+            rate = outputs.get("rate_sensitivity") or {}
+            if rate.get("verdict") == "WARNING":
+                return Finding("DEFORM_RATE_SENSITIVE", stage,
+                               details={"gate_output": dict(outputs), **rate})
+        elif bm != "BM_REPORTABLE":
+            reasons = " ".join(map(str, outputs.get("bm_gate_reasons") or ())).lower()
+            code = ("BM_INADMISSIBLE_NONMONOTONIC"
+                    if bm == "BM_INADMISSIBLE" and "not monotonic" in reasons
+                    else str(bm or "BM_INADMISSIBLE"))
+            return Finding(code, stage,
+                           details={"gate_output": dict(outputs)})
+        elif outputs.get("bm_convergence_verdict") == "BM_LADDER_NOT_CONVERGED":
+            # Additive to bm_gate_verdict's admissibility contract -- fires only when the
+            # fit WAS numerically BM_REPORTABLE but the pressure range never actually
+            # identified B0' (plateau/leave-one-out/B0'-band diagnostics). Never touches
+            # the BM_REPORTABLE/BM_FALLBACK_DEFORM/BM_INADMISSIBLE three-value contract.
+            return Finding("BM_LADDER_NOT_CONVERGED", stage,
+                           confidence=str(outputs.get("bm_convergence_confidence") or "high"),
+                           details={"gate_output": dict(outputs)})
+    return None
+
+
+def pressure_point_drop_allowed(point_status: Mapping[float, str]) -> bool:
+    """Whether failed pressure points may be dropped without losing identifiability.
+
+    Callers retry each failed point once before using this predicate. Values equal to
+    ``"accepted"`` are valid; all other values are treated as failed/incomplete.
+    """
+    valid = {float(pressure) for pressure, status in point_status.items()
+             if status == "accepted"}
+    return (len(valid) >= 4 and 0.0 in valid and
+            sum(pressure > 0.0 for pressure in valid) >= 2)
+
+
+class WorkflowEngine:
+    """Execute, remedy, invalidate, and resume one campaign."""
+
+    # Injectable so wait_and_retry is testable without real sleeping.
+    _sleep = staticmethod(time.sleep)
+    _clock = staticmethod(time.monotonic)
+
+    def __init__(self, run_dir: Path, plan: Mapping[str, Any], executor: StageExecutor,
+                 *, registry: Optional[RemedyRegistry] = None,
+                 recovery_agent: Any = None, policy_hashes: Optional[Mapping[str, str]] = None,
+                 implementation_version: str = ENGINE_VERSION,
+                 plan_path: Optional[Path] = None,
+                 plan_validator: Optional[Callable[[Mapping[str, Any]], list[Mapping[str, Any]]]] = None,
+                 override_validator: Optional[Callable[[Mapping[str, Any]], None]] = None):
+        self.run_dir = Path(run_dir)
+        self.plan = json.loads(json.dumps(plan))
+        self.executor = executor
+        self.registry = registry or RemedyRegistry()
+        self.recovery_agent = recovery_agent
+        self.policy_hashes = dict(policy_hashes or {})
+        self.implementation_version = implementation_version
+        self.plan_path = Path(plan_path) if plan_path else None
+        self.plan_validator = plan_validator
+        # Bounds/whitelist check for agent-proposed `modifications` (raises ValueError on an
+        # out-of-range value or an unsupported key); injected rather than imported so this
+        # module stays stdlib-only and independently testable. scientific_control.py's
+        # validate_overrides is the production value.
+        self.override_validator = override_validator
+        self.state_path = self.run_dir / "workflow_state.json"
+        self.attempts_dir = self.run_dir / "attempts"
+        # Append-only, human-readable record of every remedy/escalation event -- separate from
+        # workflow_state.json (the full re-derivable engine state) so "what happened and why"
+        # can be read/tailed without parsing the whole state blob, and survives even if
+        # workflow_state.json's own remedy_history/agent_escalations fields are ever restructured.
+        self.recovery_log_path = self.run_dir / "recovery_log.jsonl"
+        self.state = self._load_or_create_state()
+        self._reconcile_plan()
+
+    def _log_recovery_event(self, event: dict[str, Any]) -> None:
+        record = {"at": _now(), "run_name": self.plan.get("run_name"), **event}
+        with self.recovery_log_path.open("a") as stream:
+            stream.write(json.dumps(record, default=str) + "\n")
+
+    def enabled_stages(self) -> tuple[str, ...]:
+        """Which macro stages this plan runs. THE runtime authority -- _dependencies,
+        invalidate_from and _input_hash all key off it.
+
+        Routed through track_registry rather than re-derived here. This is the one place the
+        engine's hermetic property is relaxed, deliberately: the registry is stdlib-only with no
+        repo-local imports (same footing as protocol_policy above), and a second hand-written
+        copy of this mapping is exactly what drifted across the other six sites. The ordering
+        contract -- output must be a subsequence of STAGE_ORDER -- is guarded by
+        test_track_registry_lockstep.
+        """
+        return track_registry.macro_stages_for(self.plan.get("properties") or ())
+
+    def _load_or_create_state(self) -> dict[str, Any]:
+        self.run_dir.mkdir(parents=True, exist_ok=True)
+        if self.state_path.exists():
+            state = json.loads(self.state_path.read_text())
+            for record in state.get("stages", {}).values():
+                if record.get("status") == "running":
+                    record["status"] = "incomplete"
+                    record.pop("accepted_attempt", None)
+            self._save(state)
+            return state
+        state = {
+            "schema_version": 1,
+            "engine_version": self.implementation_version,
+            "run_name": self.plan.get("run_name"),
+            "plan_hash": _canonical_hash(self.plan),
+            "effective_parameters": dict(self.plan.get("decided_params") or {}),
+            "stages": {name: {"status": "pending", "attempts": []} for name in self.enabled_stages()},
+            "remedy_counters": {"total": 0, "by_id": {}, "by_route": {}},
+            "agent_escalations": [],
+            "created_at": _now(),
+            "updated_at": _now(),
+        }
+        self._save(state)
+        return state
+
+    def _save(self, state: Optional[dict[str, Any]] = None) -> None:
+        target = state if state is not None else self.state
+        target["updated_at"] = _now()
+        atomic_write_json(self.state_path, target)
+
+    def _reconcile_plan(self) -> None:
+        new_hash = _canonical_hash(self.plan)
+        if self.state.get("plan_hash") == new_hash:
+            return
+        old = dict(self.state.get("effective_parameters") or {})
+        new = dict(self.plan.get("decided_params") or {})
+        # Diff the PLAN against the plan, not against effective_parameters. A remedy key lives
+        # only in effective_parameters (see the note below), so against `old` it reads as
+        # different from `new` forever -- and since the comparison runs on every plan-hash change,
+        # any such key permanently re-invalidates its own stage. The trap is silent until some
+        # process constructs a fresh engine: the melt gate's derived_inputs write-back moves the
+        # plan hash at 11:59, the running engine never re-reconciles, and the next resume -- hours
+        # later, for unrelated reasons -- invalidates an ACCEPTED equilibration and starts
+        # re-running it. That is what a resume of sPVC_1 did on 2026-09-09, and aPS_1 carries the
+        # same npt_continuation_ns and was one resume away from the same thing.
+        #
+        # `plan_decided_params` is the snapshot this diff is actually about. The fallback for a
+        # state written before this field existed is `old`, restricted to keys the plan declares
+        # -- which is exactly the set the buggy comparison got right.
+        baseline = self.state.get("plan_decided_params")
+        if baseline is None:
+            baseline = {key: value for key, value in old.items() if key in new}
+        changed = {key for key in set(baseline) | set(new)
+                   if baseline.get(key) != new.get(key)}
+        self.state["plan_hash"] = new_hash
+        self.state["plan_decided_params"] = json.loads(json.dumps(new, default=str))
+        # Keys a REMEDY introduced live only here -- _auto_remedy writes effective_parameters and
+        # never touches run_plan.json -- so they are exactly the keys absent from decided_params.
+        # Replacing this dict wholesale discarded every one of them on any plan change, and the
+        # plan changes for reasons that have nothing to do with the remedy: the melt gate's own
+        # backbone_types write-back was enough. On 2026-09-09 that silently dropped
+        # npt_continuation_ns from aPS_1 and sPVC_1 between the remedy being applied and the
+        # attempt running, turning a 2 ns restart-continuation into a fresh ten-stage chain --
+        # the remedy was recorded as applied in recovery_log.jsonl while its parameter no longer
+        # existed. A remedy that cannot survive a reconcile is not a remedy.
+        #
+        # `changed` is still computed against the plan alone, so this cannot mask a real
+        # parameter change or suppress an invalidation.
+        preserved = {key: value for key, value in old.items() if key not in new}
+        self.state["effective_parameters"] = {**preserved, **new}
+        affected = {stage for key in changed for stage in stages_for(key)}
+        if affected:
+            enabled = self.enabled_stages()
+            targets = sorted(affected & set(enabled), key=enabled.index)
+            # One call per INDEPENDENT branch, not just the earliest: invalidate_from walks
+            # dependents, and cooling and thermal are not each other's dependents, so a key
+            # reaching both (see PARAMETER_EXTRA_STAGES) needs both named. Calls after the
+            # first are no-ops for anything the first already reached.
+            for stage in targets or ["build"]:
+                self.invalidate_from(stage, "executable plan changed")
+        else:
+            self._save()
+
+    def _dependencies(self, stage: str) -> tuple[str, ...]:
+        enabled = self.enabled_stages()
+        if stage == "build":
+            return ()
+        if stage == "equilibration":
+            return ("build",)
+        # Both cooling and thermal descend from the SAME gated melt cell, independently: the
+        # staircase does not wait for the cooldown and does not consume its output.
+        if stage in ("cooling", "thermal"):
+            return ("equilibration",)
+        if stage == "mechanical":
+            # cooling is guaranteed present whenever mechanical is (track_registry's
+            # _MECHANICAL.requires), but filter anyway -- an unenabled dependency KeyErrors in
+            # run() and _input_hash rather than degrading.
+            return tuple(name for name in ("cooling", "thermal") if name in enabled)
+        # Structure reads the MELT cell's data file and dump, so it descends from the melt hold
+        # like cooling and thermal do, and does not wait for either.
+        if stage == "structure":
+            return ("equilibration",)
+        # Cohesive needs the bulk log of the cell delta is reported at -- npt_final. Same
+        # `requires` relation mechanical has, and the same reason to filter.
+        if stage == "cohesive":
+            return tuple(name for name in ("cooling",) if name in enabled)
+        return tuple(name for name in enabled if name != "summary")
+
+    def _accepted_manifest(self, stage: str) -> dict[str, Any]:
+        record = self.state["stages"][stage]
+        attempt_id = record.get("accepted_attempt")
+        if not attempt_id:
+            raise ValueError(f"{stage} has no accepted attempt")
+        attempt_dir = self.attempts_dir / stage / attempt_id
+        stored = next((entry.get("manifest") for entry in record.get("attempts", ())
+                       if entry.get("attempt_id") == attempt_id), None)
+        # entry["manifest"] is the authoritative path once _finish_attempt has stamped it (the
+        # attempt's own record of what it was actually named). Attempts persisted before the
+        # manifest.json -> executor_state.json rename have no stored path -- fall back to the
+        # new filename, then the pre-rename one, so an on-disk run from before this change
+        # doesn't hard-fail resumption.
+        path = (Path(stored) if stored else
+                (attempt_dir / "executor_state.json" if (attempt_dir / "executor_state.json").exists()
+                 else attempt_dir / "manifest.json"))
+        manifest = json.loads(path.read_text())
+        for artifact in manifest.get("artifacts", []):
+            artifact_path = Path(artifact["path"])
+            if not artifact_path.is_absolute():
+                artifact_path = path.parent / artifact_path
+            if not artifact_path.is_file() or file_sha256(artifact_path) != artifact["sha256"]:
+                raise ValueError(f"artifact integrity failed for {artifact_path}")
+        return manifest
+
+    def _input_hash(self, stage: str) -> str:
+        dependency_checksums = {}
+        for dependency in self._dependencies(stage):
+            manifest = self._accepted_manifest(dependency)
+            dependency_checksums[dependency] = {
+                item["path"]: item["sha256"] for item in manifest.get("artifacts", [])
+            }
+        relevant_parameters = {
+            key: value for key, value in self.state["effective_parameters"].items()
+            if stage in stages_for(key)
+            # Global scientific parameters intentionally belong to build only. Descendants
+            # receive their effect through dependency artifact checksums.
+        }
+        return _canonical_hash({
+            "stage": stage,
+            "effective_parameters": relevant_parameters,
+            "scientific_identity": ({
+                "polymer_class": self.plan.get("polymer_class"),
+                "smiles": self.plan.get("smiles"),
+            } if stage == "build" else {}),
+            "policy_hashes": self.policy_hashes,
+            "implementation_version": self.implementation_version,
+            "dependencies": dependency_checksums,
+        })
+
+    def invalidate_from(self, stage: str, reason: str) -> None:
+        """Mark `stage` and every enabled stage downstream of it stale (if accepted) or
+        pending, recording `reason`. A running stage keeps its status."""
+        enabled = self.enabled_stages()
+        descendants = {stage}
+        changed = True
+        while changed:
+            changed = False
+            for name in enabled:
+                if name not in descendants and descendants.intersection(self._dependencies(name)):
+                    descendants.add(name)
+                    changed = True
+        for name in enabled:
+            if name not in descendants:
+                continue
+            record = self.state["stages"].setdefault(name, {"attempts": []})
+            if record.get("status") == "accepted":
+                record["status"] = "stale"
+            elif record.get("status") != "running":
+                record["status"] = "pending"
+            record.pop("accepted_attempt", None)
+            record["stale_reason"] = reason
+        self._save()
+
+    def reconcile_inputs(self) -> None:
+        """On resume, re-verify each accepted stage in order: its output manifest must still
+        match on disk and its input hash must be unchanged. The first mismatch invalidates
+        that stage and everything after it."""
+        for stage in self.enabled_stages():
+            record = self.state["stages"].setdefault(stage, {"status": "pending", "attempts": []})
+            if record.get("status") != "accepted":
+                break
+            try:
+                # Verify this stage's own immutable outputs as well as the dependency hashes
+                # incorporated into its input hash.
+                self._accepted_manifest(stage)
+                current = self._input_hash(stage)
+            except (OSError, ValueError, json.JSONDecodeError):
+                self.invalidate_from(stage, "accepted artifact missing or changed")
+                break
+            if record.get("input_hash") != current:
+                self.invalidate_from(stage, "stage input hash changed")
+                break
+
+    def _new_attempt(self, stage: str, input_hash: str) -> tuple[str, Path]:
+        record = self.state["stages"][stage]
+        # Reattach instead of minting a fresh attempt when the *previous* invocation of this
+        # exact stage+input never reached a terminal executor verdict -- its own process died
+        # (killed session, host reboot, OOM) while still inside self.executor.execute(), not
+        # because the executor itself returned failed/remedy_required/escalation_required.
+        # _load_or_create_state() is the only place that produces this "incomplete" status, and
+        # it deliberately leaves the last attempt entry's own status at "running" (see there) so
+        # it's distinguishable here from a real terminal state. Executors that submit a
+        # long-running detached background job (equilibration/thermal/mechanical chains) may have
+        # left that job running or even finished — reusing the same attempt_dir lets them find
+        # and reattach to it (see do_equil_and_check's pending_equil_submission.json) instead of
+        # blindly resubmitting and discarding real, possibly expensive completed work.
+        last = (record.get("attempts") or [None])[-1]
+        if (record.get("status") == "incomplete" and last is not None
+                and last.get("status") == "running" and last.get("input_hash") == input_hash):
+            attempt_id = last["attempt_id"]
+            attempt_dir = self.attempts_dir / stage / attempt_id
+            if attempt_dir.is_dir():
+                record["status"] = "running"
+                self._save()
+                return attempt_id, attempt_dir
+        attempt_id = f"attempt-{len(record.get('attempts', [])) + 1:04d}"
+        attempt_dir = self.attempts_dir / stage / attempt_id
+        attempt_dir.mkdir(parents=True, exist_ok=False)
+        entry = {"attempt_id": attempt_id, "status": "running", "input_hash": input_hash,
+                 "started_at": _now()}
+        record.setdefault("attempts", []).append(entry)
+        record.update({"status": "running", "input_hash": input_hash})
+        self._save()
+        return attempt_id, attempt_dir
+
+    def _finish_attempt(self, stage: str, attempt_id: str, attempt_dir: Path,
+                        result: StageResult, input_hash: str, parameters: Mapping[str, Any]
+                        ) -> dict[str, Any]:
+        artifacts = []
+        for raw_path in result.artifacts:
+            path = Path(raw_path)
+            if not path.is_absolute():
+                path = attempt_dir / path
+            if not path.is_file():
+                raise ValueError(f"executor declared missing artifact {path}")
+            artifacts.append({"path": str(path), "sha256": file_sha256(path),
+                              "size": path.stat().st_size})
+        manifest = {
+            "attempt_id": attempt_id, "stage": stage, "status": result.status,
+            "input_hash": input_hash, "findings": [item.to_dict() for item in result.findings],
+            "parameters": dict(parameters), "outputs": result.outputs, "artifacts": artifacts,
+            "finished_at": _now(),
+        }
+        atomic_write_json(attempt_dir / "executor_state.json", manifest)
+        entry = self.state["stages"][stage]["attempts"][-1]
+        entry.update({"status": result.status, "finished_at": manifest["finished_at"],
+                      "manifest": str(attempt_dir / "executor_state.json")})
+        self._save()
+        return manifest
+
+    def _resume_pending_verdict(self, stage: str, input_hash: str):
+        """Replay a verdict the executor already returned, instead of re-running the stage.
+
+        run()'s loop executes any stage that is not `accepted`. Nothing consulted the verdict a
+        prior attempt had ALREADY produced -- so if the orchestrator died between the executor
+        returning `remedy_required` and the remedy being applied, the resumed run silently
+        re-executed the stage from scratch. On 2026-09-09 that made aPS_1 replay all ten
+        equilibration stages against a melt whose gate had already spoken, and the replay was
+        futile as well as expensive: the protocol was unchanged, so it would have reached the
+        same 1.14% density drift and raised the same finding.
+
+        Everything needed is already on disk -- _finish_attempt persists status, input_hash and
+        the full findings into executor_state.json -- it was simply never read back.
+
+        Deliberately narrow. It fires only when the LAST attempt of this stage ended in
+        `remedy_required` (a real executor verdict, not a process death, which routes through
+        transient_retry instead), under an input_hash identical to the one now in force (a
+        changed parameter means the verdict was about a different protocol), with at least one
+        blocking finding, and only once per attempt -- `verdict_resumed` guards against a remedy
+        that revises nothing leaving the hash unchanged and re-serving the same verdict forever.
+        """
+        record = self.state["stages"][stage]
+        last = (record.get("attempts") or [None])[-1]
+        if not last or last.get("status") != "remedy_required":
+            return None
+        if last.get("input_hash") != input_hash or last.get("verdict_resumed"):
+            return None
+        manifest_path = last.get("manifest")
+        if not manifest_path or not Path(manifest_path).is_file():
+            return None
+        try:
+            manifest = json.loads(Path(manifest_path).read_text())
+        except (OSError, ValueError):
+            return None
+        findings = tuple(Finding.from_value(item, stage)
+                         for item in (manifest.get("findings") or ()))
+        if not any(item.severity in BLOCKING_SEVERITIES for item in findings):
+            return None
+        last["verdict_resumed"] = True
+        record["status"] = "running"
+        self._save()
+        self._log_recovery_event({
+            "event": "verdict_resumed", "code": findings[0].code, "stage": stage,
+            "attempt_id": last["attempt_id"],
+            "reason": "executor verdict already on disk -- applying its remedy instead of "
+                      "re-running the stage",
+        })
+        return StageResult("remedy_required", findings,
+                           tuple(a["path"] for a in (manifest.get("artifacts") or ())),
+                           manifest.get("outputs") or {}), manifest
+
+    def _execute_stage(self, stage: str) -> tuple[StageResult, dict[str, Any]]:
+        input_hash = self._input_hash(stage)
+        resumed = self._resume_pending_verdict(stage, input_hash)
+        if resumed is not None:
+            return resumed
+        attempt_id, attempt_dir = self._new_attempt(stage, input_hash)
+        dependencies = {name: self._accepted_manifest(name) for name in self._dependencies(stage)}
+        context = {
+            "run_name": self.plan.get("run_name"), "stage": stage,
+            "attempt_id": attempt_id, "attempt_dir": str(attempt_dir),
+            "parameters": dict(self.state["effective_parameters"]),
+            "plan": json.loads(json.dumps(self.plan)), "dependencies": dependencies,
+            "prior_attempts": list(self.state["stages"][stage].get("attempts", ())[:-1]),
+        }
+        try:
+            result = StageResult.from_value(self.executor.execute(stage, context), stage)
+            gate_failure = binding_gate_failure(stage, result.outputs) if result.status == "accepted" else None
+            if gate_failure and gates_advisory():
+                # Fixed-protocol replicate: the verdict is a RESULT of the campaign, recorded
+                # against the attempt, not a branch in its execution. Everything
+                # binding_gate_failure can return is a gate verdict (TG_*/BM_*/DEFORM_*), never
+                # a failure to execute the stage, so demoting the whole set is sound here.
+                result = StageResult(
+                    result.status, result.findings, result.artifacts,
+                    {**(result.outputs or {}),
+                     "gate_verdict_advisory": {
+                         "code": gate_failure.code,
+                         "stage": stage,
+                         "would_have_blocked": True,
+                         "note": ("POLYJARVIS_GATES_ADVISORY=1: verdict recorded, stage "
+                                  "accepted, protocol unchanged"),
+                     }})
+                gate_failure = None
+            if gate_failure:
+                result = StageResult("remedy_required", result.findings + (gate_failure,),
+                                     result.artifacts, result.outputs)
+        except Exception as exc:  # process adapters normalize unexpected execution failures
+            result = StageResult("failed", (Finding("PROCESS_FAILED", stage,
+                                                     details={"error": str(exc)}),))
+        manifest = self._finish_attempt(stage, attempt_id, attempt_dir, result, input_hash,
+                                        context["parameters"])
+        return result, manifest
+
+    def _gpus_needed(self) -> int:
+        """GPUs one attempt of a GPU-bearing stage claims. Defaults to 1 the way
+        do_deformation's `cls.get("gpu_per_run") or 1` does; 0 only if the class is
+        unreadable, which disables the check rather than blocking on a guess."""
+        try:
+            from rules_common import get_class_entry, load_rules
+            entry = get_class_entry(load_rules(), str(self.plan.get("polymer_class") or ""))
+            return int(entry.get("gpu_per_run") or 1)
+        except Exception:
+            return 0
+
+    def _apply_remedy(self, finding: Finding) -> bool:
+        remedy = self.registry.route(finding)
+        counters = self.state["remedy_counters"]
+        route_key = f"{remedy.remedy_id}:{finding.stage}"
+        used = int(counters.setdefault("by_route", {}).get(route_key, 0))
+        if finding.confidence == "low" or remedy.agent_only or used >= remedy.local_cap:
+            return False
+        if int(counters["total"]) >= MAX_AUTOMATIC_REMEDIES:
+            return False
+        if remedy.remedy_id == "transient_retry":
+            # In _apply_remedy rather than in the remedy action, which is handed only the
+            # parameter dict and has no way to reach the run directory or the GPU ledger.
+            #
+            # GPUs are only checked for stages that actually claim one: the build runs EMC and
+            # the summary is pure analysis, so blocking either on GPU contention would refuse a
+            # retry for a resource the stage never wanted. gpu_per_run comes from the class
+            # entry, NOT from effective_parameters -- it is not in make_deterministic_plan's
+            # SNAPSHOT_KEYS, so reading it there always yielded 0 and disabled the check.
+            # RESOURCE_WAIT_S, not 0: a momentary collision must cost a pause, never one of
+            # the two agent calls. See RESOURCE_WAIT_S for the campaign that paid for this.
+            blocked = _transient_retry_blocked(
+                self.state_path.parent,
+                self._gpus_needed() if finding.stage in GPU_STAGES else 0,
+                wait_s=RESOURCE_WAIT_S)
+            if blocked is not None:
+                self._log_recovery_event({
+                    "event": "auto_remedy_rejected", "code": finding.code,
+                    "stage": finding.stage, "remedy_id": remedy.remedy_id, "reason": blocked,
+                })
+                return False
+        params = dict(self.state["effective_parameters"])
+        try:
+            revised = remedy.action(params, finding, used + 1)
+        except (KeyError, TypeError, ValueError) as exc:
+            # A remedy that cannot construct a defensible revision declines HERE, and the
+            # reason has to survive: this is the difference between "the second rung was spent
+            # on a mystery" and "the agent was handed a named cause". Previously every
+            # exception returned False silently, so recovery_log.jsonl recorded the escalation
+            # with no trace of why the deterministic remedy stood down.
+            self._log_recovery_event({
+                "event": "auto_remedy_rejected", "code": finding.code, "stage": finding.stage,
+                "remedy_id": remedy.remedy_id, "reason": f"{type(exc).__name__}: {exc}",
+            })
+            return False
+        rejection = _validate_revised_parameters(params, revised)
+        if rejection is not None:
+            self._log_recovery_event({
+                "event": "auto_remedy_rejected", "code": finding.code, "stage": finding.stage,
+                "remedy_id": remedy.remedy_id, "reason": rejection,
+            })
+            return False
+        self.state["effective_parameters"] = revised
+        counters["total"] += 1
+        counters["by_id"][remedy.remedy_id] = int(counters["by_id"].get(remedy.remedy_id, 0)) + 1
+        counters["by_route"][route_key] = used + 1
+        self.state.setdefault("remedy_history", []).append({
+            "remedy_id": remedy.remedy_id, "finding": finding.to_dict(),
+            "application": used + 1, "at": _now(),
+        })
+        invalidate = finding.stage if remedy.invalidate_from == "same" else remedy.invalidate_from
+        self.invalidate_from(invalidate, f"remedy {remedy.remedy_id}")
+        self._log_recovery_event({
+            "event": "auto_remedy", "code": finding.code, "stage": finding.stage,
+            "remedy_id": remedy.remedy_id, "application": used + 1,
+        })
+        return True
+
+    def _offered_actions(self, finding: Finding, manifest: Mapping[str, Any]) -> tuple[str, ...]:
+        """What the agent may choose for THIS failure. Code decides the menu, not the prompt.
+
+        accept_with_caveat is offered only where it withdraws a number and nothing else: a
+        property gate (thermal/mechanical) whose own artifact already records a non-reportable
+        verdict, so generate_run_summary withholds the value and the characterization cache
+        refuses to freeze it. An equilibration or cooling failure is never caveatable -- every
+        downstream property would inherit the unconverged cell (iPMMA_1's hand-accepted melt is
+        why its Tg is not reportable). BM_LADDER_NOT_CONVERGED and DEFORM_RATE_SENSITIVE are
+        excluded because their artifact verdict still reads reportable, so accepting them would
+        publish the very number the finding doubts.
+        """
+        actions = ["retry", "wait_and_retry", "revise_plan"]
+        outputs = manifest.get("outputs") or {}
+        gate = binding_gate_failure(finding.stage, outputs) if finding.stage in CAVEAT_STAGES else None
+        if (gate is not None and gate.code not in {"BM_LADDER_NOT_CONVERGED", "DEFORM_RATE_SENSITIVE"}
+                and manifest.get("artifacts") and manifest.get("attempt_id")):
+            actions.append("accept_with_caveat")
+        actions.append("end_run")
+        return tuple(actions)
+
+    def _consult_agent(self, finding: Finding, manifest: Mapping[str, Any],
+                       offered: tuple[str, ...], rejection: Optional[dict]) -> dict:
+        escalations = self.state["agent_escalations"]
+        payload = {
+            "finding": finding.to_dict(),
+            "remedy_history": list(self.state.get("remedy_history", [])),
+            "attempt_manifests": [entry.get("manifest") for record in self.state["stages"].values()
+                                  for entry in record.get("attempts", []) if entry.get("manifest")],
+            "current_plan": json.loads(json.dumps(self.plan)),
+            "valid_actions": ["registered_remedy", *offered],
+            "valid_predefined_remedies": [self.registry.route(finding).remedy_id],
+            "previous_rejection": rejection,
+        }
+        if hasattr(self.recovery_agent, "decide"):
+            decision = self.recovery_agent.decide(payload)
+        elif hasattr(self.recovery_agent, "diagnose"):
+            try:
+                decision = self.recovery_agent.diagnose(payload)
+            except TypeError:
+                intent_payload = {
+                    "run_name": self.plan.get("run_name"), "goal": self.plan.get("goal", ""),
+                    "smiles": self.plan.get("smiles", ""),
+                    "requested_properties": tuple(self.plan.get("properties") or ()),
+                    "polymer_class_hint": self.plan.get("polymer_class"),
+                }
+                intent = SimpleNamespace(to_dict=lambda: intent_payload)
+                # SubprocessRecoveryAgent.diagnose serializes issue.to_dict() and nothing
+                # else, so anything absent from it never reaches the agent. Returning the
+                # bare finding used to discard the whole payload above: the LLM was told the
+                # code and the stage, and got its history from plan_summary.recovery_history
+                # -- which is plan["recovery_history"], written only by the OUTER loop and
+                # therefore empty here. It was being told nothing had been tried on a run
+                # that had just burned both automatic rungs.
+                #
+                # engine_context, not `detail`/`details`: recovery_agent_cli._trim_payload
+                # reads issue.get("detail", issue.get("details")), so a `detail` key would
+                # shadow the finding's own details -- including gate_output, the thing being
+                # diagnosed.
+                engine_context = {
+                    "confidence": finding.confidence,
+                    "escalation_attempt": len(escalations) + 1,
+                    "max_agent_decisions": MAX_AGENT_DECISIONS,
+                    "max_agent_decisions_per_stage": MAX_AGENT_DECISIONS_PER_STAGE,
+                    # The engine's menu for this failure. SubprocessRecoveryAgent turns it into
+                    # the output contract, so the outer control-plane loop's own action set
+                    # (VALID_RECOVERY_ACTIONS) is untouched.
+                    "valid_actions": list(offered),
+                    "autonomous": True,
+                    "previous_rejection": rejection,
+                    "run_dir": str(self.state_path.parent.resolve()),
+                    "failed_attempt_manifest": manifest.get("attempt_id"),
+                    # Trimmed: this rides into a one-line prompt, and the full records carry
+                    # whole findings and manifest paths.
+                    "remedy_history": [
+                        {"remedy_id": entry.get("remedy_id"),
+                         "code": (entry.get("finding") or {}).get("code"),
+                         "stage": (entry.get("finding") or {}).get("stage"),
+                         "application": entry.get("application")}
+                        for entry in self.state.get("remedy_history", [])
+                    ],
+                }
+                issue_payload = {**finding.to_dict(), "engine_context": engine_context}
+                issue = SimpleNamespace(code=finding.code, stage=finding.stage,
+                                        detail=payload, attempt=len(escalations) + 1,
+                                        to_dict=lambda: issue_payload)
+                decision = self.recovery_agent.diagnose(intent, self.plan, issue)
+        else:
+            decision = self.recovery_agent(payload)
+        if hasattr(decision, "__dict__"):
+            decision = vars(decision)
+        return dict(decision)
+
+    def _wait_for_resources(self, finding: Finding) -> Optional[str]:
+        """Poll the same preflight transient_retry uses until it clears or MAX_WAIT_S passes.
+
+        Bounded in wall-clock, not GPU-hours: nothing is claimed while waiting (claims are per
+        submission), so the only cost of a wait is time. Returns None once clear, else the
+        last blocking reason.
+        """
+        gpus = self._gpus_needed() if finding.stage in GPU_STAGES else 0
+        deadline = self._clock() + MAX_WAIT_S
+        while True:
+            blocked = _transient_retry_blocked(self.state_path.parent, gpus)
+            if blocked is None or self._clock() >= deadline:
+                return blocked
+            self._sleep(WAIT_POLL_S)
+
+    def _accept_with_caveat(self, finding: Finding, manifest: Mapping[str, Any],
+                            decision: Mapping[str, Any]) -> None:
+        """Accept the failing attempt as-is so the run can finish its other properties.
+
+        The same edit an operator makes by hand (aPS_2 thermal, 2026-09-13): manifest status to
+        accepted, findings archived rather than deleted, stage points at the attempt, input_hash
+        untouched. It never rewrites a gate verdict -- the artifact keeps its non-reportable
+        verdict, which is what withholds the value downstream -- and recovery_caveat marks the
+        acceptance for every reader that checks markers rather than verdicts.
+        """
+        attempt_id = manifest["attempt_id"]
+        record = self.state["stages"][finding.stage]
+        stored_path = next((Path(entry["manifest"]) for entry in record.get("attempts", ())
+                            if entry.get("attempt_id") == attempt_id and entry.get("manifest")),
+                           self.attempts_dir / finding.stage / attempt_id / "executor_state.json")
+        stored = json.loads(stored_path.read_text())
+        caveat = {
+            "code": finding.code, "reportable": False, "decided_by": "recovery_agent",
+            "rationale": decision.get("rationale"), "at": _now(),
+            "note": ("stage accepted so the run can finish; its gate verdict stands and the "
+                     "property is withheld from results and from the characterization cache"),
+        }
+        stored["status"] = "accepted"
+        stored["outputs"] = {**(stored.get("outputs") or {}), "recovery_caveat": caveat}
+        stored["findings_retired_by_recovery_agent"] = stored.get("findings") or []
+        stored["findings"] = []
+        atomic_write_json(stored_path, stored)
+        for entry in record.get("attempts", ()):
+            if entry.get("attempt_id") == attempt_id:
+                entry["status"] = "accepted"
+        record.update({"status": "accepted", "accepted_attempt": attempt_id,
+                       "input_hash": stored.get("input_hash", manifest.get("input_hash"))})
+        self.state.setdefault("caveats", []).append(
+            {"stage": finding.stage, "attempt_id": attempt_id, **caveat})
+        self._save()
+
+    def _end_run(self, finding: Finding, finish: Callable[..., str], *, decided_by: str,
+                 reason: str, rationale: Optional[str] = None) -> str:
+        """Close the run without a human. Status is `failed`; `terminated_by` says who decided
+        and why, so a deliberate close is never confused with a harness crash."""
+        self.state["terminated_by"] = {
+            "by": decided_by, "reason": reason, "stage": finding.stage, "code": finding.code,
+            "rationale": rationale, "at": _now(),
+        }
+        self._save()
+        return finish("failed", action="end_run", decided_by=decided_by, reason=reason,
+                      rationale=rationale)
+
+    def _escalate(self, finding: Finding, manifest: Mapping[str, Any]) -> str:
+        def _finish(outcome: str, **extra: Any) -> str:
+            self._log_recovery_event({"event": "escalation", "code": finding.code,
+                                      "stage": finding.stage, "outcome": outcome, **extra})
+            return outcome
+
+        escalations = self.state["agent_escalations"]
+        if self.recovery_agent is None:
+            # The deterministic arm: no agent, so the run halts for a human exactly as before.
+            return _finish("escalation_required", reason="no_recovery_agent_configured")
+        # With an agent configured the run never waits on a human. Every decision the engine
+        # cannot apply is handed back to the agent with the reason, inside a fixed budget; the
+        # budget running out ends the run.
+        offered = self._offered_actions(finding, manifest)
+        rejection: Optional[dict] = None
+        while True:
+            spent_here = sum(1 for entry in escalations
+                             if (entry.get("finding") or {}).get("stage") == finding.stage)
+            if len(escalations) >= MAX_AGENT_DECISIONS or spent_here >= MAX_AGENT_DECISIONS_PER_STAGE:
+                return self._end_run(finding, _finish, decided_by="engine",
+                                     reason="agent_decision_budget_exhausted",
+                                     rationale=(rejection or {}).get("reason"))
+            decision = self._consult_agent(finding, manifest, offered, rejection)
+            escalations.append({"finding": finding.to_dict(), "decision": decision,
+                                "manifest": manifest.get("attempt_id"),
+                                "offered_actions": list(offered), "at": _now()})
+            self._save()
+            outcome, rejection = self._apply_agent_decision(finding, manifest, decision, offered,
+                                                            _finish)
+            if outcome is not None:
+                return outcome
+            escalations[-1]["rejected"] = rejection
+            self._save()
+            self._log_recovery_event({"event": "agent_decision_rejected", "code": finding.code,
+                                      "stage": finding.stage, **rejection})
+
+    def _apply_agent_decision(self, finding: Finding, manifest: Mapping[str, Any],
+                              decision: dict, offered: tuple[str, ...],
+                              _finish: Callable[..., str]) -> tuple[Optional[str], Optional[dict]]:
+        """(outcome, None) when the decision was carried out; (None, rejection) when the engine
+        refused it -- the rejection goes back to the agent, never to a human."""
+        escalations = self.state["agent_escalations"]
+        action = str(decision.get("action") or "end_run").lower()
+        if action == "stop":
+            action = "end_run"   # the pre-autonomy name for the same decision
+        if action == "registered_remedy":
+            selected = decision.get("remedy_id")
+            expected = self.registry.route(finding).remedy_id
+            if selected != expected:
+                return None, {"action": action, "reason": "remedy_id_mismatch",
+                              "selected": selected, "expected": expected}
+            # Agent selection does not override scientific bounds or caps.
+            revised_finding = Finding(finding.code, finding.stage, finding.severity, "high",
+                                      finding.details, selected)
+            if not self._apply_remedy(revised_finding):
+                return None, {"action": action, "reason": "remedy_rejected_by_apply_remedy"}
+            return _finish("resume", action=action, remedy_id=selected), None
+        if action not in offered:
+            return None, {"action": action, "reason": "action_not_offered",
+                          "offered": list(offered)}
+        if action == "end_run":
+            return self._end_run(finding, _finish, decided_by="recovery_agent",
+                                 reason="agent_decision",
+                                 rationale=decision.get("rationale")), None
+        if action == "accept_with_caveat":
+            try:
+                self._accept_with_caveat(finding, manifest, decision)
+            except (OSError, KeyError, ValueError) as exc:
+                return None, {"action": action, "reason": f"caveat_failed: {exc}"}
+            return _finish("resume", action=action, caveat=True), None
+        if action == "retry" and str(decision.get("rationale") or "").startswith(
+                "[recovery-agent invocation failed"):
+            # recovery_agent_cli maps a crashed/timed-out headless session to `retry`. That is
+            # not a diagnosis, and re-running a GPU stage on it costs hours; ask again instead
+            # (spends decision budget, not hardware).
+            return None, {"action": action, "reason": "agent_invocation_failed"}
+        if action == "wait_and_retry":
+            blocked = self._wait_for_resources(finding)
+            if blocked is not None:
+                return None, {"action": action, "reason": "resources_still_blocked",
+                              "blocked": blocked, "waited_s": MAX_WAIT_S}
+        # retry / wait_and_retry / revise_plan
+        # retry means unchanged params by definition; ignore any modifications a
+        # non-conforming agent attaches to it rather than reject the whole decision.
+        modifications = dict(decision.get("modifications") or {}) if action == "revise_plan" else {}
+        forbidden = {"path", "dir", "command", "script", "state", "artifact", "file"}
+        unsafe = [key for key in modifications
+                  if any(token in key.lower() for token in forbidden)]
+        if unsafe:
+            return None, {"action": action, "reason": "forbidden_modification_key",
+                          "keys": unsafe}
+        if self.override_validator is not None:
+            try:
+                self.override_validator(modifications)
+            except ValueError as exc:
+                escalations[-1]["validation_error"] = str(exc)
+                return None, {"action": action, "reason": "override_validation_failed",
+                              "error": str(exc)}
+        candidate = json.loads(json.dumps(self.plan))
+        candidate.setdefault("decided_params", {}).update(modifications)
+        if self.plan_validator is not None:
+            validation_findings = list(self.plan_validator(candidate))
+            if any(item.get("severity") in {"structural", "blocking", "error", "fatal"}
+                   for item in validation_findings):
+                escalations[-1]["validation_findings"] = validation_findings
+                return None, {"action": action, "reason": "plan_validation_failed",
+                              "findings": validation_findings}
+        earliest = decision.get("invalidate_from") or finding.stage
+        if earliest not in self.enabled_stages():
+            return None, {"action": action, "reason": "invalidate_from_not_enabled",
+                          "invalidate_from": earliest}
+        self.plan = candidate
+        self.state["plan_hash"] = _canonical_hash(candidate)
+        # The reconcile baseline moves with the plan. Without this the next hash change --
+        # any derived_inputs write is enough -- would diff the revised plan against the
+        # PRE-revision snapshot and re-invalidate everything revise_plan just settled.
+        self.state["plan_decided_params"] = json.loads(
+            json.dumps(candidate.get("decided_params") or {}, default=str))
+        self.state["effective_parameters"].update(modifications)
+        if self.plan_path is not None:
+            atomic_write_json(self.plan_path, candidate)
+        # A decision to re-run supersedes the verdict on disk. Without this mark,
+        # _resume_pending_verdict replays that verdict under the unchanged input_hash of a
+        # retry and the stage is never actually re-attempted.
+        attempts = self.state["stages"][finding.stage].get("attempts") or []
+        if attempts:
+            attempts[-1]["verdict_resumed"] = True
+        self.invalidate_from(earliest, f"recovery agent {action}")
+        return _finish("resume", action=action, modifications=modifications), None
+
+    def run(self) -> dict[str, Any]:
+        """Execute stages in dependency order until all are accepted or one cannot proceed.
+
+        A blocking finding first goes to its code-owned remedy (bounded by
+        MAX_AUTOMATIC_REMEDIES); if none applies it is escalated to the recovery agent
+        (bounded by MAX_AGENT_DECISIONS and MAX_AGENT_DECISIONS_PER_STAGE). Returns
+        {"status": "accepted", ...} or the terminal status with the stage and finding,
+        plus `terminated_by` when a budget closed the run. Safe to call again to resume.
+        """
+        # A resumed run is a new decision; the previous close no longer describes it.
+        if self.state.pop("terminated_by", None) is not None:
+            self._save()
+        self.reconcile_inputs()
+        while True:
+            progressed = False
+            for stage in self.enabled_stages():
+                record = self.state["stages"][stage]
+                if record.get("status") == "accepted":
+                    continue
+                if any(self.state["stages"][dep].get("status") != "accepted"
+                       for dep in self._dependencies(stage)):
+                    continue
+                result, manifest = self._execute_stage(stage)
+                progressed = True
+                if result.status == "accepted":
+                    record = self.state["stages"][stage]
+                    record.update({"status": "accepted", "accepted_attempt": manifest["attempt_id"],
+                                   "input_hash": manifest["input_hash"]})
+                    self._save()
+                    continue
+                binding = [item for item in result.findings if item.severity in BLOCKING_SEVERITIES]
+                finding = binding[0] if binding else Finding("UNEXPLAINED_STAGE_FAILURE", stage,
+                                                             confidence="low")
+                if self._apply_remedy(finding):
+                    break
+                outcome = self._escalate(finding, manifest)
+                if outcome == "resume":
+                    break
+                record = self.state["stages"][stage]
+                record["status"] = outcome
+                self.state["status"] = outcome
+                self.state["active_finding"] = finding.to_dict()
+                self._save()
+                returned = {"status": outcome, "stage": stage, "finding": finding.to_dict(),
+                            "state_path": str(self.state_path)}
+                if self.state.get("terminated_by"):
+                    returned["terminated_by"] = self.state["terminated_by"]
+                return returned
+            else:
+                if all(self.state["stages"][stage].get("status") == "accepted"
+                       for stage in self.enabled_stages()):
+                    self.state["status"] = "accepted"
+                    self._save()
+                    return {"status": "accepted", "run_name": self.plan.get("run_name"),
+                            "state_path": str(self.state_path),
+                            "accepted_attempts": {stage: self.state["stages"][stage]["accepted_attempt"]
+                                                  for stage in self.enabled_stages()}}
+            if not progressed:
+                self.state["status"] = "failed"
+                self._save()
+                return {"status": "failed", "reason": "workflow made no progress",
+                        "state_path": str(self.state_path)}
+
+
+def inspect_workflow(run_dir: Path) -> dict[str, Any]:
+    """Read-only view of data/<run>/workflow_state.json, or status "not_found"."""
+    path = Path(run_dir) / "workflow_state.json"
+    if not path.exists():
+        return {"status": "not_found", "state_path": str(path)}
+    state = json.loads(path.read_text())
+    return {"status": state.get("status", "active"), "state": state,
+            "state_path": str(path)}

@@ -1,0 +1,365 @@
+{
+  "active_finding": {
+    "code": "TG_REVIEW",
+    "confidence": "high",
+    "details": {
+      "gate_output": {
+        "is_glassy": true,
+        "per_rate": [
+          {
+            "Tg_K": 490.0,
+            "fit_quality": "ACCEPTABLE",
+            "output_dir": "/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L3_r50/attempts/thermal/attempt-0001/raw",
+            "r_squared": 0.9978,
+            "rate": 50.0,
+            "tg_gate_cause": "method_gap",
+            "tg_gate_verdict": "TG_REVIEW",
+            "tg_melt_start_density_consistent": true,
+            "tg_per_t_sampling": [
+              {
+                "T_K": 620.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.1040762907730672,
+                "n_eff": 41,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 600.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.1132613154613467,
+                "n_eff": 75,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 580.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.124359727182045,
+                "n_eff": 48,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 560.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.1364756426433915,
+                "n_eff": 49,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 540.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.1474947062344139,
+                "n_eff": 65,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 520.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.1507628478802991,
+                "n_eff": 43,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 500.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.1610504119700749,
+                "n_eff": 114,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 480.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.1682572600997507,
+                "n_eff": 24,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 460.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.1798536052369077,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 440.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.18554846159601,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 420.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.1947615625935162,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 400.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2012367356608478,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 380.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2062580399002494,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 360.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2109729573566086,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 340.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2166456950124687,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 320.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2238329341645886,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 300.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2340828476309227,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 280.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2391374990024937,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 260.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2429307678304238,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 240.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2470714533665836,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 220.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2531012683291771,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 200.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2582700132169578,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 180.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2623217947630923,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 160.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2668362551122194,
+                "n_eff": 802,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 140.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2712614675810472,
+                "n_eff": 693,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 120.0,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2757839738154615,
+                "n_eff": 282,
+                "outcome": "PASS",
+                "stable": true
+              },
+              {
+                "T_K": 100,
+                "extensions_used": 0,
+                "mean_density_gcm3": 1.2814095206982543,
+                "n_eff": 176,
+                "outcome": "PASS",
+                "stable": true
+              }
+            ],
+            "tg_start_cell": {
+              "T_start_K": 620.0,
+              "outcome": "MELT_HOLD_START",
+              "start_data_path": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data"
+            },
+            "velocity_seed": 561359054
+          }
+        ],
+        "tg_gate_cause": "method_gap",
+        "tg_gate_verdict": "TG_REVIEW"
+      }
+    },
+    "remedy_id": null,
+    "severity": "blocking",
+    "stage": "thermal"
+  },
+  "agent_escalations": [],
+  "created_at": "2026-09-13T03:13:19.029939+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 620.0,
+    "T_melt_hold_K": 620.0,
+    "T_workflow_K": 620.0,
+    "annealing_T_high_K": 700.0,
+    "backbone_types": [
+      1,
+      2,
+      3,
+      6,
+      7
+    ],
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.15,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.63,
+    "dp_typical": 70,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 686928993,
+    "experimental_density_gcm3": 1.248,
+    "experimental_tg_K": 331.0,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_min_steps_per_T": 200000,
+    "tg_rate_K_per_ns": 50,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 561359054
+  },
+  "engine_version": "workflow-engine-v3",
+  "input_hash_restamp": [
+    {
+      "at": "2026-09-16T22:09:30.930733+00:00",
+      "reason": "trajectory dumps compressed to .dump.gz (no re-execution, no re-analysis); artifact paths and sha256 changed, so dependency checksums and every dependent stage input hash shifted",
+      "stages": {}
+    }
+  ],
+  "plan_hash": "8dc6dcf3998d37060ebf588d204f2bf696b19d7cda4a7b36f35f7c7bde43ce42",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {},
+    "total": 0
+  },
+  "run_name": "tg_sensitivity/TGS_PLLA_1_L3_r50",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-08T22:30:49.263620+00:00",
+          "input_hash": "d01689b68f67572c8d13f32929d5f4fcd6132ab45656ea26aac32a7e0b75770d",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-08T22:28:48.936215+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "d01689b68f67572c8d13f32929d5f4fcd6132ab45656ea26aac32a7e0b75770d",
+      "status": "accepted"
+    },
+    "equilibration": {
+      "accepted_attempt": "attempt-0002",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-09T13:27:04.859975+00:00",
+          "input_hash": "d8abb22117dfbaeba57a9b70f5876f34b52902256b80c61104964057ec75308d",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/executor_state.json",
+          "started_at": "2026-09-09T00:12:39.640607+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "d8abb22117dfbaeba57a9b70f5876f34b52902256b80c61104964057ec75308d",
+      "status": "accepted"
+    },
+    "summary": {
+      "attempts": [],
+      "status": "pending"
+    },
+    "thermal": {
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T16:45:14.527987+00:00",
+          "input_hash": "6e65d46ec6e8e4e72028bd03e13caf2d9b9586d2565d7ff147e29a4834ec7803",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L3_r50/attempts/thermal/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T03:15:14.743161+00:00",
+          "status": "remedy_required"
+        }
+      ],
+      "input_hash": "6e65d46ec6e8e4e72028bd03e13caf2d9b9586d2565d7ff147e29a4834ec7803",
+      "status": "escalation_required"
+    }
+  },
+  "status": "escalation_required",
+  "updated_at": "2026-09-13T16:45:14.529701+00:00"
+}

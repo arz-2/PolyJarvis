@@ -1,0 +1,659 @@
+units real
+atom_style full
+boundary p p p
+
+# --- Force Field Styles ---
+pair_style lj/class2/coul/long 9.5 9.5
+kspace_style pppm 1e-6
+dielectric 1.000000
+bond_style class2
+angle_style class2
+dihedral_style class2
+improper_style class2
+special_bonds lj/coul 0 0 1
+pair_modify mix sixthpower tail yes
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+neigh_modify one 4000
+# KOKKOS: package loaded via -pk kokkos on the command line
+
+read_data /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/minimize/minimize_out.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (51.046552 51.046552 51.046552)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  6320 atoms
+  reading velocities ...
+  6320 velocities
+  scanning bonds ...
+  4 = max bonds/atom
+  scanning angles ...
+  12 = max angles/atom
+  scanning dihedrals ...
+  21 = max dihedrals/atom
+  scanning impropers ...
+  8 = max impropers/atom
+  orthogonal box = (0 0 0) to (51.046552 51.046552 51.046552)
+  1 by 1 by 1 MPI processor grid
+  reading bonds ...
+  6310 bonds
+  reading angles ...
+  11200 angles
+  reading dihedrals ...
+  13970 dihedrals
+  reading impropers ...
+  6300 impropers
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        1       
+  special bond factors coul:  0        0        1       
+     4 = max # of 1-2 neighbors
+     6 = max # of 1-3 neighbors
+    10 = max # of special neighbors
+  special bonds CPU = 0.003 seconds
+  read_data CPU = 0.247 seconds
+include /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/build/attempt-0001/work/cell/emc_build.params
+# LAMMPS parameters created by EMC v9.4.4, build Jul 21 2026 07:58:38
+
+# Variables
+
+variable	seed		index	686928993
+variable	ntotal		index	6320
+variable	fshape		index	1
+variable	output		index	emc_build
+variable	field		index	pcff/pcff
+variable	location1	index	/home/arz2/emc/field/
+variable	nav		index	0.6022141179
+variable	temperature	index	300
+variable	radius		index	5
+variable	nrelax		index	100
+variable	weight_nonbond	index	0.0001
+variable	weight_bond	index	0.0001
+variable	weight_focus	index	1
+variable	cutoff		index	9.5
+variable	charge_cutoff	index	9.5
+variable	kappa		index	4
+variable	density1	index	0.63
+variable	lprevious	index	0
+variable	lphase		index	51.0465517814
+variable	f_poly		index	10
+variable	chem_repeat	index	*[C@@H](C)C(=O)O*
+variable	chem_cap	index	*[H]
+variable	lg_repeat	index	9
+variable	lg_cap		index	1
+variable	norm_poly	index	100
+variable	l_poly		index	632
+variable	mg_repeat	index	44.05358
+variable	mg_cap		index	0
+variable	m_poly		index	3083.7506
+variable	n_poly		index	10
+variable	mtotal		index	50465.0507
+variable	nphase1		index	6320
+variable	mphase1		index	50465.0507
+variable	vphase1		index	133014.575212
+variable	lbox		index	51.0465517814
+variable	lphase1		index	51.0465517814
+variable	lxx		index	51.0465517814
+variable	lyy		index	51.0465517814
+variable	lzz		index	51.0465517814
+variable	lzy		index	0
+variable	lzx		index	0
+variable	lyx		index	0
+variable	vtotal		index	133014.575212
+variable	nl_poly		index	10
+
+# Types
+
+variable	type_c		index	1
+variable	type_c1		index	2
+variable	type_c_1	index	3
+variable	type_hc		index	4
+variable	type_ho2	index	5
+variable	type_o_1	index	6
+variable	type_o_2	index	7
+
+variable	type_bond_c_c	index	1
+variable	type_bond_c_c1	index	2
+variable	type_bond_c_c_1	index	3
+variable	type_bond_c_hc	index	4
+variable	type_bond_c1_c_1 index	5
+variable	type_bond_c1_hc	index	6
+variable	type_bond_c1_o_2 index	7
+variable	type_bond_c_1_o_1 index	8
+variable	type_bond_c_1_o_2 index	9
+variable	type_bond_ho2_o_2 index	10
+
+variable	type_angle_c_c_c_1 index	1
+variable	type_angle_c_c_hc index	2
+variable	type_angle_c_c1_c_1 index	3
+variable	type_angle_c_c1_hc index	4
+variable	type_angle_c_c1_o_2 index	5
+variable	type_angle_c_c_1_o_1 index	6
+variable	type_angle_c_c_1_o_2 index	7
+variable	type_angle_c1_c_hc index	8
+variable	type_angle_c1_c_1_o_1 index	9
+variable	type_angle_c1_c_1_o_2 index	10
+variable	type_angle_c1_o_2_c_1 index	11
+variable	type_angle_c_1_c_hc index	12
+variable	type_angle_c_1_c1_hc index	13
+variable	type_angle_c_1_c1_o_2 index	14
+variable	type_angle_c_1_o_2_ho2 index	15
+variable	type_angle_hc_c_hc index	16
+variable	type_angle_hc_c1_o_2 index	17
+variable	type_angle_o_1_c_1_o_2 index	18
+
+# Clusters
+
+variable	n0_poly		index	1
+variable	n1_poly		index	10
+variable	nl_poly		index	10
+
+# Flags
+
+variable	flag_charged	index	1
+
+# Masses
+
+mass		1    12.01115  # c
+mass		2    12.01115  # c1
+mass		3    12.01115  # c_1
+mass		4     1.00797  # hc
+mass		5     1.00800  # ho2
+mass		6    15.99940  # o_1
+mass		7    15.99940  # o_2
+
+# Potentials
+
+pair_modify	mix sixthpower tail yes
+special_bonds	lj/coul 0 0 1
+
+# Pair Coeffs
+
+pair_coeff	 1  1    0.05400    4.01000  # c,c
+pair_coeff	 2  2    0.05400    4.01000  # c1,c1
+pair_coeff	 3  3    0.12000    3.81000  # c_1,c_1
+pair_coeff	 4  4    0.02000    2.99500  # hc,hc
+pair_coeff	 5  5    0.01300    1.11000  # ho2,ho2
+pair_coeff	 6  6    0.26700    3.30000  # o_1,o_1
+pair_coeff	 7  7    0.24000    3.42000  # o_2,o_2
+
+# Bond Coeffs
+
+bond_coeff	 1    1.53000  299.67000 -501.77000  679.81000  # c,c
+bond_coeff	 2    1.53000  299.67000 -501.77000  679.81000  # c,c1
+bond_coeff	 3    1.52020  253.70670 -423.03700  396.90000  # c,c_1
+bond_coeff	 4    1.10100  345.00000 -691.89000  844.60000  # c,hc
+bond_coeff	 5    1.52020  253.70670 -423.03700  396.90000  # c1,c_1
+bond_coeff	 6    1.10100  345.00000 -691.89000  844.60000  # c1,hc
+bond_coeff	 7    1.43000  326.72730 -608.53060  689.03330  # c1,o_2
+bond_coeff	 8    1.20200  851.14030 -1918.48820 2160.76590  # c_1,o_1
+bond_coeff	 9    1.36830  367.14810 -794.79080 1055.23190  # c_1,o_2
+bond_coeff	10    0.95200  534.29940 -1287.19370 1889.13960  # ho2,o_2
+
+# Angle Coeffs
+
+angle_coeff	 1  108.52950   51.97470   -9.48510  -10.99850  # c,c,c_1
+angle_coeff	 2  110.77000   41.45300  -10.60400    5.12900  # c,c,hc
+angle_coeff	 3  108.52950   51.97470   -9.48510  -10.99850  # c,c1,c_1
+angle_coeff	 4  110.77000   41.45300  -10.60400    5.12900  # c,c1,hc
+angle_coeff	 5  107.41000   63.39070  -13.45130    1.66500  # c,c1,o_2
+angle_coeff	 6  123.14510   55.54310  -17.21230    0.13480  # c,c_1,o_1
+angle_coeff	 7  100.31820   38.86310   -3.83230   -7.98020  # c,c_1,o_2
+angle_coeff	 8  110.77000   41.45300  -10.60400    5.12900  # c1,c,hc
+angle_coeff	 9  123.14510   55.54310  -17.21230    0.13480  # c1,c_1,o_1
+angle_coeff	10  100.31820   38.86310   -3.83230   -7.98020  # c1,c_1,o_2
+angle_coeff	11  113.28800   61.28680  -28.97860    7.99290  # c1,o_2,c_1
+angle_coeff	12  107.73360   40.60990  -28.81210    0.00000  # c_1,c,hc
+angle_coeff	13  107.73360   40.60990  -28.81210    0.00000  # c_1,c1,hc
+angle_coeff	14  109.50000   60.00000    0.00000    0.00000  # c_1,c1,o_2
+angle_coeff	15  112.87400   53.25120  -14.99790    2.46400  # c_1,o_2,ho2
+angle_coeff	16  107.66000   39.64100  -12.92100   -2.43180  # hc,c,hc
+angle_coeff	17  107.68800   65.48010  -10.34980    5.88660  # hc,c1,o_2
+angle_coeff	18  120.79700   95.34460  -32.28690    6.37780  # o_1,c_1,o_2
+
+# BondBond Coeffs
+
+angle_coeff	 1 bb    5.41990    1.53000    1.52020  # c,c,c_1
+angle_coeff	 2 bb    3.38720    1.53000    1.10100  # c,c,hc
+angle_coeff	 3 bb    5.41990    1.53000    1.52020  # c,c1,c_1
+angle_coeff	 4 bb    3.38720    1.53000    1.10100  # c,c1,hc
+angle_coeff	 5 bb   23.26470    1.53000    1.43000  # c,c1,o_2
+angle_coeff	 6 bb   46.06850    1.52020    1.20200  # c,c_1,o_1
+angle_coeff	 7 bb   19.10690    1.52020    1.36830  # c,c_1,o_2
+angle_coeff	 8 bb    3.38720    1.53000    1.10100  # c1,c,hc
+angle_coeff	 9 bb   46.06850    1.52020    1.20200  # c1,c_1,o_1
+angle_coeff	10 bb   19.10690    1.52020    1.36830  # c1,c_1,o_2
+angle_coeff	11 bb   45.45030    1.43000    1.36830  # c1,o_2,c_1
+angle_coeff	12 bb    0.71150    1.52020    1.10100  # c_1,c,hc
+angle_coeff	13 bb    0.71150    1.52020    1.10100  # c_1,c1,hc
+angle_coeff	14 bb    0.00000    1.52020    1.43000  # c_1,c1,o_2
+angle_coeff	15 bb    9.56710    1.36830    0.95200  # c_1,o_2,ho2
+angle_coeff	16 bb    5.33160    1.10100    1.10100  # hc,c,hc
+angle_coeff	17 bb    5.64540    1.10100    1.43000  # hc,c1,o_2
+angle_coeff	18 bb  121.48800    1.20200    1.36830  # o_1,c_1,o_2
+
+# BondAngle Coeffs
+
+angle_coeff	 1 ba   18.16780   15.87580    1.53000    1.52020  # c,c,c_1
+angle_coeff	 2 ba   20.75400   11.42100    1.53000    1.10100  # c,c,hc
+angle_coeff	 3 ba   18.16780   15.87580    1.53000    1.52020  # c,c1,c_1
+angle_coeff	 4 ba   20.75400   11.42100    1.53000    1.10100  # c,c1,hc
+angle_coeff	 5 ba   23.39200   47.94870    1.53000    1.43000  # c,c1,o_2
+angle_coeff	 6 ba   34.99820   37.12980    1.52020    1.20200  # c,c_1,o_1
+angle_coeff	 7 ba    1.34350    4.69780    1.52020    1.36830  # c,c_1,o_2
+angle_coeff	 8 ba   20.75400   11.42100    1.53000    1.10100  # c1,c,hc
+angle_coeff	 9 ba   34.99820   37.12980    1.52020    1.20200  # c1,c_1,o_1
+angle_coeff	10 ba    1.34350    4.69780    1.52020    1.36830  # c1,c_1,o_2
+angle_coeff	11 ba   41.91160   46.46080    1.43000    1.36830  # c1,o_2,c_1
+angle_coeff	12 ba   12.46320    9.17650    1.52020    1.10100  # c_1,c,hc
+angle_coeff	13 ba   12.46320    9.17650    1.52020    1.10100  # c_1,c1,hc
+angle_coeff	14 ba    0.00000    0.00000    1.52020    1.43000  # c_1,c1,o_2
+angle_coeff	15 ba   37.91630   21.43640    1.36830    0.95200  # c_1,o_2,ho2
+angle_coeff	16 ba   18.10300   18.10300    1.10100    1.10100  # hc,c,hc
+angle_coeff	17 ba    8.68640   57.49750    1.10100    1.43000  # hc,c1,o_2
+angle_coeff	18 ba   76.26140   71.87610    1.20200    1.36830  # o_1,c_1,o_2
+
+# Dihedral Coeffs
+
+dihedral_coeff	 1    0.04420    0.00000    0.02920    0.00000    0.05620    0.00000  # c,c,c_1,o_1
+dihedral_coeff	 2    1.83410    0.00000    2.06030    0.00000   -0.01950    0.00000  # c,c,c_1,o_2
+dihedral_coeff	 3    0.04420    0.00000    0.02920    0.00000    0.05620    0.00000  # c,c1,c_1,o_1
+dihedral_coeff	 4    1.83410    0.00000    2.06030    0.00000   -0.01950    0.00000  # c,c1,c_1,o_2
+dihedral_coeff	 5    0.00000    0.00000    0.00000    0.00000   -0.19320    0.00000  # c,c1,o_2,c_1
+dihedral_coeff	 6   -2.55940    0.00000    2.20130    0.00000    0.03250    0.00000  # c,c_1,o_2,c1
+dihedral_coeff	 7   -2.55940    0.00000    2.20130    0.00000    0.03250    0.00000  # c1,c_1,o_2,c1
+dihedral_coeff	 8   -2.91260    0.00000    1.01990    0.00000   -0.20770    0.00000  # c1,c_1,o_2,ho2
+dihedral_coeff	 9    0.00000    0.00000    2.20890    0.00000    0.00000    0.00000  # c1,o_2,c_1,o_1
+dihedral_coeff	10   -0.02280    0.00000    0.02800    0.00000   -0.18630    0.00000  # c_1,c,c,hc
+dihedral_coeff	11   -0.02280    0.00000    0.02800    0.00000   -0.18630    0.00000  # c_1,c1,c,hc
+dihedral_coeff	12    0.00000    0.00000    0.00000    0.00000   -0.19320    0.00000  # c_1,c1,o_2,c_1
+dihedral_coeff	13    0.00000    0.00000    0.00000    0.00000   -0.19320    0.00000  # c_1,o_2,c1,hc
+dihedral_coeff	14   -0.14320    0.00000    0.06170    0.00000   -0.10830    0.00000  # hc,c,c,hc
+dihedral_coeff	15   -0.14320    0.00000    0.06170    0.00000   -0.10830    0.00000  # hc,c,c1,hc
+dihedral_coeff	16    0.00000    0.00000    0.00000    0.00000   -0.25000    0.00000  # hc,c,c1,o_2
+dihedral_coeff	17   -0.18040    0.00000    0.00120    0.00000    0.03710    0.00000  # hc,c,c_1,o_1
+dihedral_coeff	18   -0.63590    0.00000    1.48070    0.00000   -0.04380    0.00000  # hc,c,c_1,o_2
+dihedral_coeff	19   -0.18040    0.00000    0.00120    0.00000    0.03710    0.00000  # hc,c1,c_1,o_1
+dihedral_coeff	20   -0.63590    0.00000    1.48070    0.00000   -0.04380    0.00000  # hc,c1,c_1,o_2
+dihedral_coeff	21    0.00000    0.00000    2.20890    0.00000    0.00000    0.00000  # ho2,o_2,c_1,o_1
+dihedral_coeff	22    0.00000  180.00000    0.00000    0.00000    0.00000    0.00000  # o_1,c_1,c1,o_2
+dihedral_coeff	23    0.00000  180.00000    0.00000    0.00000    0.00000    0.00000  # o_2,c1,c_1,o_2
+
+# MiddleBondTorsion Coeffs
+
+dihedral_coeff	 1 mbt    0.33880   -0.10960    0.12190    1.52020  # c,c,c_1,o_1
+dihedral_coeff	 2 mbt  -17.32800   -5.79000   -3.21140    1.52020  # c,c,c_1,o_2
+dihedral_coeff	 3 mbt    0.33880   -0.10960    0.12190    1.52020  # c,c1,c_1,o_1
+dihedral_coeff	 4 mbt  -17.32800   -5.79000   -3.21140    1.52020  # c,c1,c_1,o_2
+dihedral_coeff	 5 mbt   -5.43500    0.00000    0.00000    1.43000  # c,c1,o_2,c_1
+dihedral_coeff	 6 mbt    1.34450    3.55150   -4.92020    1.36830  # c,c_1,o_2,c1
+dihedral_coeff	 7 mbt    1.34450    3.55150   -4.92020    1.36830  # c1,c_1,o_2,c1
+dihedral_coeff	 8 mbt    2.14520    0.54820   -2.36930    1.36830  # c1,c_1,o_2,ho2
+dihedral_coeff	 9 mbt    4.26000    0.00000    0.00000    1.36830  # c1,o_2,c_1,o_1
+dihedral_coeff	10 mbt   -3.50390    1.24580   -0.76100    1.53000  # c_1,c,c,hc
+dihedral_coeff	11 mbt   -3.50390    1.24580   -0.76100    1.53000  # c_1,c1,c,hc
+dihedral_coeff	12 mbt    0.00000    0.00000    0.00000    1.43000  # c_1,c1,o_2,c_1
+dihedral_coeff	13 mbt    0.00000    0.00000    0.00000    1.43000  # c_1,o_2,c1,hc
+dihedral_coeff	14 mbt  -14.26100   -0.53220   -0.48640    1.53000  # hc,c,c,hc
+dihedral_coeff	15 mbt  -14.26100   -0.53220   -0.48640    1.53000  # hc,c,c1,hc
+dihedral_coeff	16 mbt    0.00000    0.00000    0.00000    1.53000  # hc,c,c1,o_2
+dihedral_coeff	17 mbt    0.23590    0.91390    0.95940    1.52020  # hc,c,c_1,o_1
+dihedral_coeff	18 mbt  -13.76860   -2.59590    1.19340    1.52020  # hc,c,c_1,o_2
+dihedral_coeff	19 mbt    0.23590    0.91390    0.95940    1.52020  # hc,c1,c_1,o_1
+dihedral_coeff	20 mbt  -13.76860   -2.59590    1.19340    1.52020  # hc,c1,c_1,o_2
+dihedral_coeff	21 mbt    4.26000    0.00000    0.00000    1.36830  # ho2,o_2,c_1,o_1
+dihedral_coeff	22 mbt    0.00000    0.00000    0.00000    1.52020  # o_1,c_1,c1,o_2
+dihedral_coeff	23 mbt    0.00000    0.00000    0.00000    1.52020  # o_2,c1,c_1,o_2
+
+# EndBondTorsion Coeffs
+
+dihedral_coeff	 1 ebt    0.26540    0.05030    0.10460   -0.28100    0.08160   -0.15220    1.53000    1.20200  # c,c,c_1,o_1
+dihedral_coeff	 2 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.53000    1.36830  # c,c,c_1,o_2
+dihedral_coeff	 3 ebt    0.26540    0.05030    0.10460   -0.28100    0.08160   -0.15220    1.53000    1.20200  # c,c1,c_1,o_1
+dihedral_coeff	 4 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.53000    1.36830  # c,c1,c_1,o_2
+dihedral_coeff	 5 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.53000    1.36830  # c,c1,o_2,c_1
+dihedral_coeff	 6 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.52020    1.43000  # c,c_1,o_2,c1
+dihedral_coeff	 7 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.52020    1.43000  # c1,c_1,o_2,c1
+dihedral_coeff	 8 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.52020    0.95200  # c1,c_1,o_2,ho2
+dihedral_coeff	 9 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.43000    1.20200  # c1,o_2,c_1,o_1
+dihedral_coeff	10 ebt   -0.02040    0.36280   -0.44260   -0.00970   -0.03150   -0.07550    1.52020    1.10100  # c_1,c,c,hc
+dihedral_coeff	11 ebt   -0.02040    0.36280   -0.44260   -0.00970   -0.03150   -0.07550    1.52020    1.10100  # c_1,c1,c,hc
+dihedral_coeff	12 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.52020    1.36830  # c_1,c1,o_2,c_1
+dihedral_coeff	13 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.36830    1.10100  # c_1,o_2,c1,hc
+dihedral_coeff	14 ebt    0.21300    0.31200    0.07770    0.21300    0.31200    0.07770    1.10100    1.10100  # hc,c,c,hc
+dihedral_coeff	15 ebt    0.21300    0.31200    0.07770    0.21300    0.31200    0.07770    1.10100    1.10100  # hc,c,c1,hc
+dihedral_coeff	16 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.10100    1.43000  # hc,c,c1,o_2
+dihedral_coeff	17 ebt    1.21430    0.28310    0.39160   -0.22980    0.03540    0.38530    1.10100    1.20200  # hc,c,c_1,o_1
+dihedral_coeff	18 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.10100    1.36830  # hc,c,c_1,o_2
+dihedral_coeff	19 ebt    1.21430    0.28310    0.39160   -0.22980    0.03540    0.38530    1.10100    1.20200  # hc,c1,c_1,o_1
+dihedral_coeff	20 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.10100    1.36830  # hc,c1,c_1,o_2
+dihedral_coeff	21 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    0.95200    1.20200  # ho2,o_2,c_1,o_1
+dihedral_coeff	22 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.20200    1.43000  # o_1,c_1,c1,o_2
+dihedral_coeff	23 ebt    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000    1.43000    1.36830  # o_2,c1,c_1,o_2
+
+# AngleTorsion Coeffs
+
+dihedral_coeff	 1 at    0.08850   -1.37030   -0.54520    0.67500    0.59650    0.67250  108.52950  123.14510  # c,c,c_1,o_1
+dihedral_coeff	 2 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  108.52950  100.31820  # c,c,c_1,o_2
+dihedral_coeff	 3 at    0.08850   -1.37030   -0.54520    0.67500    0.59650    0.67250  108.52950  123.14510  # c,c1,c_1,o_1
+dihedral_coeff	 4 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  108.52950  100.31820  # c,c1,c_1,o_2
+dihedral_coeff	 5 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  107.41000  113.28800  # c,c1,o_2,c_1
+dihedral_coeff	 6 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  100.31820  113.28800  # c,c_1,o_2,c1
+dihedral_coeff	 7 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  100.31820  113.28800  # c1,c_1,o_2,c1
+dihedral_coeff	 8 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  100.31820  112.87400  # c1,c_1,o_2,ho2
+dihedral_coeff	 9 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  113.28800  120.79700  # c1,o_2,c_1,o_1
+dihedral_coeff	10 at   -0.74660   -0.94480   -0.63210    0.01620    1.42110   -1.40920  108.52950  110.77000  # c_1,c,c,hc
+dihedral_coeff	11 at   -0.74660   -0.94480   -0.63210    0.01620    1.42110   -1.40920  108.52950  110.77000  # c_1,c1,c,hc
+dihedral_coeff	12 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  109.50000  113.28800  # c_1,c1,o_2,c_1
+dihedral_coeff	13 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  113.28800  107.68800  # c_1,o_2,c1,hc
+dihedral_coeff	14 at   -0.80850    0.55690   -0.24660   -0.80850    0.55690   -0.24660  110.77000  110.77000  # hc,c,c,hc
+dihedral_coeff	15 at   -0.80850    0.55690   -0.24660   -0.80850    0.55690   -0.24660  110.77000  110.77000  # hc,c,c1,hc
+dihedral_coeff	16 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  110.77000  107.41000  # hc,c,c1,o_2
+dihedral_coeff	17 at    9.12990   -0.48470    0.35820   -1.49460    0.73080   -0.20830  107.73360  123.14510  # hc,c,c_1,o_1
+dihedral_coeff	18 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  107.73360  100.31820  # hc,c,c_1,o_2
+dihedral_coeff	19 at    9.12990   -0.48470    0.35820   -1.49460    0.73080   -0.20830  107.73360  123.14510  # hc,c1,c_1,o_1
+dihedral_coeff	20 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  107.73360  100.31820  # hc,c1,c_1,o_2
+dihedral_coeff	21 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  112.87400  120.79700  # ho2,o_2,c_1,o_1
+dihedral_coeff	22 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  123.14510  109.50000  # o_1,c_1,c1,o_2
+dihedral_coeff	23 at    0.00000    0.00000    0.00000    0.00000    0.00000    0.00000  109.50000  100.31820  # o_2,c1,c_1,o_2
+
+# AngleAngleTorsion Coeffs
+
+dihedral_coeff	 1 aat   -8.01900  108.52950  123.14510  # c,c,c_1,o_1
+dihedral_coeff	 2 aat    0.00000  108.52950  100.31820  # c,c,c_1,o_2
+dihedral_coeff	 3 aat   -8.01900  108.52950  123.14510  # c,c1,c_1,o_1
+dihedral_coeff	 4 aat    0.00000  108.52950  100.31820  # c,c1,c_1,o_2
+dihedral_coeff	 5 aat    0.00000  107.41000  113.28800  # c,c1,o_2,c_1
+dihedral_coeff	 6 aat    0.00000  100.31820  113.28800  # c,c_1,o_2,c1
+dihedral_coeff	 7 aat    0.00000  100.31820  113.28800  # c1,c_1,o_2,c1
+dihedral_coeff	 8 aat    0.00000  100.31820  112.87400  # c1,c_1,o_2,ho2
+dihedral_coeff	 9 aat    0.00000  113.28800  120.79700  # c1,o_2,c_1,o_1
+dihedral_coeff	10 aat   -5.36240  108.52950  110.77000  # c_1,c,c,hc
+dihedral_coeff	11 aat   -5.36240  108.52950  110.77000  # c_1,c1,c,hc
+dihedral_coeff	12 aat    0.00000  109.50000  113.28800  # c_1,c1,o_2,c_1
+dihedral_coeff	13 aat    0.00000  113.28800  107.68800  # c_1,o_2,c1,hc
+dihedral_coeff	14 aat  -12.56400  110.77000  110.77000  # hc,c,c,hc
+dihedral_coeff	15 aat  -12.56400  110.77000  110.77000  # hc,c,c1,hc
+dihedral_coeff	16 aat    0.00000  110.77000  107.41000  # hc,c,c1,o_2
+dihedral_coeff	17 aat  -15.34960  107.73360  123.14510  # hc,c,c_1,o_1
+dihedral_coeff	18 aat    0.00000  107.73360  100.31820  # hc,c,c_1,o_2
+dihedral_coeff	19 aat  -15.34960  107.73360  123.14510  # hc,c1,c_1,o_1
+dihedral_coeff	20 aat    0.00000  107.73360  100.31820  # hc,c1,c_1,o_2
+dihedral_coeff	21 aat    0.00000  112.87400  120.79700  # ho2,o_2,c_1,o_1
+dihedral_coeff	22 aat    0.00000  123.14510  109.50000  # o_1,c_1,c1,o_2
+dihedral_coeff	23 aat    0.00000  109.50000  100.31820  # o_2,c1,c_1,o_2
+
+# BondBond13 Coeffs
+
+dihedral_coeff	 1 bb13    0.00000    1.53000    1.20200  # c,c,c_1,o_1
+dihedral_coeff	 2 bb13    0.00000    1.53000    1.36830  # c,c,c_1,o_2
+dihedral_coeff	 3 bb13    0.00000    1.53000    1.20200  # c,c1,c_1,o_1
+dihedral_coeff	 4 bb13    0.00000    1.53000    1.36830  # c,c1,c_1,o_2
+dihedral_coeff	 5 bb13    0.00000    1.53000    1.36830  # c,c1,o_2,c_1
+dihedral_coeff	 6 bb13    0.00000    1.52020    1.43000  # c,c_1,o_2,c1
+dihedral_coeff	 7 bb13    0.00000    1.52020    1.43000  # c1,c_1,o_2,c1
+dihedral_coeff	 8 bb13    0.00000    1.52020    0.95200  # c1,c_1,o_2,ho2
+dihedral_coeff	 9 bb13    0.00000    1.43000    1.20200  # c1,o_2,c_1,o_1
+dihedral_coeff	10 bb13    0.00000    1.52020    1.10100  # c_1,c,c,hc
+dihedral_coeff	11 bb13    0.00000    1.52020    1.10100  # c_1,c1,c,hc
+dihedral_coeff	12 bb13    0.00000    1.52020    1.36830  # c_1,c1,o_2,c_1
+dihedral_coeff	13 bb13    0.00000    1.36830    1.10100  # c_1,o_2,c1,hc
+dihedral_coeff	14 bb13    0.00000    1.10100    1.10100  # hc,c,c,hc
+dihedral_coeff	15 bb13    0.00000    1.10100    1.10100  # hc,c,c1,hc
+dihedral_coeff	16 bb13    0.00000    1.10100    1.43000  # hc,c,c1,o_2
+dihedral_coeff	17 bb13    0.00000    1.10100    1.20200  # hc,c,c_1,o_1
+dihedral_coeff	18 bb13    0.00000    1.10100    1.36830  # hc,c,c_1,o_2
+dihedral_coeff	19 bb13    0.00000    1.10100    1.20200  # hc,c1,c_1,o_1
+dihedral_coeff	20 bb13    0.00000    1.10100    1.36830  # hc,c1,c_1,o_2
+dihedral_coeff	21 bb13    0.00000    0.95200    1.20200  # ho2,o_2,c_1,o_1
+dihedral_coeff	22 bb13    0.00000    1.20200    1.43000  # o_1,c_1,c1,o_2
+dihedral_coeff	23 bb13    0.00000    1.43000    1.36830  # o_2,c1,c_1,o_2
+
+# Improper Coeffs
+
+improper_coeff	 1    0.00000    0.00000  # c,c,c_1,hc
+improper_coeff	 2    0.00000    0.00000  # c,c,hc,c_1
+improper_coeff	 3    0.00000    0.00000  # c,c,hc,hc
+improper_coeff	 4    0.00000    0.00000  # c,c1,hc,hc
+improper_coeff	 5    0.00000    0.00000  # c,c_1,hc,hc
+improper_coeff	 6    0.00000    0.00000  # c,hc,hc,hc
+improper_coeff	 7    0.00000    0.00000  # c1,c,c_1,hc
+improper_coeff	 8    0.00000    0.00000  # c1,c,o_2,c_1
+improper_coeff	 9    0.00000    0.00000  # c1,c,o_2,hc
+improper_coeff	10    0.00000    0.00000  # c1,c_1,hc,o_2
+improper_coeff	11   46.92640    0.00000  # c_1,c,o_2,o_1
+improper_coeff	12   46.92640    0.00000  # c_1,c1,o_2,o_1
+
+# AngleAngle Coeffs
+
+improper_coeff	 1 aa    2.04030   -1.82020    1.08270  108.52950  110.77000  107.73360  # c,c,c_1,hc
+improper_coeff	 2 aa    1.08270   -1.82020    2.04030  110.77000  108.52950  107.73360  # c,c,hc,c_1
+improper_coeff	 3 aa    0.27380   -0.48250    0.27380  110.77000  110.77000  107.66000  # c,c,hc,hc
+improper_coeff	 4 aa    0.27380   -0.48250    0.27380  110.77000  110.77000  107.66000  # c,c1,hc,hc
+improper_coeff	 5 aa   -3.38670   -3.49760   -3.38670  107.73360  107.73360  107.66000  # c,c_1,hc,hc
+improper_coeff	 6 aa   -0.31570   -0.31570   -0.31570  107.66000  107.66000  107.66000  # c,hc,hc,hc
+improper_coeff	 7 aa    2.04030   -1.82020    1.08270  108.52950  110.77000  107.73360  # c1,c,c_1,hc
+improper_coeff	 8 aa    0.00000    0.00000    0.00000  107.41000  108.52950  109.50000  # c1,c,o_2,c_1
+improper_coeff	 9 aa    0.00000    0.00000    0.00000  107.41000  110.77000  107.68800  # c1,c,o_2,hc
+improper_coeff	10 aa    0.00000    0.00000    0.00000  107.73360  109.50000  107.68800  # c1,c_1,hc,o_2
+improper_coeff	11 aa    0.00000    0.00000    0.00000  100.31820  123.14510  120.79700  # c_1,c,o_2,o_1
+improper_coeff	12 aa    0.00000    0.00000    0.00000  100.31820  123.14510  120.79700  # c_1,c1,o_2,o_1
+
+
+# --- Thermo Output ---
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
+thermo_modify flush yes
+thermo 1000
+
+# --- Trajectory ---
+dump dump_nvt all custom 1000 nvt_warmup.dump id type mol x y z ix iy iz vx vy vz
+
+
+# --- Restart Checkpointing ---
+restart 10000 nvt_1.rst nvt_2.rst
+
+# --- Initial Velocities (optional) ---
+velocity all create 300.0 561359054 mom yes rot yes dist gaussian
+
+# --- SHAKE Constraints ---
+# Constrains H-X bonds to allow 2fs timestep
+# SHAKE disabled
+
+# --- NVT Thermostat (Nose-Hoover) ---
+# T_damp = 100.0 fs  (coupling timescale for heat exchange)
+# Ramp: 300.0 K -> 300.0 K over 100000 steps
+timestep 0.5
+fix nvt_fix all nvt temp 300.0 300.0 100.0
+
+run 100000
+PPPM Kokkos initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.33160826
+  grid = 54 54 54
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00035492389
+  estimated relative force accuracy = 1.0688427e-06
+  using double precision cuFFT
+  3d grid and FFT values/proc = 226981 157464
+Generated 21 of 21 mixed pair_coeff terms from sixthpower/sixthpower mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 4000, page size: 100000
+  master list distance cutoff = 11.5
+  ghost atom cutoff = 11.5
+  binsize = 11.5, bins = 5 5 5
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/class2/coul/long/kk, perpetual
+      attributes: full, newton off, kokkos_device
+      pair build: full/bin/kk/device
+      stencil: full/bin/3d
+      bin: kk/device
+Per MPI rank memory allocation (min/avg/max) = 46.48 | 46.48 | 46.48 Mbytes
+   Step          Time           Temp          Press         Enthalpy        TotEng         KinEng         PotEng         E_bond        E_angle        E_dihed        E_impro         E_vdwl         E_coul         E_long         E_tail         Volume           Lx             Ly             Lz          Density          Pxx            Pyy            Pzz      
+         0   0              300            1254.081       22943.396      20510.628      5650.7216      14859.906      714.45905      2810.2411     -4773.2466      18.45136      -2619.5053      61874.806     -43165.3       -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     1337.6016      1176.4066      1248.2347    
+      1000   500            240.12351      87.490359      24101.74       23932.019      4522.9036      19409.116      2325.2798      4687.377      -4421.3149      181.61012     -2138.697       61916.973     -43142.112     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -426.81449     -160.69826      849.98383    
+      2000   1000           306.77288     -359.87199      25955.811      26653.92       5778.2938      20875.626      2983.5909      5334.8826     -4412.6408      226.40168     -2008.197       61885.235     -43133.646     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -280.73612     -477.96093     -320.91893    
+      3000   1500           304.50741     -435.2516       25517.954      26362.29       5735.622       20626.668      2912.2269      5169.7079     -4415.1302      227.15898     -1957.3195      61840.68      -43150.656     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1028.0933     -292.23852      14.577049    
+      4000   2000           298.67838     -512.16211      25118.4        26111.933      5625.8279      20486.105      2710.6409      5193.6685     -4399.6966      226.26464     -1966.4494      61884.952     -43163.275     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -8.1857997     -784.03327     -744.26725    
+      5000   2500           295.62559     -650.13479      24695.922      25957.106      5568.3264      20388.78       2808.963       5081.6626     -4488.8873      216.43559     -1927.8093      61860.497     -43162.082     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -507.87594     -939.9903      -502.53812    
+      6000   3000           298.03219     -480.97021      25025.775      25958.8        5613.6565      20345.144      2833.7539      5038.1198     -4509.7478      196.28529     -1920.53        61866.125     -43158.862     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -232.35258     -60.417014     -1150.141     
+      7000   3500           300.03316     -912.46897      24260.49       26030.571      5651.3462      20379.225      2843.5548      5046.3228     -4540.2254      211.46302     -1914.7826      61891.096     -43158.204     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -660.73875     -730.95675     -1345.7114    
+      8000   4000           306.10259     -197.04235      25775.72       26157.959      5765.6685      20392.29       2809.6445      5105.103      -4546.9547      229.39744     -1895.5717      61855.927     -43165.255     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -784.62235     -18.990685      212.48599    
+      9000   4500           302.30684      404.15495      26865.43       26081.418      5694.1726      20387.245      2892.8254      5092.2934     -4574.8065      218.30787     -1905.6354      61831.422     -43167.162     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     381.54659      1014.9714     -184.05318    
+     10000   5000           302.45155     -385.37         25163.075      25910.647      5696.8984      20213.748      2739.839       5022.2882     -4553.5106      221.36185     -1918.6256      61867.962     -43165.566     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -135.63584     -642.40727     -378.06689    
+     11000   5500           294.89283     -49.735516      25716.687      25813.168      5554.5243      20258.644      2746.4489      5112.5654     -4507.9027      198.18991     -1994.901       61868.715     -43164.472     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     116.02645      239.90619     -505.13919    
+     12000   6000           297.17858     -672.3186       24443.213      25747.432      5597.578       20149.854      2752.6236      5084.9919     -4625.8668      186.99589     -1949.8285      61874.312     -43173.374     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -737.85141     -1004.5657     -274.53869    
+     13000   6500           298.60966      188.85403      26298.998      25932.644      5624.5335      20308.11       2878.2984      5135.4603     -4664.1962      236.26099     -1914.7516      61804.012     -43166.974     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     492.06992      40.809219      33.682947    
+     14000   7000           303.21906     -432.87764      25052.362      25892.094      5711.3549      20180.739      2820.288       5112.1029     -4604.801       207.81763     -1986.5599      61808.237     -43176.346     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -314.93999     -665.87422     -317.81872    
+     15000   7500           295.54308     -950.22788      23868.745      25712.074      5566.7723      20145.301      2794.359       5151.7427     -4566.2483      204.03123     -2071.1679      61804.205     -43171.621     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -793.00114     -1206.0304     -851.65206    
+     16000   8000           295.27815     -219.52396      25185.093      25610.943      5561.782       20049.161      2800.939       5075.5456     -4623.8147      220.09089     -2074.5153      61832.747     -43181.832     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     358.00224     -493.9547      -522.61943    
+     17000   8500           295.75873     -1104.8701      23511.188      25654.504      5570.8341      20083.67       2872.4652      5134.5659     -4618.684       241.72521     -2154.6303      61786.716     -43178.488     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -744.23164     -1384.1836     -1186.1951    
+     18000   9000           301.44431      39.079396      25695.552      25619.743      5677.9263      19941.816      2735.3665      5164.1321     -4718.3009      203.37387     -2054.8931      61787.918     -43175.78      -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     72.482174     -553.27828      598.03429    
+     19000   9500           300.80011     -717.54067      24305.12       25697.064      5665.7923      20031.271      2742.1222      5159.1207     -4690.2798      237.73086     -2048.7682      61795.484     -43164.138     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -499.26507     -477.73512     -1175.6218    
+     20000   10000          299.87726     -386.58974      24876.674      25626.612      5648.4098      19978.203      2809.8708      5065.3593     -4719.4767      210.37496     -2048.8935      61832.337     -43171.369     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -708.97314      577.22202     -1028.0181    
+     21000   10500          297.16373     -345.88568      25032.494      25703.472      5597.2984      20106.173      2759.1331      5205.3799     -4683.3705      220.44401     -2023.3475      61798.979     -43171.045     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -442.05838     -274.2691      -321.32958    
+     22000   11000          301.48498     -1018.9328      23657.882      25634.491      5678.6923      19955.798      2795.8537      5217.0663     -4779.8776      208.13036     -2117.0885      61802.198     -43170.483     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1249.7546     -931.11868     -875.92504    
+     23000   11500          299.49773     -147.0134       25361.521      25646.709      5641.2611      20005.448      2825.1681      5114.3749     -4724.4545      230.39394     -2068.5489      61812.312     -43183.797     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1068.8094     -1.4648159      629.23405    
+     24000   12000          300.47967     -1067.2751      23518.224      25588.611      5659.7566      19928.854      2788.2459      5105.2468     -4656.2862      199.28934     -2127.2565      61799.596     -43179.981     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     53.38778      -1809.6372     -1445.576     
+     25000   12500          298.58371     -1100.8443      23445.471      25580.978      5624.0447      19956.933      2813.3852      5067.6661     -4694.0833      234.18915     -2104.7408      61814.886     -43174.369     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -809.03958     -726.71184     -1766.7815    
+     26000   13000          294.3509      -1538.4046      22541.754      25526.076      5544.3166      19981.76       2927.5915      5121.9481     -4775.1762      244.30338     -2150.7381      61781.499     -43167.668     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -967.35643     -1932.5074     -1715.3501    
+     27000   13500          296.45727     -732.69042      24046.2        25467.532      5583.9916      19883.541      2831.5213      5119.166      -4835.4865      191.15818     -2057.2332      61813.251     -43178.836     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     146.49679     -1599.6638     -744.90422    
+     28000   14000          298.27479     -590.27621      24378.57       25523.635      5618.2261      19905.409      2798.1914      5096.9183     -4750.5924      230.28525     -2117.5669      61830.439     -43182.266     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -357.84556     -429.20797     -983.77509    
+     29000   14500          302.99464     -1035.7738      23568.527      25577.805      5707.128       19870.677      2840.3744      5157.0434     -4761.9107      194.75681     -2148.0388      61761.584     -43173.132     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -820.92471     -1115.645      -1170.7516    
+     30000   15000          301.57579     -636.97409      24273.205      25508.859      5680.4027      19828.456      2858.5784      5114.0236     -4720.6548      197.91239     -2224.1358      61781.776     -43179.043     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1090.9072     -601.47989     -218.53517    
+     31000   15500          297.98655     -881.08953      23848.885      25558.094      5612.7968      19945.297      2861.5463      5170.8504     -4771.276       214.50555     -2149.4075      61805.725     -43186.647     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -244.36476     -948.28961     -1450.6142    
+     32000   16000          295.38198     -251.70916      24928.1        25416.386      5563.7378      19852.649      2852.0351      5100.0001     -4781.3029      233.48248     -2176.0907      61811.5       -43186.976     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -507.62649      2.7040931     -250.20509    
+     33000   16500          302.18918     -335.87188      24939.052      25590.604      5691.9564      19898.648      2829.635       5233.641      -4800.9171      212.33732     -2156.1746      61755.976     -43175.85      -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -632.66562      606.05575     -981.00577    
+     34000   17000          301.62906     -406.79141      24723.284      25512.411      5681.4061      19831.005      2934.0809      5117.2058     -4796.4763      204.34598     -2182.4411      61742.325     -43188.036     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1484.3554     -179.19692      443.17804    
+     35000   17500          304.09803     -380.97811      24747.957      25487.01       5727.911       19759.099      2838.695       5081.256      -4854.1244      218.54417     -2147.0155      61799.719     -43177.975     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -137.53045     -290.28349     -715.12038    
+     36000   18000          300.40664     -737.64973      23989.197      25420.15       5658.381       19761.769      2797.2936      5169.4135     -4758.9716      213.85519     -2195.5338      61726.468     -43190.756     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -100.62375     -821.93832     -1290.3871    
+     37000   18500          299.01079     -398.77729      24596.572      25370.152      5632.0891      19738.063      2848.7882      5093.7651     -4811.0229      225.93691     -2177.164       61741.393     -43183.634     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     275.22549     -527.91177     -943.6456     
+     38000   19000          300.57407     -483.7821       24527.88       25466.36       5661.5347      19804.825      2865.2482      5125.9843     -4824.9084      221.42258     -2131.5519      61742.657     -43194.026     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -621.60888     -200.18174     -629.55568    
+     39000   19500          299.71303     -357.10125      24679.763      25372.497      5645.3163      19727.18       2886.6964      5148.8218     -4836.0208      203.83244     -2241.5109      61762.339     -43196.978     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -94.214279     -452.79246     -524.29701    
+     40000   20000          298.21292     -891.45261      23621.17       25350.482      5617.0607      19733.422      2847.4532      5173.6462     -4855.1778      215.0583      -2170.0396      61718.761     -43196.279     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -970.39833     -1227.5218     -476.43766    
+     41000   20500          295.46097     -477.8232       24478.558      25405.478      5565.2257      19840.252      2822.9048      5216.0559     -4803.5837      235.51851     -2151.6988      61716.123     -43195.067     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -510.78471     -95.905538     -826.77936    
+     42000   21000          304.87167     -1394.7829      22820.114      25525.827      5742.483       19783.344      2886.6959      5146.2725     -4885.4326      226.65398     -2170.6338      61761.768     -43181.98      -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1966.9587     -844.24742     -1373.1425    
+     43000   21500          298.79154     -985.86394      23478.563      25391.022      5627.9593      19763.063      2913.477       5118.2927     -4885.9516      232.69733     -2141.7295      61708.002     -43181.725     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1075.6893     -1251.9234     -629.97914    
+     44000   22000          300.85237     -578.65227      24310.823      25433.339      5666.7766      19766.563      2861.6083      5127.7025     -4841.6071      212.70223     -2179.385       61767.945     -43182.403     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -117.78289     -1152.6755     -465.49841    
+     45000   22500          303.46283     -430.88337      24604.184      25440.046      5715.9466      19724.1        2916.1338      5056.6674     -4866.5074      220.47969     -2150.8494      61733.534     -43185.358     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     108.76866     -461.42457     -939.9942     
+     46000   23000          300.31762     -1278.755       22867.768      25348.4        5656.7042      19691.696      2782.4925      5173.4247     -4824.4775      206.28413     -2184.042       61725.758     -43187.744     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1265.011      -1327.1935     -1244.0606    
+     47000   23500          297.90393     -620.13075      24132.954      25335.934      5611.2405      19724.694      2856.5577      5164.4315     -4917.7004      209.94872     -2159.7194      61753.67      -43182.494     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1091.8581     -264.47056     -504.06364    
+     48000   24000          299.96833     -843.39434      23712.553      25348.638      5650.1251      19698.513      2864.1185      5135.33       -4883.4922      196.55293     -2152.066       61730.879     -43192.81      -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -606.41367     -790.0984      -1133.671     
+     49000   24500          300.6115      -903.71933      23623.316      25376.424      5662.2396      19714.184      2869.1531      5165.4854     -4900.2994      202.36529     -2153.4532      61730.029     -43199.096     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -696.58534     -1261.4818     -753.09081    
+     50000   25000          297.0632      -842.07629      23777.782      25411.31       5595.4049      19815.905      2905.9621      5182.0479     -4877.9289      210.70259     -2161.8225      61744.613     -43187.669     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -811.4566      -873.16712     -841.60516    
+     51000   25500          300.75652     -452.23839      24527.627      25404.916      5664.9713      19739.945      2855.3552      5150.1715     -4918.1832      189.57972     -2115.5909      61772.879     -43194.267     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     1065.798      -913.31221     -1509.2009    
+     52000   26000          300.80155     -153.86354      25018.11       25316.587      5665.8193      19650.768      2841.5692      5127.1872     -4916.1787      181.5919      -2109.4312      61724.107     -43198.077     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -345.16851      580.78728     -697.2094     
+     53000   26500          298.13358     -1184.4447      22971.995      25269.677      5615.5663      19654.111      2884.0364      5040.5807     -4873.8655      199.37994     -2110.0525      61703.234     -43189.202     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1409.1379     -925.21696     -1218.9792    
+     54000   27000          293.97792     -383.02095      24509.941      25252.956      5537.2913      19715.665      2878.3314      5110.5729     -4944.6451      218.02338     -2120.8832      61763.097     -43188.831     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -252.49177     -799.99925     -96.571842    
+     55000   27500          295.85418     -1361.7927      22798.463      25440.179      5572.632       19867.547      2958.1047      5213.3585     -4970.3527      229.31429     -2122.5024      61748.384     -43188.76      -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1287.2466     -1180.0251     -1618.1064    
+     56000   28000          301.02169     -730.36191      24011.244      25428.059      5669.9658      19758.093      2872.4836      5174.6905     -4932.0997      213.19724     -2180.15        61792.784     -43182.812     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -128.09779     -666.37386     -1396.6141    
+     57000   28500          299.23953     -507.73397      24273.605      25258.549      5636.3976      19622.151      2822.7401      5124.5422     -4937.8523      212.3125      -2165.3596      61753.014     -43187.245     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     84.539632     -1098.0925     -509.64908    
+     58000   29000          297.35989     -351.98288      24650.746      25333.551      5600.9933      19732.557      2914.6365      5149.9383     -4938.1329      199.52808     -2155.6326      61740.094     -43177.874     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -232.66268      166.55158     -989.83754    
+     59000   29500          295.23605     -1031.3565      23258.965      25259.674      5560.9891      19698.685      2887.8044      5182.7216     -4973.1119      207.1259      -2211.4529      61781.222     -43175.625     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1111.5818     -358.30153     -1624.1863    
+     60000   30000          299.62833     -616.42411      23982.197      25177.986      5643.7209      19534.266      2810.6718      5033.4829     -4934.6109      202.80818     -2149.1401      61757.225     -43186.171     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     194.46157     -1344.7677     -698.96618    
+     61000   30500          298.4924      -138.95725      24959.205      25228.765      5622.3249      19606.44       2847.9111      5128.7985     -5015.1994      220.67981     -2137.8569      61738.688     -43176.581     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -249.14345     -99.714614     -68.01369     
+     62000   31000          299.44842     -582.98213      24151.599      25282.515      5640.3322      19642.183      2823.024       5235.1942     -4997.6535      193.47982     -2252.2725      61804.364     -43163.953     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -297.99059     -858.02955     -592.92626    
+     63000   31500          300.61409     -673.85411      24031.06       25338.257      5662.2884      19675.968      2897.2999      5164.2305     -4940.7519      204.66814     -2173.5835      61692.469     -43168.364     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -313.40212     -865.85016     -842.31004    
+     64000   32000          300.68294     -883.81403      23589.738      25304.233      5663.5854      19640.647      2906.7846      5162.446      -5017.383       199.03198     -2166.4733      61723.244     -43167.003     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1323.7255     -1188.4726     -139.24399    
+     65000   32500          300.04258     -804.3503       23687.124      25247.468      5651.5237      19595.944      2903.5178      5171.0639     -5008.9616      206.44336     -2197.8644      61698.682     -43176.936     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -646.31136     -999.95757     -766.78198    
+     66000   33000          291.65402     -413.7817       24274.879      25077.566      5493.5188      19584.047      2877.6952      5135.9814     -4992.1991      227.58044     -2207.346       61709.68      -43167.345     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -705.97301     -297.794       -237.57809    
+     67000   33500          295.63111     -309.98396      24613.61       25214.942      5568.4303      19646.511      2870.0119      5176.375      -5015.0373      212.06043     -2178.2645      61749.84      -43168.475     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -12.103756     -379.78337     -538.06476    
+     68000   34000          300.24618     -460.87111      24405.717      25299.752      5655.3586      19644.394      2871.564       5230.7562     -4986.0609      175.17171     -2189.0047      61699.364     -43157.397     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -776.94972     -455.06093     -150.60268    
+     69000   34500          301.83741     -1072.3896      23184.895      25265.204      5685.3307      19579.873      2924.9961      5118.1735     -4994.2116      196.87483     -2228.0214      61724.48      -43162.418     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -628.49377     -853.31006     -1735.365     
+     70000   35000          296.64807     -565.02958      24098.081      25194.171      5587.5856      19606.585      2908.8223      5116.3696     -4987.8126      217.52238     -2246.1122      61771.777     -43173.981     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -371.51895     -880.97531     -442.59449    
+     71000   35500          298.80781     -844.75695      23419.915      25058.643      5628.2658      19430.377      2804.8334      5163.2129     -5053.7894      193.8702      -2285.8331      61779.971     -43171.887     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1264.0601     -635.98839     -634.22234    
+     72000   36000          293.55008     -213.09284      24711.073      25124.448      5529.2326      19595.215      2960.9016      5149.9361     -5035.5949      208.47592     -2241.5532      61727.371     -43174.321     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -945.84218      579.38063     -272.81699    
+     73000   36500          297.10428     -763.30187      23682.095      25162.81       5596.1787      19566.631      2828.0214      5224.2869     -4975.2598      223.53409     -2266.5514      61710.175     -43177.574     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1300.7486     -518.37169     -470.78533    
+     74000   37000          296.92259     -244.79323      24727.944      25202.814      5592.7562      19610.058      2964.4106      5155.2435     -5042.9113      234.71385     -2259.2207      61734.178     -43176.356     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -381.00305     -303.70196     -49.674686    
+     75000   37500          300.06868     -614.52095      24032.709      25224.807      5652.0152      19572.792      2871.2338      5154.8319     -5011.077       245.35469     -2247.9576      61733.444     -43173.038     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -823.92378     -599.70365     -419.93542    
+     76000   38000          306.33641     -161.11364      25057.453      25369.995      5770.0726      19599.922      2826.1449      5174.4106     -4976.4381      229.02754     -2211.694       61735.982     -43177.511     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     370.02642     -609.16082     -244.20652    
+     77000   38500          304.04863     -966.99284      23323.599      25199.45       5726.9806      19472.47       2895.3912      5053.2686     -4954.2479      217.05465     -2263.4428      61696.727     -43172.281     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -970.70444     -1335.3134     -594.96068    
+     78000   39000          299.07445     -562.71315      24057.671      25149.268      5633.2883      19515.98       2879.1811      5122.1395     -5063.5114      213.25967     -2239.3188      61775.567     -43171.337     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -982.20724     -623.91658     -82.015629    
+     79000   39500          301.26887     -1077.9986      23135.443      25226.632      5674.6217      19552.011      2944.6396      5190.1388     -5014.7438      199.75212     -2311.9142      61725.683     -43181.545     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1244.1599     -968.55096     -1021.2851    
+     80000   40000          305.80825     -311.45026      24699.133      25303.31       5760.1242      19543.186      2905.5299      5109.4783     -4999.395       226.82195     -2284.1383      61762.651     -43177.762     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1325.4627      772.89944     -381.78751    
+     81000   40500          295.86495     -407.96421      24210.236      25001.638      5572.8349      19428.803      2834.1531      5158.0872     -5037.8179      210.05158     -2325.4974      61767.743     -43177.917     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -260.56872     -554.12626     -409.19764    
+     82000   41000          301.32117     -1066.5077      23133.654      25202.552      5675.6069      19526.945      2996.3489      5093.201      -5034.1123      231.29345     -2330.3619      61741.555     -43170.979     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -987.41495     -834.53174     -1377.5764    
+     83000   41500          299.14652     -377.31418      24404.504      25136.449      5634.6458      19501.803      2842.9193      5242.9491     -5051.1479      207.42339     -2323.4054      61771.231     -43188.166     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     93.009942     -623.8077      -601.14478    
+     84000   42000          295.53164     -901.15523      23336.192      25084.326      5566.5567      19517.77       2891.6836      5112.6832     -5001.6536      214.04353     -2242.4523      61718.331     -43174.866     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -916.715       -871.92742     -914.82325    
+     85000   42500          299.60433     -602.60998      24028.491      25197.483      5643.2688      19554.214      2966.1495      5190.9524     -5031.8088      224.77148     -2349.0276      61739.795     -43186.618     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -539.48675     -462.84237     -805.5008     
+     86000   43000          298.66157     -940.94484      23125.949      24951.27       5625.5113      19325.759      2833.3738      5025.8987     -5034.919       223.31378     -2275.6934      61729.531     -43175.746     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1490.1956     -1144.6368     -188.00207    
+     87000   43500          299.07711     -246.99166      24562.289      25041.424      5633.3383      19408.085      2934.9951      5090.0314     -5075.138       210.97114     -2275.6692      61702.135     -43179.24      -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     16.136749     -136.72223     -620.38951    
+     88000   44000          299.38187     -725.67396      23684.69       25092.411      5639.0787      19453.332      2891.7901      5123.9139     -5048.59        211.35776     -2276.4143      61735.552     -43184.277     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -329.10413     -1173.9785     -673.93926    
+     89000   44500          305.24895     -836.06849      23571.303      25193.176      5749.5894      19443.587      2815.3488      5179.2612     -5052.4221      227.11202     -2252.3702      61714.097     -43187.44      -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -756.29182     -1008.0358     -743.87785    
+     90000   45000          298.16839     -433.57854      24171.636      25012.727      5616.2218      19396.505      2870.2543      5136.514      -5120.0801      191.41772     -2217.2818      61720.084     -43184.403     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -965.75273     -230.85219     -104.13071    
+     91000   45500          296.58994     -479.10391      24115.088      25044.493      5586.4906      19458.002      2906.1924      5108.2073     -5071.6525      213.51384     -2254.38        61728.508     -43172.387     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -546.78741     -1046.9952      156.47092    
+     92000   46000          301.14568     -703.24453      23720.655      25084.866      5672.3014      19412.565      2895.253       5098.3588     -5103.1558      206.56943     -2233.2381      61736.081     -43187.303     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1097.4655     -396.45868     -615.80945    
+     93000   46500          302.70127     -44.240066      25113.404      25199.225      5701.6021      19497.623      2865.3207      5128.0894     -4995.2204      231.62675     -2268.3298      61716.886     -43180.75      -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -359.97327      429.2143      -201.96122    
+     94000   47000          297.71926     -181.15488      24628.142      24979.561      5607.7622      19371.799      2869.3448      5043.0521     -5076.3306      227.61325     -2201.4249      61696.227     -43186.683     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     172.34752     -413.60471     -302.20745    
+     95000   47500          300.07359     -796.44015      23459.543      25004.543      5652.1078      19352.435      2881.8961      5101.7516     -5078.8389      207.96747     -2271.5997      61701.066     -43189.808     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -289.01424     -717.46156     -1382.8446    
+     96000   48000          303.609       -486.0056       24251.32       25194.113      5718.6998      19475.414      2895.9849      5171.1142     -5049.2727      215.32777     -2241.4215      61669.901     -43186.22      -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -508.20672     -374.64257     -575.1675     
+     97000   48500          302.83931     -318.80248      24524.303      25142.742      5704.202       19438.54       2894.8244      5176.5678     -5099.7541      202.34201     -2298.5101      61740.422     -43177.353     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -106.24536     -516.0192      -334.14289    
+     98000   49000          300.91386     -478.31748      24117.464      25045.343      5667.9348      19377.408      2887.9293      5088.8846     -5104.437       226.5741      -2296.7306      61753.542     -43178.354     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -302.25846     -356.89915     -775.79482    
+     99000   49500          300.79476     -237.46505      24624.3        25084.954      5665.6915      19419.262      2941.6629      5085.5717     -5061.4005      210.71045     -2315.9686      61739.63      -43180.944     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999     51.885913     -912.12231      147.84125    
+    100000   50000          301.68077     -621.49024      23872.45       25078.068      5682.3802      19395.687      2866.9206      5102.9087     -5046.7635      201.6902      -2253.9028      61708.07      -43183.235     -278.5544       133014.58      51.046552      51.046552      51.046552      0.62999999    -1235.306       271.25962     -900.42439    
+Loop time of 299.782 on 1 procs for 100000 steps with 6320 atoms
+
+Performance: 14.410 ns/day, 1.665 hours/ns, 333.576 timesteps/s, 2.108 Matom-step/s
+100.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 1.5048     | 1.5048     | 1.5048     |   0.0 |  0.50
+Bond    | 119.37     | 119.37     | 119.37     |   0.0 | 39.82
+Kspace  | 150.6      | 150.6      | 150.6      |   0.0 | 50.24
+Neigh   | 8.4435     | 8.4435     | 8.4435     |   0.0 |  2.82
+Comm    | 1.7031     | 1.7031     | 1.7031     |   0.0 |  0.57
+Output  | 1.1773     | 1.1773     | 1.1773     |   0.0 |  0.39
+Modify  | 14.14      | 14.14      | 14.14      |   0.0 |  4.72
+Other   |            | 2.834      |            |       |  0.95
+
+Nlocal:           6320 ave        6320 max        6320 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          14722 ave       14722 max       14722 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:  2.64382e+06 ave 2.64382e+06 max 2.64382e+06 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2643816
+Ave neighs/atom = 418.32532
+Ave special neighs/atom = 5.5411392
+Neighbor list builds = 1783
+Dangerous builds = 0
+
+# --- Cleanup ---
+unfix nvt_fix
+
+undump dump_nvt
+
+# --- Write Output ---
+write_dump all custom nvt_warmup_last.dump id type mol x y z xu yu zu vx vy vz modify sort id
+write_data /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/nvt_warmup/nvt_warmup_out.data
+System init for write_data ...
+PPPM Kokkos initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.33160826
+  grid = 54 54 54
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00035492389
+  estimated relative force accuracy = 1.0688427e-06
+  using double precision cuFFT
+  3d grid and FFT values/proc = 226981 157464
+Generated 21 of 21 mixed pair_coeff terms from sixthpower/sixthpower mixing rule
+write_restart /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/nvt_warmup/nvt_warmup_out.restart
+System init for write_restart ...
+PPPM Kokkos initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.33160826
+  grid = 54 54 54
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00035492389
+  estimated relative force accuracy = 1.0688427e-06
+  using double precision cuFFT
+  3d grid and FFT values/proc = 226981 157464
+Generated 21 of 21 mixed pair_coeff terms from sixthpower/sixthpower mixing rule
+
+print "STAGE COMPLETE: NVT T=300.0->300.0K steps=100000"
+STAGE COMPLETE: NVT T=300.0->300.0K steps=100000
+quit

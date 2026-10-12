@@ -1,0 +1,116 @@
+{
+  "mode": "log-only",
+  "log": "/home/arz2/PolyJarvis_v2/benchmarks/polyjarvis_vs_radonpy/preserved_artifacts/PEG1_retry9/radonpy/PEG1_retry9/eq12.log",
+  "clause": "require_rubbery",
+  "verdict": "INCOMPLETE",
+  "binding": {
+    "energy_drift": true,
+    "density_sem": true,
+    "energy_sem": true,
+    "n_eff_density": true,
+    "finite_size": true
+  },
+  "failing_binding": [],
+  "unmeasured_binding": [
+    "density_homogeneity"
+  ],
+  "advisory": {
+    "density_drift": true,
+    "energy_component_drift": true,
+    "residual_stress": false,
+    "rg": true
+  },
+  "failing_advisory": [
+    "residual_stress"
+  ],
+  "energy_component_drift": {
+    "bond": {
+      "drift_pct": 0.3276,
+      "p_value": 0.0236,
+      "p_value_naive": 0.0236,
+      "tau_frames": 1.0,
+      "n_eff": 2501,
+      "criterion": "drift_pct",
+      "threshold": 1.0,
+      "pass": true
+    },
+    "angle": {
+      "drift_pct": 0.4376,
+      "p_value": 0.0009,
+      "p_value_naive": 0.0,
+      "tau_frames": 3.2,
+      "n_eff": 781,
+      "criterion": "drift_pct",
+      "threshold": 1.0,
+      "pass": true
+    },
+    "dihedral": {
+      "drift_pct": 1.4834,
+      "p_value": 0.1641,
+      "p_value_naive": 0.0,
+      "tau_frames": 318.63,
+      "n_eff": 7,
+      "criterion": "drift_pct",
+      "threshold": 1.0,
+      "pass": true
+    },
+    "vdw": {
+      "drift_pct": 0.0913,
+      "p_value": 0.8769,
+      "p_value_naive": 0.1996,
+      "tau_frames": 67.47,
+      "n_eff": 37,
+      "drift_sigma": 0.0889,
+      "sigma": 43.3079,
+      "criterion": "drift_sigma",
+      "threshold": 1.0,
+      "pass": true
+    },
+    "coul": {
+      "drift_pct": 0.0136,
+      "p_value": 0.5713,
+      "p_value_naive": 0.0,
+      "tau_frames": 57.86,
+      "n_eff": 43,
+      "drift_sigma": 0.3005,
+      "sigma": 21.0876,
+      "criterion": "drift_sigma",
+      "threshold": 1.0,
+      "pass": true
+    },
+    "kspace": {
+      "drift_pct": 0.0165,
+      "p_value": 0.1109,
+      "p_value_naive": 0.0,
+      "tau_frames": 79.54,
+      "n_eff": 31,
+      "criterion": "drift_pct",
+      "threshold": 1.0,
+      "pass": true
+    }
+  },
+  "component_drift_failing_under_naive_p": [
+    "dihedral"
+  ],
+  "rg": {
+    "pass": true,
+    "cv": 0.1668,
+    "mean_Rg_A": 19.86109512,
+    "source": "RadonPy eq_conv_data.csv Rg_mean_sd / eq_prop_data.csv Rg: the sd across chains of each chain's time-mean Rg over its mean -- the checker's rg_cv"
+  },
+  "finite_size": {
+    "available": true,
+    "pass": true,
+    "self_image_advisory": false,
+    "verdict": "SIZE_PASS",
+    "L_min_A": 45.53,
+    "cutoff_A": 12.0,
+    "L_over_2cutoff": 1.897,
+    "L_over_2Rg": 1.146,
+    "L_over_Ree": null,
+    "ree_self_image_flag": false,
+    "min_image_evaluated": true,
+    "graded_box": "last thermo row of the graded log"
+  },
+  "density_mean": null
+}

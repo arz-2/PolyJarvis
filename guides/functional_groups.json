@@ -1,0 +1,221 @@
+{
+  "_metadata": {
+    "description": "A real functional-group inventory for polymer repeat units: what chemistry is present, how much of it, and WHERE (backbone, pendant, or chain-end). Distinct in purpose from guides/polymer_group_profile.json, which mirrors RadonPy's 21 class-DEFINING patterns in order to reproduce a taxonomy label. These rules describe the molecule instead, and they are matched over the whole repeat unit rather than the extracted mainchain.",
+    "why": "polymer_class is a backbone taxonomy, and the protocol constants it carries -- notably electrostatics (lj_cut vs pppm) and charge_method -- are really standing in for POLARITY. Polarity comes from functional groups wherever they sit. poly.polyinfo_classifier matches its tier-1 SMARTS on extract_mainchain, so a pendant hydroxyl, nitrile or ester is invisible to it: PMMA reports PEST false. This file is how the driver sees that chemistry.",
+    "use": "Advisory. It never assigns polymer_class and never overrides a class constant; it produces evidence and a consistency verdict for the plan and the adjudicating critic.",
+    "hbond_donors_note": "Counted per MATCH, on the matched fragment. Acceptor counts are conservative: only lone-pair-bearing heteroatoms whose lone pairs are not delocalised into an adjacent carbonyl/aromatic system.",
+    "polarity_scale": "apolar < weakly_polar < polar_aprotic < polar_protic. The strongest category present sets the molecule's polarity class; see chemistry_policy.py.",
+    "verified_by": "tests/test_functional_groups.py asserts every SMARTS compiles and matches its own `example_smiles`, and that no rule matches `counterexample_smiles`."
+  },
+  "groups": [
+    {"id": "hydroxyl_alcohol", "smarts": "[OX2H][CX4]", "label": "aliphatic hydroxyl",
+     "polarity": "polar_protic", "hbond_donors": 1, "hbond_acceptors": 1,
+     "example_smiles": "*CC(*)O", "example_name": "PVA",
+     "counterexample_smiles": "*CC*",
+     "note": "Strong H-bond donor. A pendant -OH makes an otherwise hydrocarbon backbone strongly associating; lj_cut would drop the interaction that dominates its cohesive energy."},
+
+    {"id": "phenol", "smarts": "[OX2H]c", "label": "phenolic hydroxyl",
+     "polarity": "polar_protic", "hbond_donors": 1, "hbond_acceptors": 1,
+     "example_smiles": "*c1ccc(O)cc1*", "example_name": "poly(vinyl phenol) ring",
+     "counterexample_smiles": "*c1ccccc1*"},
+
+    {"id": "carboxylic_acid", "smarts": "[CX3](=[OX1])[OX2H1]", "label": "carboxylic acid",
+     "polarity": "polar_protic", "hbond_donors": 1, "hbond_acceptors": 2,
+     "example_smiles": "*CC(*)C(=O)O", "example_name": "PAA",
+     "counterexample_smiles": "*CC(*)C(=O)OC",
+     "note": "Ionizable. Dimerises strongly; also the group most likely to need a charge model better than a class default."},
+
+    {"id": "primary_amine", "smarts": "[NX3;H2;!$(N[CX3]=[OX1,SX1])][#6]", "label": "primary amine",
+     "polarity": "polar_protic", "hbond_donors": 2, "hbond_acceptors": 1,
+     "example_smiles": "NCCN", "example_name": "diamine fragment",
+     "counterexample_smiles": "*CCN(C)*"},
+
+    {"id": "secondary_amine", "smarts": "[NX3;H1;!$(N[CX3]=[OX1,SX1])]([#6])[#6]", "label": "secondary amine",
+     "polarity": "polar_protic", "hbond_donors": 1, "hbond_acceptors": 1,
+     "example_smiles": "*CCN*", "example_name": "linear PEI",
+     "counterexample_smiles": "*CCN(C)*"},
+
+    {"id": "amide_NH", "smarts": "[NX3;H1,H2][CX3]=[OX1]", "label": "amide N-H",
+     "polarity": "polar_protic", "hbond_donors": 1, "hbond_acceptors": 1,
+     "example_smiles": "*CCCCCC(=O)N*", "example_name": "Nylon-6",
+     "counterexample_smiles": "*CCCCCC(=O)N(C)*",
+     "note": "The inter-chain H-bond network that makes polyamides stiff and high-Tg. EMC/PCFF cannot type this nitrogen (all 3 measured moiety rules block it); it is why PAMD routes to RadonPy/GAFF2."},
+
+    {"id": "thiol", "smarts": "[SX2H]", "label": "thiol",
+     "polarity": "polar_protic", "hbond_donors": 1, "hbond_acceptors": 1,
+     "example_smiles": "*CC(*)S", "example_name": "pendant thiol",
+     "counterexample_smiles": "*CC(C)S*"},
+
+    {"id": "ester", "smarts": "[CX3](=[OX1])[OX2][#6]", "label": "ester",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 2,
+     "example_smiles": "*CC(*)(C)C(=O)OC", "example_name": "PMMA (pendant)",
+     "counterexample_smiles": "*CCOCC*",
+     "note": "The canonical backbone-vs-pendant case. PLA carries it in-chain (PEST); PMMA carries it as a side group (PACR). polyinfo_classifier sees only the first."},
+
+    {"id": "carbonate", "smarts": "[OX2][CX3](=[OX1])[OX2]", "label": "carbonate",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 3,
+     "example_smiles": "*Oc1ccc(C(C)(C)c2ccc(OC(*)=O)cc2)cc1", "example_name": "BPA-PC",
+     "counterexample_smiles": "*OC(C)C(*)=O"},
+
+    {"id": "anhydride", "smarts": "[CX3](=[OX1])[OX2][CX3]=[OX1]", "label": "anhydride",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 3,
+     "example_smiles": "*OC(=O)CCCCCCCCC(*)=O", "example_name": "poly(sebacic anhydride)",
+     "counterexample_smiles": "*OC(C)C(*)=O"},
+
+    {"id": "imide", "smarts": "[CX3](=[OX1])[NX3][CX3]=[OX1]", "label": "imide",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 2,
+     "example_smiles": "CC(=O)N(C)C(C)=O", "example_name": "imide fragment",
+     "counterexample_smiles": "*CCCCCC(=O)N*"},
+
+    {"id": "urethane", "smarts": "[NX3][CX3](=[OX1])[OX2]", "label": "urethane / carbamate",
+     "polarity": "polar_protic", "hbond_donors": 1, "hbond_acceptors": 2,
+     "example_smiles": "*NC(=O)OCC*", "example_name": "TPU hard segment",
+     "counterexample_smiles": "*OC(=O)CC*",
+     "note": "Donor count assumes the common N-H form; an N,N-disubstituted carbamate has none. chemistry_policy re-derives donors from the atoms, not from this field alone."},
+
+    {"id": "urea", "smarts": "[NX3][CX3](=[OX1])[NX3]", "label": "urea",
+     "polarity": "polar_protic", "hbond_donors": 2, "hbond_acceptors": 1,
+     "example_smiles": "*NC(=O)N*", "example_name": "polyurea repeat",
+     "counterexample_smiles": "*NC(=O)CC*"},
+
+    {"id": "amide_tertiary", "smarts": "[NX3;H0]([#6])([#6])[CX3]=[OX1]", "label": "tertiary amide",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 1,
+     "example_smiles": "*CC(*)N(C)C=O", "example_name": "poly(N-methyl vinyl amide)",
+     "counterexample_smiles": "*CCCCCC(=O)N*"},
+
+    {"id": "ketone", "smarts": "[#6][CX3](=[OX1])[#6]", "label": "ketone",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 1,
+     "example_smiles": "*Oc1ccc(C(=O)c2ccc(*)cc2)cc1", "example_name": "PEK",
+     "counterexample_smiles": "*CCOCC*"},
+
+    {"id": "aldehyde", "smarts": "[CX3H1](=[OX1])[#6]", "label": "aldehyde",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 1,
+     "example_smiles": "CCC=O", "example_name": "propanal",
+     "counterexample_smiles": "CCC(C)=O"},
+
+    {"id": "ether_aliphatic", "smarts": "[OD2]([CX4])[CX4]", "label": "aliphatic ether",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 1,
+     "example_smiles": "*CCO*", "example_name": "PEO",
+     "counterexample_smiles": "*CC*"},
+
+    {"id": "ether_aryl", "smarts": "[OD2](c)[#6]", "label": "aryl ether",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 1,
+     "example_smiles": "*Oc1ccc(*)cc1", "example_name": "PEEK/PSU linkage",
+     "counterexample_smiles": "*CCO*"},
+
+    {"id": "nitrile", "smarts": "[NX1]#[CX2]", "label": "nitrile",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 1,
+     "example_smiles": "*CC(*)C#N", "example_name": "PAN",
+     "counterexample_smiles": "*CC(*)C",
+     "note": "Very large bond dipole (~4 D) on a pure-hydrocarbon backbone -- the clearest case where a backbone taxonomy understates polarity."},
+
+    {"id": "nitro", "smarts": "[$([NX3](=O)=O),$([NX3+](=O)[O-])]", "label": "nitro",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 2,
+     "example_smiles": "*CC(*)c1ccc([N+](=O)[O-])cc1", "example_name": "nitrated PS",
+     "counterexample_smiles": "*CC(*)c1ccccc1"},
+
+    {"id": "sulfone", "smarts": "[SX4](=[OX1])(=[OX1])", "label": "sulfone",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 2,
+     "example_smiles": "*Oc1ccc(S(=O)(=O)c2ccc(*)cc2)cc1", "example_name": "PES",
+     "counterexample_smiles": "*Sc1ccc(*)cc1"},
+
+    {"id": "sulfoxide", "smarts": "[SX3](=[OX1])([#6])[#6]", "label": "sulfoxide",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 1,
+     "example_smiles": "CS(=O)C", "example_name": "DMSO fragment",
+     "counterexample_smiles": "CSC"},
+
+    {"id": "thioether", "smarts": "[SX2]([#6])[#6]", "label": "thioether / sulfide",
+     "polarity": "weakly_polar", "hbond_donors": 0, "hbond_acceptors": 1,
+     "example_smiles": "*Sc1ccc(*)cc1", "example_name": "PPS",
+     "counterexample_smiles": "*CCO*"},
+
+    {"id": "tertiary_amine", "smarts": "[NX3;H0;!$(N[CX3]=[OX1,SX1]);!$(N=*);!$([N+])]([#6])([#6])[#6]",
+     "label": "tertiary amine", "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 1,
+     "example_smiles": "*CCN(C)*", "example_name": "N-methylated PEI",
+     "counterexample_smiles": "*CCN*"},
+
+    {"id": "aromatic_N_heterocycle", "smarts": "[nX2]", "label": "pyridine-type aromatic N",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 1,
+     "example_smiles": "*CC(*)c1ccccn1", "example_name": "P2VP",
+     "counterexample_smiles": "*CC(*)c1ccccc1"},
+
+    {"id": "phosphoryl", "smarts": "[PX4]=[OX1]", "label": "phosphoryl / phosphazene P=O",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 1,
+     "example_smiles": "COP(=O)(OC)OC", "example_name": "trimethyl phosphate",
+     "counterexample_smiles": "*N=P(*)(OCC)OCC"},
+
+    {"id": "phosphazene_PN", "smarts": "[NX2]=[PX3,PX4,PX5]", "label": "phosphazene P=N",
+     "polarity": "polar_aprotic", "hbond_donors": 0, "hbond_acceptors": 1,
+     "example_smiles": "*N=P(*)(OCC)OCC", "example_name": "poly(ethoxyphosphazene)",
+     "counterexample_smiles": "*CCO*"},
+
+    {"id": "siloxane", "smarts": "[Si][OX2][Si]", "label": "siloxane Si-O-Si",
+     "polarity": "weakly_polar", "hbond_donors": 0, "hbond_acceptors": 1,
+     "example_smiles": "C[Si](C)(O[Si](C)(C)C)C", "example_name": "PDMS fragment",
+     "counterexample_smiles": "*CCO*",
+     "note": "Very low barrier to rotation and weak cohesion despite the Si-O dipole; PDMS is the archetypal low-Tg polymer."},
+
+    {"id": "silicon_alkyl", "smarts": "[Si]([#6])[#6]", "label": "organosilicon",
+     "polarity": "weakly_polar", "hbond_donors": 0, "hbond_acceptors": 0,
+     "example_smiles": "*O[Si](*)(C)C", "example_name": "PDMS",
+     "counterexample_smiles": "*CC*"},
+
+    {"id": "fluoroalkyl", "smarts": "[CX4][F]", "label": "C-F",
+     "polarity": "weakly_polar", "hbond_donors": 0, "hbond_acceptors": 0,
+     "example_smiles": "*C(F)(F)C(*)(F)F", "example_name": "PTFE",
+     "counterexample_smiles": "*CC(*)Cl",
+     "note": "Strong bond dipole but very low polarisability, and the dipoles largely cancel in a symmetric perfluorocarbon. Fluoropolymers are cohesively WEAK, unlike other polar polymers -- do not read C-F count as associating character."},
+
+    {"id": "chloroalkyl", "smarts": "[CX4][Cl]", "label": "C-Cl",
+     "polarity": "weakly_polar", "hbond_donors": 0, "hbond_acceptors": 0,
+     "example_smiles": "*CC(*)Cl", "example_name": "PVC",
+     "counterexample_smiles": "*CC(*)F"},
+
+    {"id": "bromoalkyl", "smarts": "[CX4][Br]", "label": "C-Br",
+     "polarity": "weakly_polar", "hbond_donors": 0, "hbond_acceptors": 0,
+     "example_smiles": "*CC(*)Br", "example_name": "poly(vinyl bromide)",
+     "counterexample_smiles": "*CC(*)Cl"},
+
+    {"id": "aryl_halide", "smarts": "c[F,Cl,Br,I]", "label": "aryl halide",
+     "polarity": "weakly_polar", "hbond_donors": 0, "hbond_acceptors": 0,
+     "example_smiles": "*c1ccc(Cl)cc1*", "example_name": "chlorinated arylene",
+     "counterexample_smiles": "*CC(*)Cl"},
+
+    {"id": "benzene_ring", "smarts": "c1ccccc1", "label": "benzene ring",
+     "polarity": "apolar", "hbond_donors": 0, "hbond_acceptors": 0,
+     "example_smiles": "*CC(*)c1ccccc1", "example_name": "PS",
+     "counterexample_smiles": "*CC*",
+     "note": "Quadrupolar, not dipolar. Drives pi-stacking and stiffness, and PCFF's aromatic ring charges are why PSTR prefers it over TraPPE-UA -- but it is not what pppm is for."},
+
+    {"id": "alkene", "smarts": "[CX3]=[CX3]", "label": "aliphatic C=C",
+     "polarity": "apolar", "hbond_donors": 0, "hbond_acceptors": 0,
+     "example_smiles": "*CC=CC*", "example_name": "PBD",
+     "counterexample_smiles": "*CC*"},
+
+    {"id": "alkyne", "smarts": "[CX2]#[CX2]", "label": "C#C",
+     "polarity": "apolar", "hbond_donors": 0, "hbond_acceptors": 0,
+     "example_smiles": "*C#Cc1ccc(*)cc1", "example_name": "poly(phenylene ethynylene)",
+     "counterexample_smiles": "*CC=CC*"},
+
+    {"id": "quaternary_carbon", "smarts": "[CX4]([#6])([#6])([#6])[#6]", "label": "quaternary carbon",
+     "polarity": "apolar", "hbond_donors": 0, "hbond_acceptors": 0,
+     "example_smiles": "*CC(*)(C)C(=O)OC", "example_name": "PMMA alpha-carbon",
+     "counterexample_smiles": "*CC*",
+     "note": "Backbone steric hindrance: the alpha-methyl quaternary centre is why PMMA's Tg far exceeds PMA's."},
+
+    {"id": "carboxylate_anion", "smarts": "[CX3](=[OX1])[OX1-]", "label": "carboxylate anion",
+     "polarity": "ionic", "hbond_donors": 0, "hbond_acceptors": 2,
+     "example_smiles": "CC(=O)[O-]", "example_name": "acetate",
+     "counterexample_smiles": "CC(=O)O"},
+
+    {"id": "ammonium_cation", "smarts": "[NX4+]", "label": "quaternary ammonium",
+     "polarity": "ionic", "hbond_donors": 0, "hbond_acceptors": 0,
+     "example_smiles": "C[N+](C)(C)C", "example_name": "tetramethylammonium",
+     "counterexample_smiles": "CN(C)C"},
+
+    {"id": "sulfonate", "smarts": "[SX4](=[OX1])(=[OX1])[OX1-,OX2H]", "label": "sulfonic acid / sulfonate",
+     "polarity": "ionic", "hbond_donors": 0, "hbond_acceptors": 3,
+     "example_smiles": "*CC(*)c1ccc(S(=O)(=O)[O-])cc1", "example_name": "sulfonated PS",
+     "counterexample_smiles": "*Oc1ccc(S(=O)(=O)c2ccc(*)cc2)cc1"}
+  ]
+}

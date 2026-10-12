@@ -1,177 +1,178 @@
 # PolyJarvis
 
-**PolyJarvis** is an AI-driven framework for autonomous polymer property prediction via all-atom molecular dynamics simulation. A researcher describes a polymer system in natural language; a stateful LLM orchestrator (Claude) then handles the entire workflow — from SMILES string to computed material properties — by planning the run, spawning specialist sub-agents for each stage, and driving three MCP servers (molecular construction via EMC/RadonPy, plus local GPU simulation and analysis) end to end.
+[![tests](https://github.com/arz-2/PolyJarvis/actions/workflows/tests.yml/badge.svg)](https://github.com/arz-2/PolyJarvis/actions/workflows/tests.yml)
+[![arXiv](https://img.shields.io/badge/arXiv-2604.02537-b31b1b.svg)](https://arxiv.org/abs/2604.02537)
 
-![PolyJarvis Architecture](manuscript/figures/figure1_architecture.png)
+PolyJarvis runs all-atom molecular dynamics of amorphous polymers end to end: from a
+repeat-unit SMILES to an EMC-built amorphous cell, LAMMPS equilibration on a GPU
+workstation, and properties (density, glass transition temperature, bulk modulus) graded
+against experimental reference bands. Control is split deliberately. Code owns every
+simulation file, parameter, job, validation gate, retry budget and provenance record; a
+language model makes a small number of typed, bounded decisions (a force-field critique, a
+plan adjudication, and diagnosis of failures that no code-owned remedy covers), and the
+whole pipeline also runs with no model at all.
 
----
+In the paper's v3 evaluation (seven amorphous homopolymers, three replicates each), 13 of
+19 graded comparisons against experiment met their acceptance criteria. The misses
+concentrate in the PCFF systems: aPS and PEG come out under-dense, and the Tg of PLLA and
+PEEK is overestimated.
 
-## Architecture
+## How it works
 
-PolyJarvis is a **stateful orchestrator driving a fleet of stateless specialist agents** over a Model Context Protocol (MCP) tool layer. Given a SMILES string (or polymer name) and a set of target properties, it autonomously runs the full pipeline — construction → equilibration → property campaigns → experiment-validated reporting — on a local 4× Quadro RTX 6000 GPU node.
+```mermaid
+flowchart LR
+    S["SMILES + properties<br/>+ GPU-hour ceiling"] --> P["deterministic plan"]
+    P --> C["LLM critic and adjudicator<br/>read-only, typed overrides"]
+    C --> M["materialize and validate<br/>(code)"]
+    M --> G{"cost guard"}
+    G -->|over ceiling| X([refused])
+    G --> E["workflow engine<br/>build, equilibrate, cool,<br/>Tg, bulk modulus, summary"]
+    E -->|blocking finding| R["code-owned remedy, else<br/>budgeted recovery agent"]
+    R --> E
+    E --> O([run_summary.json])
+```
 
-**Orchestration layer.** A single long-lived Claude session (the *orchestrator*) holds all run state, recovery logic, and the approved plan. It never runs simulations itself; it spawns workers and routes their results. Workers are **stateless** — each gets a self-contained prompt and returns a structured RESULT block — so the orchestrator is the only stateful component and the sole point of recovery. [`orchestration/ORCHESTRATOR.md`](orchestration/ORCHESTRATOR.md) is its operating manual and the authoritative worker roster, invoked via the `/run-campaign` skill; [`CLAUDE.md`](CLAUDE.md) covers repo layout and development conventions.
+The design, including exactly what a model may and may not decide, every validation gate,
+and the recovery budgets, is in [docs/architecture.md](docs/architecture.md).
 
-**Agent layer (13 specialist workers).** Each worker has a fixed role, a model tier matched to task difficulty, and a canonical guide inlined into its prompt by `orchestration/scripts/gen_prompt.py`:
+## Quickstart (no GPU, no LAMMPS, no API key)
 
-| Phase | Workers (model) |
-|-------|-----------------|
-| Setup | `literature-grounding-worker` (sonnet), `planner` (opus), `critic` (opus) |
-| Foundation | `molecule-builder` (opus), `equilibration-worker` (sonnet), `equilibration-checker` (haiku) |
-| Thermal track | `tg-sweep-worker`, `tg-analysis-worker` (haiku) |
-| Mechanical track | `murnaghan-worker`, `deform-worker` (haiku), `bulk-modulus-extractor` (sonnet) |
-| Summary | `exp-lookup-worker`, `run-summary-worker` (haiku) |
+Requires Python 3.11 and [uv](https://docs.astral.sh/uv/).
 
-**Tool layer (three MCP servers).** `mcp-emc-server` (EMC amorphous-cell builder covering 20 polymer classes, auto-selecting PCFF / OPLS-AA / TraPPE-UA per class), `mcp-lammps-engine` (GPU LAMMPS execution + analysis), and `mcp-mol-builder-server` (RadonPy path — the builder fallback for the one class EMC cannot type, polyureas).
+```bash
+git clone https://github.com/arz-2/PolyJarvis && cd PolyJarvis
+uv sync --locked                                   # exact versions from uv.lock
+export POLYJARVIS_MOL_PYTHON="$PWD/.venv/bin/python"  # run RDKit steps in this env
+```
 
-### Control flow: plan → critique → execute → validate
+Without uv: `python3.11 -m venv .venv && .venv/bin/pip install -r requirements-test.txt`
+(the same pins, exported from the lock), then use `.venv/bin/python` and `.venv/bin/pytest`
+in place of `uv run python` and `uv run pytest` below.
 
-1. **Ground & Plan.** For off-table or low-confidence chemistries, a grounding worker produces a DOI-verified evidence file; the planner emits a `run_plan.json`. High-confidence classes get a **deterministic, byte-identical plan** with no runtime LLM reasoning.
-2. **Critique.** A critic adjudicates the plan (approve / revise / escalate), looping up to two rounds. Deterministic plans pass in round 1 with zero findings.
-3. **Execute by track.** The **foundation** track always runs first (build → equilibrate → equil-check gate → density). The property-conditional tracks then run against the equilibrated cell: **thermal** (multi-rate T<sub>g</sub> sweeps → T<sub>g</sub>, CTE, ΔC<sub>p</sub>) and **mechanical** (Murnaghan pressure-series EOS as the primary bulk-modulus path, 3-direction uniaxial deformation as the fallback → K). Mechanical reads the glassy/rubbery regime from thermal.
-4. **Validate.** Every worker result is checked against the plan's `success_criteria`; failures trigger bounded recovery (max 2 attempts/worker) before the run is marked UNRESOLVED. A condition-matched experimental lookup supplies grading bounds before the final summary.
+### 1. Run the test suite
 
-The **`run_plan.json` is the single source of truth** — `orchestration/scripts/gen_prompt.py` threads its `decided_params` into every worker prompt, so no worker improvises parameters and the whole run is reconstructable from the plan. What gets reported, and how each property is computed, is documented in [`docs/PROPERTIES.md`](docs/PROPERTIES.md).
+```bash
+uv run pytest
+```
 
-### Inferred vs. inherited
+```text
+2199 passed, 44 skipped, 33 deselected, 2 xpassed in 214.94s (0:03:34)
+```
 
-- **Inherited / encoded** (in `guides/polymer_rules.json`, `orchestration/decision_policy.json`, stage guides): per-class T<sub>g</sub>/density targets, DP defaults, force-field family rules, SMILES conventions, equilibration templates. On the high-confidence path these drive a fully deterministic plan.
-- **LLM-inferred at runtime**: off-table planning, critic adjudication, error root-causing and recovery routing, and adaptive extensions (equilibration EXTEND, T<sub>g</sub> slope-gate recovery).
+Tests that need EMC, LAMMPS or RadonPy are marked `requires_binaries` and skipped by
+default. `tests/test_control_plane_guardrails.py` is the shortest tour of the agent
+guardrails.
 
-Below is a sample conversation between a user and the agent:
-![Conversation](manuscript/figures/figure2_conversation.png)
+### 2. Replay a captured plan
 
----
+Validate an already-adjudicated polystyrene plan and resolve every stage into concrete
+engine arguments, without submitting anything:
 
-## Benchmark study
+```bash
+uv run python orchestration/scripts/scientific_control.py \
+  --run-name PS_replay --goal 'density, Tg and bulk modulus at 300 K' \
+  --smiles '*CC(*)c1ccccc1' --properties density,tg,bulk_modulus \
+  --plan examples/pstr_run_plan.json --dry-run
+```
 
-The framework was validated on a **36-run replicate study: 9 polymers × 4 independent replicates** (PE, cis-PBD, PEG, PLA, PMMA, PS, PVC, PEEK, PSU), reporting density, T<sub>g</sub>, and bulk modulus against experimental ranges. All manuscript-related material — the replicate-run provenance, analysis csv/figures and their generators, and the error-recovery benchmark — is consolidated under [`manuscript/`](manuscript/); the run provenance is indexed in [`manuscript/data/README.md`](manuscript/data/README.md).
+The output is one JSON document ending in `"status": "complete"` and
+`"recovery_agent_calls": 0`; under `result` are the resolved arguments for each of the
+eleven stage calls (`build`, `equil`, `equil-check`, `cool`, `cool-check`, `tg`,
+`analyze-tg`, `murnaghan`, `deform`, `analyze-bm`, `run-summary`).
 
----
+### 3. From SMILES to a priced plan, headless and with no model
 
-## Repository Map
+```bash
+uv run python orchestration/langgraph/run_graph.py \
+  --run-name PE_demo --smiles '*CC*' --properties density,tg \
+  --goal 'density and Tg for polyethylene' \
+  --max-gpu-hours 40 --deadline-hours 24 --no-llm --dry-run
+```
 
-| Path | What lives there |
+It streams one JSON event per graph node (shortened here):
+
+```text
+{"event": "cache_probe", "hit": true}
+{"event": "plan", "plan_mode": "deterministic", "confidence": "high", "gpu_hours": 1.6988}
+{"event": "cost_admitted", "gpu_hours": 1.6988, "ceiling": 40.0, "note": "total_gpu_hours is a LOWER bound; ..."}
+{"event": "execute", "skipped": true, "note": "--dry-run"}
+{"event": "done", "status": "accepted", "exit_code": 0, ...}
+```
+
+Lower the ceiling below the estimate (`--max-gpu-hours 1`) and the cost guard refuses
+before anything runs:
+
+```text
+{"event": "stop", "status": "cost_exceeded", "detail": "priced work is 1.70 GPU-hours against a ceiling of 1.00. This is a LOWER bound -- 1 stage(s) are unpriced -- so the real cost is higher, not lower."}
+{"event": "done", "status": "cost_exceeded", "exit_code": 5, ...}
+```
+
+Both runs write their plan to `data/<run-name>/raw/run_plan.json` (ignored by git). A
+SMILES not in `guides/system_characterization_cache.json` must first be classified, which
+needs RadonPy, so this demo uses a cached polymer.
+
+## Running real campaigns
+
+Real runs happen on a GPU workstation with LAMMPS (optionally built with KOKKOS), EMC, and
+the RadonPy and RDKit conda environments in `env/`. Install the MCP servers' dependencies
+from `mcp-servers/requirements.txt`, copy `.mcp.json.example` to `.mcp.json` and fill in
+the host paths, and calibrate the host's cost model:
+
+```bash
+python3 hardware/calibrate_hardware.py --dry-run
+```
+
+Then drop `--dry-run` from the command above; drop `--no-llm` as well to enable the
+literature critic, the adjudicator and the recovery agent, which run as headless
+`claude -p` calls. A run that stops early resumes from `data/<run>/` with the same command.
+
+| Exit code | Status | Meaning |
+|---|---|---|
+| 0 | `accepted` | Every stage passed its gates |
+| 2 | `escalation_required` | A finding needs a decision and no agent is configured (`--no-llm`) |
+| 3 | `failed` | Ended by the engine or the agent; `workflow_state.json` records `terminated_by` |
+| 4 | `deadline_exceeded` | Wall-clock deadline reached; resumable |
+| 5 | `cost_exceeded`, `cost_unknown` | Refused by the cost guard |
+| 6 | `classify_error`, `plan_error`, `materialize_error` | Could not produce a valid plan |
+| 7 | `d01_refusal` | No force field types this repeat unit |
+| 8 | `locked` | Another process holds this run |
+
+## Repository layout
+
+| Path | Contents |
 |---|---|
-| `CLAUDE.md` | Repo layout, key directories, development conventions (start here to understand the codebase) |
-| `.claude/` | Agent definitions (13 workers), hooks, slash commands, per-agent memory |
-| `guides/` | **Agent prompts & machine-read config**, not human docs — worker guides inlined by `gen_prompt.py`, `polymer_rules.json` (see [`guides/README.md`](guides/README.md)) |
-| `orchestration/` | `ORCHESTRATOR.md` — orchestrator operating manual, the agent's workflow spec, invoked via `/run-campaign`; `scripts/` — CLI/orchestration helpers (prompt generation, deterministic planning, GPU allocation); `tracks/` — orchestrator-read phase/track guides (`FOUNDATION.md`, `THERMAL_TRACK.md`, `MECHANICAL_TRACK.md`, `SUMMARY.md`); `decision_policy.json` (see [`orchestration/README.md`](orchestration/README.md)) |
-| `mcp-servers/` | The three MCP servers: `mcp-mol-builder-server` (RadonPy), `mcp-emc-server` (EMC), `mcp-lammps-engine` (LAMMPS + analysis scripts + templates) |
-| `data/` | Live pipeline working directory — per-run simulation outputs (`<run>/run_log.md`, `lammps/`, `raw/`, `graphs/`), run template |
-| `hardware/` | Hardware calibration — `/calibrate-hardware` toolchain (`calibrate_hardware.py`, `benchmark_hardware.py`, `bench_accuracy_diff.py`) and the per-FF calibration cells (`CALIB_<FAM>/`); the engine/GPU/MPI policy docs (`HARDWARE.md`, `HARDWARE_STUDY.md`) are machine-specific and local-only (gitignored) |
-| `db/` | Experimental property database (`polymer_db.sqlite`, schema, query + ingest scripts) |
-| `tests/`, `mcp-servers/*/tests/`, `tools/runlog_miner/tests/` | Test suites (root `pytest.ini`); the recovery-benchmark suite is run separately (`pytest manuscript/recovery/tests/`) |
-| `tools/runlog_miner/` | Run-log mining/reporting package |
-| `docs/` | Human-facing docs: `PROPERTIES.md` (what gets computed & how), `ROADMAP.md`, `TOOLS_REFERENCE.md` |
-| `env/` | Conda environment YAMLs |
-| `manuscript/` | Everything paper-related: benchmark-run provenance (`data/`, see [`manuscript/data/README.md`](manuscript/data/README.md)), analysis tables (`csv/`), figures + generator scripts, the error-recovery benchmark (`recovery/`), and the data-release rebuilder (`collect_data.sh`) |
+| `orchestration/scripts/` | The control plane: planning, validation, parameter resolution, the workflow engine and its remedies, cost and hardware policy. [Module index](orchestration/README.md). |
+| `orchestration/langgraph/` | The headless driver: topology only, holding no state of its own |
+| `mcp-servers/` | EMC builder, LAMMPS engine (templates, launch, analysis) and molecule-builder servers |
+| `guides/` | Machine-readable policy: polymer classes, force-field rules, functional groups |
+| `tests/` | The pure-logic suite (default `pytest` selection) |
+| `benchmarks/`, `manuscript/gen/` | Evaluation harnesses and the generators behind every number in the paper |
+| `data/` | Per-run workspaces; the runs reported in the paper are committed here |
 
----
+## Earlier multi-agent version
 
-## Quick Start
+Before this design, PolyJarvis ran as a team of 16 cooperating stage agents, each driven
+by a worker prompt. That version is preserved at the
+[`v1-multi-agent`](https://github.com/arz-2/PolyJarvis/tree/v1-multi-agent) tag;
+[docs/architecture.md](docs/architecture.md#why-this-design) explains what changed and why.
 
-New to the repo? The fastest path to a first run:
+## Citation
 
-1. **Read [`guides/README.md`](guides/README.md)** — the navigation hub for the whole pipeline.
-2. **Complete [Setup](#setup) below** — build LAMMPS (GPU), create the conda envs, install EMC, configure `.mcp.json` (Claude Code launches the three MCP servers from it automatically).
-3. **Calibrate once on a new machine:** run `/calibrate-hardware` (see [Hardware Calibration](#hardware-calibration-first-run-on-a-new-machine)).
-4. **Ask the agent in natural language** (see [Usage](#usage)) — copy `Task_TEMPLATE.txt`, fill in a polymer name + SMILES, and describe what you want.
-
----
-
-## Setup
-
-### Prerequisites
-
-Install the following before starting:
-
-**1. Miniforge (conda)**
-```bash
-wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
-bash Miniforge3-Linux-x86_64.sh
+```bibtex
+@misc{zhao2026polyjarvis,
+  title         = {PolyJarvis: An LLM-Orchestrated Agent for Automated All-Atom Molecular
+                   Dynamics of Amorphous Homopolymers},
+  author        = {Zhao, Alexander and Chandrasekhar, Achuth and Barati Farimani, Amir},
+  year          = {2026},
+  eprint        = {2604.02537},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL},
+  url           = {https://arxiv.org/abs/2604.02537}
+}
 ```
 
-**2. LAMMPS with GPU support**
-```bash
-# Build with MOLECULE, KSPACE, CLASS2, GPU packages
-# See https://docs.lammps.org/Build_cmake.html
-# Confirm: lmp -h | grep GPU
-```
-
-**3. mol-builder environment**
-```bash
-conda create -n mol-builder python=3.9
-conda activate mol-builder
-pip install radonpy rdkit psi4 mdanalysis fastmcp xtb-python
-pip install -e /path/to/RadonPy
-```
-
-**4. EMC (Enhanced Monte Carlo)**
-```bash
-# Download EMC from http://montecarlo.sourceforge.net/emc/
-# Extract to ~/emc; add ~/emc/bin to PATH in ~/.bashrc
-# Verify: emc_setup.pl --help
-```
-
-**5. Claude Code CLI**
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
-### Configuration
-
-Create `PolyJarvis/.env` (single file shared by all servers):
-
-```env
-LAMBDA_USER     = <your_username>
-LAMBDA_WORKDIR  = /home/<user>/simulations
-LAMBDA_LAMMPS   = /home/<user>/lammps-install/bin/lmp
-CONDA_ENV       = mol-builder
-RADONPY_PATH    = /path/to/RadonPy
-```
-
-### Hardware Calibration (first run on a new machine)
-
-Each run's `engine`/`mpi`/`gpu` defaults come from `guides/polymer_rules.json:hardware_policy`, and the right engine choice is hardware-dependent — so after cloning onto new hardware, host-match the defaults once (runs still work on the shipped defaults until you do; they're just directional, not measured-for-you):
-
-```bash
-python3 hardware/calibrate_hardware.py --dry-run   # preview the polite plan per FF; writes nothing
-nice -n 19 python3 hardware/calibrate_hardware.py  # measure + write hardware_policy
-python3 orchestration/scripts/pick_gpu.py status          # verify: GPU allocation / spare-core view
-```
-
-Calibration is **polite by default** on a shared box: idle GPUs only, rank caps against measured CPU load, everything `nice`d — never use `--allow-busy`. The calibration cells ship in-repo (`hardware/CALIB_<FAM>/`). Re-run after any GPU/CPU change. Measured results and the per-FF lookup table are kept in machine-specific notes (`hardware/HARDWARE.md`, `hardware/HARDWARE_STUDY.md`; local-only, gitignored). An agent can drive the whole procedure via the `/calibrate-hardware` slash-command.
-
----
-
-## Usage
-
-Open Claude Code in the `PolyJarvis/` directory and invoke the `run-campaign` skill with your polymer:
-
-> `/run-campaign "*CC(F)(F)*" Tg,density pvdf1`
-
-This reads `orchestration/ORCHESTRATOR.md`, classifies the polymer, selects the correct force field and builder, plans and critiques the run, builds the amorphous cell, equilibrates, runs the requested property tracks, and reports results graded against experiment — all without further manual intervention. Orchestration only starts on explicit `/run-campaign` invocation; plain chat describing a polymer does not.
-
-To start a new simulation, copy `Task_TEMPLATE.txt` and fill in the polymer name and SMILES.
-
----
-
-## Tech Stack
-
-| Component | Library / Tool |
-|-----------|---------|
-| Molecular construction (GAFF2) | RadonPy, RDKit |
-| Quantum chemistry (charges) | Psi4 / xTB (GFN2 AM1-BCC fallback) |
-| Amorphous cell builder (PCFF) | EMC v9.4.4 (Pieter in 't Veld) |
-| Force fields | GAFF2, GAFF2_mod (RadonPy) · OPLS-AA, TraPPE-UA, PCFF (EMC) |
-| MD simulation | LAMMPS (GPU + KOKKOS builds, class2 styles) |
-| Trajectory analysis | MDAnalysis |
-| T<sub>g</sub> fitting | SciPy (F-stat exhaustive split) |
-| MCP framework | FastMCP |
-
----
+GitHub's "Cite this repository" button reads the same metadata from `CITATION.cff`.
 
 ## License
 
-See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

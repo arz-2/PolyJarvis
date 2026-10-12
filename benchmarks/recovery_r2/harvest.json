@@ -1,0 +1,471 @@
+{
+  "summary": {
+    "agent_decision_actions": {
+      "stop": 8,
+      "revise_plan": 1
+    },
+    "agent_decisions_with_a_plan_change": 1,
+    "runs_with_state": 12,
+    "campaign_runs": 10,
+    "remedy_events_total": 12,
+    "scored": 12,
+    "pending_excluded": 0,
+    "recovered": 12,
+    "completion_rate": 1.0,
+    "by_remedy": {
+      "continue_npt": {
+        "recovered": 4
+      },
+      "transient_retry": {
+        "recovered": 8
+      }
+    },
+    "by_code": {
+      "PROCESS_FAILED": 8,
+      "EXTEND": 4
+    },
+    "escalations_total": 9,
+    "escalations_retired_by_operator": 6,
+    "operator_interventions": 5
+  },
+  "runs": [
+    {
+      "agent_decisions": [
+        {
+          "run": "PLLA_1",
+          "at": "2026-09-08T23:39:58.070568+00:00",
+          "retired": true,
+          "action": "stop",
+          "modifications": {},
+          "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] Host-level, not plan-level. PLLA_1's equilibration chain was killed mid-npt_densify_hold at step 419000 with healthy physics (T~300K, rho~1.23 g/cm3, no LAMMPS error, empty chain_80f3d1ef.log, no sentinel). Three sibling runs on the same host -- aPS_1, sPVC_1, iPMMA_1 -- all recorded PROCESS_FAILED within the same 19:34-19:36 window"
+        },
+        {
+          "run": "PLLA_1",
+          "at": "2026-09-09T12:24:14.592206+00:00",
+          "retired": true,
+          "action": "revise_plan",
+          "modifications": {
+            "nvt_melt_min_steps": 15000000
+          },
+          "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] Root cause: the melt is not chain-relaxed. C(t) on the 5 ns nvt_melt_hold trajectory decayed 11.5% (decay_fraction_at_end=0.115, trajectory_ps=4951) against PEST's curated ct_min_decay_melt=0.15; tau_relax=872660 ps from a KWW fit with beta=0.446. `ct` is the ONLY failing binding gate -- rg, p2, torsion, msid_gaussian, both drifts, "
+        }
+      ],
+      "run": "PLLA_1",
+      "campaign": true,
+      "status": "accepted",
+      "events": [
+        {
+          "run": "PLLA_1",
+          "at": "2026-09-09T17:58:03.060970+00:00",
+          "stage": "cooling",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": "cool-check comprehensive analysis failed: {'run_id': '16cafd04', 'run_type': 'check_equilibration_comprehensive', 'status': 'failed', 'result': None, 'error': \""
+        }
+      ],
+      "escalations_live": 0,
+      "escalations_retired_by_operator": 2,
+      "escalations_total": 2,
+      "operator_interventions": 1,
+      "stages": {
+        "build": "accepted",
+        "cooling": "accepted",
+        "equilibration": "accepted",
+        "mechanical": "accepted",
+        "summary": "accepted",
+        "thermal": "accepted"
+      }
+    },
+    {
+      "agent_decisions": [],
+      "run": "PLLA_2",
+      "campaign": true,
+      "status": "accepted",
+      "events": [],
+      "escalations_live": 0,
+      "escalations_retired_by_operator": 0,
+      "escalations_total": 0,
+      "operator_interventions": 0,
+      "stages": {
+        "build": "accepted",
+        "cooling": "accepted",
+        "equilibration": "accepted",
+        "mechanical": "accepted",
+        "summary": "accepted",
+        "thermal": "accepted"
+      }
+    },
+    {
+      "agent_decisions": [],
+      "run": "PLLA_3",
+      "campaign": true,
+      "status": "accepted",
+      "events": [],
+      "escalations_live": 0,
+      "escalations_retired_by_operator": 0,
+      "escalations_total": 0,
+      "operator_interventions": 0,
+      "stages": {
+        "build": "accepted",
+        "cooling": "accepted",
+        "equilibration": "accepted",
+        "mechanical": "accepted",
+        "summary": "accepted",
+        "thermal": "accepted"
+      }
+    },
+    {
+      "agent_decisions": [],
+      "run": "TGS_PLLA_1_L3_r50",
+      "campaign": false,
+      "status": null,
+      "events": [],
+      "escalations_live": 0,
+      "escalations_retired_by_operator": 0,
+      "escalations_total": 0,
+      "operator_interventions": 0,
+      "stages": {
+        "build": "accepted",
+        "equilibration": "accepted",
+        "summary": "pending",
+        "thermal": "running"
+      }
+    },
+    {
+      "agent_decisions": [],
+      "run": "TGS_PLLA_1_L6_dT40",
+      "campaign": false,
+      "status": null,
+      "events": [],
+      "escalations_live": 0,
+      "escalations_retired_by_operator": 0,
+      "escalations_total": 0,
+      "operator_interventions": 0,
+      "stages": {
+        "build": "accepted",
+        "equilibration": "accepted",
+        "thermal": "pending",
+        "summary": "pending"
+      }
+    },
+    {
+      "agent_decisions": [
+        {
+          "run": "aPS_1",
+          "at": "2026-09-10T21:19:25.697809+00:00",
+          "retired": false,
+          "action": "stop",
+          "modifications": {},
+          "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] Root cause: the melt is not conformationally relaxed on the sampled timescale, and the EXTEND lever cannot reach that timescale. attempt-0008's equilibration.json shows a single failing binding gate, energy_component_drift, driven by dihedral drift 3.7173% (criterion drift_pct, threshold 1.0, tau_frames 1.0, n_eff 1001, p_eff 0.0) \u2014"
+        },
+        {
+          "run": "aPS_1",
+          "at": "2026-09-08T23:39:05.015700+00:00",
+          "retired": true,
+          "action": "stop",
+          "modifications": {},
+          "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] Root cause is environmental, not a plan defect, and the fix is outside the recovery contract. (1) Not a physics/parameter failure: at death the aPS_1 chain c67eb6a6 was healthy \u2014 step 319000 of npt_densify_hold, T~300 K, rho~0.99, no ERROR in npt_densify_hold_run.log \u2014 yet chain_c67eb6a6_progress.jsonl shows only {\"stage\":\"npt_densi"
+        },
+        {
+          "run": "aPS_1",
+          "at": "2026-09-09T14:21:56.555219+00:00",
+          "retired": true,
+          "action": "stop",
+          "modifications": {},
+          "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] Root cause is a code defect in the EXTEND continuation path, not a plan defect, and no key in the override contract reaches it. Evidence: the `continue_npt` remedy (remedy_history application 1, EXTEND with extension_ns=2.0) makes the engine call generate_equilibration_workflow with extend_only=True; `server.py:1524` `_continue_stag"
+        }
+      ],
+      "run": "aPS_1",
+      "campaign": true,
+      "status": "accepted",
+      "events": [
+        {
+          "run": "aPS_1",
+          "at": "2026-09-09T14:11:23.459229+00:00",
+          "stage": "equilibration",
+          "code": "EXTEND",
+          "remedy_id": "continue_npt",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": ""
+        },
+        {
+          "run": "aPS_1",
+          "at": "2026-09-09T14:11:23.931189+00:00",
+          "stage": "equilibration",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": "generate_equilibration_workflow failed: {'status': 'error', 'error': 'Pre-flight validation failed \u2014 workflow not generated', 'validation_errors': [\"'Pair Coeff"
+        },
+        {
+          "run": "aPS_1",
+          "at": "2026-09-09T14:11:24.411781+00:00",
+          "stage": "equilibration",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 2,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": "generate_equilibration_workflow failed: {'status': 'error', 'error': 'Pre-flight validation failed \u2014 workflow not generated', 'validation_errors': [\"'Pair Coeff"
+        }
+      ],
+      "escalations_live": 1,
+      "escalations_retired_by_operator": 2,
+      "escalations_total": 3,
+      "operator_interventions": 3,
+      "stages": {
+        "build": "accepted",
+        "cooling": "accepted",
+        "equilibration": "accepted",
+        "mechanical": "accepted",
+        "summary": "accepted",
+        "thermal": "accepted"
+      }
+    },
+    {
+      "agent_decisions": [],
+      "run": "aPS_2",
+      "campaign": true,
+      "status": "accepted",
+      "events": [],
+      "escalations_live": 0,
+      "escalations_retired_by_operator": 0,
+      "escalations_total": 0,
+      "operator_interventions": 1,
+      "stages": {
+        "build": "accepted",
+        "cooling": "accepted",
+        "equilibration": "accepted",
+        "mechanical": "accepted",
+        "summary": "accepted",
+        "thermal": "accepted"
+      }
+    },
+    {
+      "agent_decisions": [],
+      "run": "aPS_3",
+      "campaign": true,
+      "status": "accepted",
+      "events": [],
+      "escalations_live": 0,
+      "escalations_retired_by_operator": 0,
+      "escalations_total": 0,
+      "operator_interventions": 0,
+      "stages": {
+        "build": "accepted",
+        "cooling": "accepted",
+        "equilibration": "accepted",
+        "mechanical": "accepted",
+        "summary": "accepted",
+        "thermal": "accepted"
+      }
+    },
+    {
+      "agent_decisions": [
+        {
+          "run": "iPMMA_1",
+          "at": "2026-09-11T15:15:31.177125+00:00",
+          "retired": false,
+          "action": "stop",
+          "modifications": {},
+          "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] Root cause is host scheduling, not this run: the mechanical stage never started. attempts/mechanical/attempt-0001/executor_state.json carries exactly one finding (PROCESS_FAILED, \"GPU claim failed for iPMMA_1 (need=1): insufficient_free_gpus, available: []\"), artifacts [], outputs {}, and ran 2026-09-11T15:12:14->15:12:16 \u2014 1.4 s, z"
+        },
+        {
+          "run": "iPMMA_1",
+          "at": "2026-09-10T10:26:22.986234+00:00",
+          "retired": true,
+          "action": "stop",
+          "modifications": {},
+          "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] Root cause: the melt cell is equilibrated by every binding criterion except one term of energy_component_drift, and that residual is bias (a slow conformational mode), not undersampling, so no further EXTEND rung fixes it. Evidence from workflow_state.json + the attempt manifests: continue_npt is at its cap 2/2 (remedy_counters.by_r"
+        },
+        {
+          "run": "iPMMA_1",
+          "at": "2026-09-11T07:16:17.979232+00:00",
+          "retired": true,
+          "action": "stop",
+          "modifications": {},
+          "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] Root cause: this is not a resolvable method_gap \u2014 the density(T) curve has no clean glass transition to place, and the caloric channel says the transition itself is contaminated. thermal.json reports dCp_J_per_g_K = -0.6819 with dCp_weak_step_flag = true, and the enthalpy slopes are INVERTED (H_slope_glassy 38.6999 > H_slope_rubbery"
+        }
+      ],
+      "run": "iPMMA_1",
+      "campaign": true,
+      "status": "accepted",
+      "events": [
+        {
+          "run": "iPMMA_1",
+          "at": "2026-09-09T00:12:10.838884+00:00",
+          "stage": "equilibration",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": "Equilibration chain did not complete: {'status': 'failed', 'reason': 'PROCESS_DEAD_NO_SENTINEL', 'run_id': 'b1d286a6'}"
+        },
+        {
+          "run": "iPMMA_1",
+          "at": "2026-09-09T14:43:05.372113+00:00",
+          "stage": "equilibration",
+          "code": "EXTEND",
+          "remedy_id": "continue_npt",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": ""
+        },
+        {
+          "run": "iPMMA_1",
+          "at": "2026-09-10T05:41:10.639030+00:00",
+          "stage": "equilibration",
+          "code": "EXTEND",
+          "remedy_id": "continue_npt",
+          "application": 2,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": ""
+        }
+      ],
+      "escalations_live": 1,
+      "escalations_retired_by_operator": 2,
+      "escalations_total": 3,
+      "operator_interventions": 0,
+      "stages": {
+        "build": "accepted",
+        "cooling": "accepted",
+        "equilibration": "accepted",
+        "mechanical": "accepted",
+        "summary": "accepted",
+        "thermal": "accepted"
+      }
+    },
+    {
+      "agent_decisions": [
+        {
+          "run": "sPVC_1",
+          "at": "2026-09-10T05:49:33.146462+00:00",
+          "retired": false,
+          "action": "stop",
+          "modifications": {},
+          "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] ROOT CAUSE (confident): the -1000 atm tension point is not on the EOS. Its relaxation time is 169 frames vs 2.9-4.9 for every other point, n_eff=29 vs 510-869, it carries the largest vol_std (412.9 A^3), and detect_anomalous_points flags \"|dV/dP| between points 0 and 1 is 3.972, >3x the other intervals' median (1.165) -- possible ca"
+        }
+      ],
+      "run": "sPVC_1",
+      "campaign": true,
+      "status": "accepted",
+      "events": [
+        {
+          "run": "sPVC_1",
+          "at": "2026-09-09T06:58:49.856880+00:00",
+          "stage": "equilibration",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": "melt gate density analysis failed: {'run_id': '3025c029', 'run_type': 'extract_equilibrated_density', 'status': 'failed', 'result': None, 'error': \"_run_extract"
+        },
+        {
+          "run": "sPVC_1",
+          "at": "2026-09-09T14:10:34.918051+00:00",
+          "stage": "equilibration",
+          "code": "EXTEND",
+          "remedy_id": "continue_npt",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": ""
+        },
+        {
+          "run": "sPVC_1",
+          "at": "2026-09-09T14:10:35.244025+00:00",
+          "stage": "equilibration",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 2,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": "generate_equilibration_workflow failed: {'status': 'error', 'error': 'Pre-flight validation failed \u2014 workflow not generated', 'validation_errors': [\"'Pair Coeff"
+        },
+        {
+          "run": "sPVC_1",
+          "at": "2026-09-09T17:12:20.983271+00:00",
+          "stage": "cooling",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 1,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": "cool-check comprehensive analysis failed: {'run_id': '9455ed71', 'run_type': 'check_equilibration_comprehensive', 'status': 'failed', 'result': None, 'error': \""
+        },
+        {
+          "run": "sPVC_1",
+          "at": "2026-09-09T18:22:27.941228+00:00",
+          "stage": "cooling",
+          "code": "PROCESS_FAILED",
+          "remedy_id": "transient_retry",
+          "application": 2,
+          "severity": "blocking",
+          "outcome": "recovered",
+          "detail": "cool-check comprehensive analysis failed: {'run_id': '00505588', 'run_type': 'check_equilibration_comprehensive', 'status': 'failed', 'result': None, 'error': \""
+        }
+      ],
+      "escalations_live": 1,
+      "escalations_retired_by_operator": 0,
+      "escalations_total": 1,
+      "operator_interventions": 0,
+      "stages": {
+        "build": "accepted",
+        "cooling": "accepted",
+        "equilibration": "accepted",
+        "mechanical": "accepted",
+        "summary": "accepted",
+        "thermal": "accepted"
+      }
+    },
+    {
+      "agent_decisions": [],
+      "run": "sPVC_2",
+      "campaign": true,
+      "status": "accepted",
+      "events": [],
+      "escalations_live": 0,
+      "escalations_retired_by_operator": 0,
+      "escalations_total": 0,
+      "operator_interventions": 0,
+      "stages": {
+        "build": "accepted",
+        "cooling": "accepted",
+        "equilibration": "accepted",
+        "mechanical": "accepted",
+        "summary": "accepted",
+        "thermal": "accepted"
+      }
+    },
+    {
+      "agent_decisions": [],
+      "run": "sPVC_3",
+      "campaign": true,
+      "status": "accepted",
+      "events": [],
+      "escalations_live": 0,
+      "escalations_retired_by_operator": 0,
+      "escalations_total": 0,
+      "operator_interventions": 0,
+      "stages": {
+        "build": "accepted",
+        "cooling": "accepted",
+        "equilibration": "accepted",
+        "mechanical": "accepted",
+        "summary": "accepted",
+        "thermal": "accepted"
+      }
+    }
+  ]
+}

@@ -1,0 +1,675 @@
+{
+  "active_finding": null,
+  "agent_escalations": [],
+  "agent_escalations_archived": [
+    {
+      "at": "2026-09-13T18:05:39.853309+00:00",
+      "decision": {
+        "action": "revise_plan",
+        "modifications": {
+          "cooling_continuation_ns": 0.6
+        },
+        "rationale": "[recovery-agent diagnosis via claude-opus-5[1m]] ROOT CAUSE (deterministic, not transient): attempts 0003/0004/0005 share input_hash 4b0c389a\u2026; each ran `read_restart attempt-0002/.../npt_final_out.restart` + `run 44000` (cooling_continuation_ns=0.088 at dt 2 fs, dump every 1000), wrote a FRESH per-attempt npt_final.dump holding exactly 44 frames (grep count 44 in all three; LAMMPS reached 'STAGE COMPLETE'), and cool-check calls check_equilibration_comprehensive.py with its default --skip_frames 50 \u2192 n_frames_used = 44\u221250 = \u22126 < 10 \u2192 identical PROCESS_FAILED. The two transient_retry rungs replayed a byte-identical failure; a third blind retry would do the same. Disk/GPU are not involved.\n\nWHY 0.088 ns: _thermo_extension_ns sizes n_eff_density as stage_ns*(n_eff_min/n_eff\u22121) = 0.5*(20/17\u22121) = 0.088 \u2014 a formula that assumes the continuation APPENDS to the measured trajectory. It doesn't: each attempt has its own work dir, so `dump_modify append`/`log append` start fresh files and the gate measures the increment ALONE (attempt-0002's 0.333 ns standalone window gave n_eff=17; attempt-0001's 5 ns window gave 12 while energy_drift was still failing, i.e. aging). So the 2nd continue_npt rung was mis-sized by a code defect and never actually got gated \u2014 it crashed before measurement. It also used stage_ns=0.5 rather than npt_final's actual 5 ns.\n\nFIX: size the standalone continuation window to clear both the analysis and the gate on its own. From attempt-0002's stationary window (energy_drift passing), tau_int \u2248 0.333 ns/17 samples; 0.6 ns \u2192 300 frames (250 after the 50-frame skip, far above the \u226510 floor) and a projected n_eff \u2248 25\u201330 (\u224825 even if thermo also discards the first 0.1 ns), clearing n_eff_min=20 with margin. Resume path still finds attempt-0002's outputs.npt_prod_restart_path (attempts 3\u20135 have empty outputs), so the continuation restarts from the same cell. Cost is small: the 0.333 ns rung took ~2 min wall (17:59:49\u219218:02:02 incl. analysis), so 0.6 ns is ~4\u20135 GPU-min.\n\nCAVEATS: remedy_economics.py (\u00a73) could not be executed in this session (Bash permission denied), so no SPEND verdict is transcribed; this is recommended as a re-execution of the already-spent, mis-sized continue_npt rung at a measurement-derived size, not a new lever. If the 0.6 ns window still returns EXTEND on n_eff_density, continue_npt is capped (2/2) and it should come back for stop/accept-with-annotation rather than further extension. Human follow-up (code, not this run): (1) cool-check's fixed skip_frames=50 must scale with (or be capped below) the frame count of a continuation dump; (2) _thermo_extension_ns's shortfall formula is invalid when the continuation is gated standalone \u2014 it should size the whole window (stage_ns*n_eff_min/n_eff) or the gate should concatenate prior attempts' trajectories."
+      },
+      "finding": {
+        "code": "PROCESS_FAILED",
+        "confidence": "high",
+        "details": {
+          "error": "cool-check comprehensive analysis failed: Only -6 frames after skip in --dump_file \u2014 need \u226510."
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "cooling"
+      },
+      "manifest": "attempt-0005"
+    },
+    {
+      "at": "2026-09-13T18:11:04.515956+00:00",
+      "decision": {
+        "action": "stop",
+        "modifications": {},
+        "rationale": "[recovery-agent diagnosis via claude-opus-5[1m]] ROOT CAUSE: n_eff_density fails because of how the estimator works, not because the run is too short, so a longer trajectory cannot fix it. Evidence from workflow_state.json and the attempts' raw/cooling.json:\n- attempt-0002 (0.333 ns standalone window, 117 frames): n_eff=17, tau_eff_frames=4.9, tau_eff_fraction=0.0583.\n- attempt-0006 (0.6 ns window from the previous agent's cooling_continuation_ns=0.6 revision, 250 frames): n_eff=17, tau_eff_frames=8.48, tau_eff_fraction=0.0562.\n- attempt-0001 (5 ns npt_final): n_eff=12.\nNearly doubling the window moved tau in proportion and left n_eff unchanged. That matches analysis_utils.integrated_act, which subtracts the window mean and sums the ACF up to its first zero crossing. The cell has a relaxation that is slow compared with the window (the attempt-0006 checker reports tau_relax_ps=254549, i.e. relaxation_time_ns=254.5), so the zero crossing lands at a fixed fraction of whatever window is measured. That makes n_eff about 1/(2*0.056), roughly 17-18, at any length. The 0.088 ns and 1.8 ns extension sizes the EXTEND remedy suggests both come from the formula stage_ns*(20/17-1), which assumes n_eff grows with the window. The data shows it does not. This is the same failure pattern as memory equil-check-cv-gate-melt-dump-artifact: an extension-invariant gate that EXTEND can never clear.\n\nLADDER STATE: continue_npt is capped at 2/2 and transient_retry is capped at 2/2. This is agent escalation 2 of 2, and the previous one already spent a correctly sized 0.6 ns re-run. A third blind retry would reproduce n_eff=17. No decided_params override can fix the gate: raising cooling_continuation_ns or npt_continuation_ns is the lever already shown not to work, and nchain, dt_fs and the thermostat do not change a window-proportional ACF truncation.\n\nremedy_economics.py (section 3) could not be run because the Bash permission was denied, so there is no verdict to copy. The measured history trajectory_ns:n_eff = 0.333:17, 0.6:17 (5 ns:12) has zero or negative slope, which would give STOP_ANNOTATE or WRONG_LEVER, never SPEND.\n\nPHYSICS IS OTHERWISE SOUND (attempt-0006):\n- Every other binding gate passes: energy_drift, density_sem, energy_sem, density_homogeneity (HOMOG_PASS), finite_size.\n- plateau density is 0.8658 g/cm3 with SEM 0.00038 (0.04%) and drift 0.72%, close to amorphous PE (about 0.855; +1.3%).\n- Advisory flags only: SIZE_CHAIN_SELF_IMAGE_ADVISORY (L/Ree=0.556), and msd_not_trapped / energy_component_drift false.\n\nHUMAN DECISION NEEDED: accept cooling with an annotation that n_eff_density=17 against a minimum of 20 is an estimator artifact with window-invariant tau_eff_fraction of about 0.056, carrying the SEM caveat forward. The alternative is to abandon the run. The engine's action set has no accept-with-annotation path, so this has to be stop.\n\nCODE FOLLOW-UPS (not for this run):\n1. The n_eff gate should cap the ACF summation window (e.g. Sokal c*tau self-consistent window or a fixed max lag) or use blocking at the plateau, so it can respond to extension.\n2. _thermo_extension_ns should not recommend an EXTEND whose projected n_eff does not rise with the window. It should read tau_eff_fraction across rungs and decline when that fraction stays constant.\n3. The earlier defects are still open: a fixed skip_frames=50 against short continuation dumps, and continuations measured standalone instead of appended."
+      },
+      "finding": {
+        "code": "EXTEND",
+        "confidence": "high",
+        "details": {
+          "advisory_gates": {
+            "ct": true,
+            "density_drift": true,
+            "energy_component_drift": false,
+            "msd_not_trapped": false,
+            "msid_gaussian": true,
+            "residual_stress": true,
+            "rg": true,
+            "torsion": true
+          },
+          "applicable_clause": "require_rubbery",
+          "binding_gates": {
+            "density_homogeneity": true,
+            "density_sem": true,
+            "energy_drift": true,
+            "energy_sem": true,
+            "finite_size": true,
+            "n_eff_density": false
+          },
+          "cooling_extrapolation_reliable": null,
+          "cooling_verdict": null,
+          "density_value_binding": "n/a",
+          "extension_ns": 0.088,
+          "failing_binding_gates": [
+            "n_eff_density"
+          ],
+          "finite_size": {
+            "L_min_A": 45.83,
+            "L_over_2Rg": 0.651,
+            "L_over_2cutoff": 1.637,
+            "L_over_Ree": 0.556,
+            "available": true,
+            "box_A": [
+              45.83,
+              45.83,
+              45.83
+            ],
+            "cutoff_A": 14.0,
+            "graded_box": "actual_equilibrated",
+            "min_image_evaluated": true,
+            "pass": true,
+            "ree_self_image_flag": true,
+            "self_image_advisory": true,
+            "verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY"
+          },
+          "finite_size_min_image_unarmed": false,
+          "finite_size_verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
+          "homogeneity_verdict": "HOMOG_PASS",
+          "regime": "rubbery",
+          "relaxation_time_ns": 254.5492,
+          "remedy": "extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': extend_ns=1.8 (1.5 x 20/17 independent-sample deficit) via restart-continuation (read_restart from npt_final's own .restart output, appended log/dump) at npt_prod_temp_K. Cap 2 per gate.",
+          "remedy_confidence": "high",
+          "residual_stress": {
+            "available": true,
+            "dev_atm": {
+              "Pxx": 19.0,
+              "Pyy": -55.5,
+              "Pzz": 36.5
+            },
+            "max_abs_dev_atm": 55.5,
+            "mean_pressure_atm": -13.5,
+            "resolved": false,
+            "von_mises_atm": 84.6,
+            "z_max": 1.54
+          },
+          "saved_to": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0006/raw/cooling.json",
+          "unmeasured_binding_gates": [],
+          "verdict": "EXTEND"
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "cooling"
+      },
+      "manifest": "attempt-0006"
+    }
+  ],
+  "created_at": "2026-09-13T16:03:12.463455+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 550.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 620.0,
+    "bm_pressures_atm": [
+      1,
+      1000,
+      2500,
+      5000,
+      10000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "embedded",
+    "cooling_continuation_attempt": 1,
+    "cooling_continuation_ns": 0.5,
+    "cooling_extend_base_stage": "npt_final",
+    "cooling_extend_ensemble": "npt",
+    "ct_min_decay_melt": 0.25,
+    "cutoff_A": 14.0,
+    "density_initial_gcm3": 0.65,
+    "dp_typical": 179,
+    "dt_fs": 2.0,
+    "electrostatics": "lj_cut",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 450,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "trappe-ua",
+    "stage8_min_steps": 2500000,
+    "tg_min_steps_per_T": 250000,
+    "tg_rate_K_per_ns": 40,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20
+  },
+  "engine_version": "workflow-engine-v3",
+  "plan_decided_params": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 550.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 620.0,
+    "bm_pressures_atm": [
+      1,
+      1000,
+      2500,
+      5000,
+      10000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "embedded",
+    "ct_min_decay_melt": 0.25,
+    "cutoff_A": 14.0,
+    "density_initial_gcm3": 0.65,
+    "dp_typical": 179,
+    "dt_fs": 2.0,
+    "electrostatics": "lj_cut",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 450,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "trappe-ua",
+    "stage8_min_steps": 2500000,
+    "tg_min_steps_per_T": 250000,
+    "tg_rate_K_per_ns": 40,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20
+  },
+  "plan_hash": "505204c7a6b127d8fabb0d86cb17fe2eab5be3556e2281e0ce39d54bd9f1a99f",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {
+      "agent_only:build": 0,
+      "agent_only:cooling": 0,
+      "agent_only:equilibration": 0,
+      "agent_only:mechanical": 0,
+      "agent_only:summary": 0,
+      "agent_only:thermal": 0,
+      "conditional_deformation:build": 1,
+      "conditional_deformation:cooling": 1,
+      "conditional_deformation:equilibration": 1,
+      "conditional_deformation:mechanical": 1,
+      "conditional_deformation:summary": 1,
+      "conditional_deformation:thermal": 1,
+      "continue_npt:build": 2,
+      "continue_npt:cooling": 2,
+      "continue_npt:equilibration": 2,
+      "continue_npt:mechanical": 2,
+      "continue_npt:summary": 2,
+      "continue_npt:thermal": 2,
+      "deformation_fallback:build": 1,
+      "deformation_fallback:cooling": 1,
+      "deformation_fallback:equilibration": 1,
+      "deformation_fallback:mechanical": 1,
+      "deformation_fallback:summary": 1,
+      "deformation_fallback:thermal": 1,
+      "finite_size_rebuild:build": 2,
+      "finite_size_rebuild:cooling": 2,
+      "finite_size_rebuild:equilibration": 2,
+      "finite_size_rebuild:mechanical": 2,
+      "finite_size_rebuild:summary": 2,
+      "finite_size_rebuild:thermal": 2,
+      "melt_homogeneity:build": 2,
+      "melt_homogeneity:cooling": 2,
+      "melt_homogeneity:equilibration": 2,
+      "melt_homogeneity:mechanical": 2,
+      "melt_homogeneity:summary": 2,
+      "melt_homogeneity:thermal": 2,
+      "murnaghan_ladder_extend:build": 1,
+      "murnaghan_ladder_extend:cooling": 1,
+      "murnaghan_ladder_extend:equilibration": 1,
+      "murnaghan_ladder_extend:mechanical": 1,
+      "murnaghan_ladder_extend:summary": 1,
+      "murnaghan_ladder_extend:thermal": 1,
+      "murnaghan_resample:build": 1,
+      "murnaghan_resample:cooling": 1,
+      "murnaghan_resample:equilibration": 1,
+      "murnaghan_resample:mechanical": 1,
+      "murnaghan_resample:summary": 1,
+      "murnaghan_resample:thermal": 1,
+      "negative_deformation:build": 1,
+      "negative_deformation:cooling": 1,
+      "negative_deformation:equilibration": 1,
+      "negative_deformation:mechanical": 1,
+      "negative_deformation:summary": 1,
+      "negative_deformation:thermal": 1,
+      "raise_minimize_tolerance:build": 2,
+      "raise_minimize_tolerance:cooling": 2,
+      "raise_minimize_tolerance:equilibration": 2,
+      "raise_minimize_tolerance:mechanical": 2,
+      "raise_minimize_tolerance:summary": 2,
+      "raise_minimize_tolerance:thermal": 2,
+      "rate_sensitivity:build": 1,
+      "rate_sensitivity:cooling": 1,
+      "rate_sensitivity:equilibration": 1,
+      "rate_sensitivity:mechanical": 1,
+      "rate_sensitivity:summary": 1,
+      "rate_sensitivity:thermal": 1,
+      "tg_breakpoint:build": 1,
+      "tg_breakpoint:cooling": 1,
+      "tg_breakpoint:equilibration": 1,
+      "tg_breakpoint:mechanical": 1,
+      "tg_breakpoint:summary": 1,
+      "tg_breakpoint:thermal": 1,
+      "transient_retry:build": 0,
+      "transient_retry:cooling": 0,
+      "transient_retry:equilibration": 0,
+      "transient_retry:mechanical": 0,
+      "transient_retry:summary": 0,
+      "transient_retry:thermal": 0
+    },
+    "note": "operator strict-replay pin, 2026-09-13: every parameter-changing route at cap; transient_retry (identical params) left available. Real history in remedy_counters_archived.",
+    "total": 0
+  },
+  "remedy_counters_archived": [
+    {
+      "at": "2026-09-13T20:55:01.543463+00:00",
+      "counters": {
+        "by_id": {
+          "continue_npt": 2,
+          "transient_retry": 2
+        },
+        "by_route": {
+          "continue_npt:cooling": 2,
+          "transient_retry:cooling": 2
+        },
+        "total": 4
+      }
+    }
+  ],
+  "remedy_history": [],
+  "remedy_history_archived": [
+    {
+      "application": 1,
+      "at": "2026-09-13T17:59:49.114028+00:00",
+      "finding": {
+        "code": "EXTEND",
+        "confidence": "high",
+        "details": {
+          "advisory_gates": {
+            "ct": true,
+            "density_drift": true,
+            "energy_component_drift": false,
+            "msd_not_trapped": false,
+            "msid_gaussian": true,
+            "residual_stress": true,
+            "rg": true,
+            "torsion": true
+          },
+          "applicable_clause": "require_rubbery",
+          "binding_gates": {
+            "density_homogeneity": true,
+            "density_sem": true,
+            "energy_drift": false,
+            "energy_sem": true,
+            "finite_size": true,
+            "n_eff_density": false
+          },
+          "cooling_extrapolation_reliable": null,
+          "cooling_verdict": null,
+          "density_value_binding": "n/a",
+          "extension_ns": 0.333,
+          "failing_binding_gates": [
+            "energy_drift",
+            "n_eff_density"
+          ],
+          "finite_size": {
+            "L_min_A": 46.03,
+            "L_over_2Rg": 0.659,
+            "L_over_2cutoff": 1.644,
+            "L_over_Ree": 0.562,
+            "available": true,
+            "box_A": [
+              46.03,
+              46.03,
+              46.03
+            ],
+            "cutoff_A": 14.0,
+            "graded_box": "actual_equilibrated",
+            "min_image_evaluated": true,
+            "pass": true,
+            "ree_self_image_flag": true,
+            "self_image_advisory": true,
+            "verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY"
+          },
+          "finite_size_min_image_unarmed": false,
+          "finite_size_verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
+          "homogeneity_verdict": "HOMOG_PASS",
+          "regime": "rubbery",
+          "relaxation_time_ns": 9534.6211,
+          "remedy": "extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': extend_ns=2.5 (1.5 x 20/12 independent-sample deficit) via restart-continuation (read_restart from npt_final's own .restart output, appended log/dump) at npt_prod_temp_K. Cap 2 per gate.",
+          "remedy_confidence": "high",
+          "residual_stress": {
+            "available": true,
+            "dev_atm": {
+              "Pxx": 2.2,
+              "Pyy": -7.7,
+              "Pzz": 5.5
+            },
+            "max_abs_dev_atm": 7.7,
+            "mean_pressure_atm": 7.0,
+            "resolved": false,
+            "von_mises_atm": 11.9,
+            "z_max": 0.71
+          },
+          "saved_to": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0001/raw/cooling.json",
+          "unmeasured_binding_gates": [],
+          "verdict": "EXTEND"
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "cooling"
+      },
+      "remedy_id": "continue_npt"
+    },
+    {
+      "application": 2,
+      "at": "2026-09-13T18:02:02.190992+00:00",
+      "finding": {
+        "code": "EXTEND",
+        "confidence": "high",
+        "details": {
+          "advisory_gates": {
+            "ct": true,
+            "density_drift": true,
+            "energy_component_drift": true,
+            "msd_not_trapped": false,
+            "msid_gaussian": true,
+            "residual_stress": true,
+            "rg": true,
+            "torsion": true
+          },
+          "applicable_clause": "require_rubbery",
+          "binding_gates": {
+            "density_homogeneity": true,
+            "density_sem": true,
+            "energy_drift": true,
+            "energy_sem": true,
+            "finite_size": true,
+            "n_eff_density": false
+          },
+          "cooling_extrapolation_reliable": null,
+          "cooling_verdict": null,
+          "density_value_binding": "n/a",
+          "extension_ns": 0.088,
+          "failing_binding_gates": [
+            "n_eff_density"
+          ],
+          "finite_size": {
+            "L_min_A": 45.8,
+            "L_over_2Rg": 0.649,
+            "L_over_2cutoff": 1.636,
+            "L_over_Ree": 0.559,
+            "available": true,
+            "box_A": [
+              45.8,
+              45.8,
+              45.8
+            ],
+            "cutoff_A": 14.0,
+            "graded_box": "actual_equilibrated",
+            "min_image_evaluated": true,
+            "pass": true,
+            "ree_self_image_flag": true,
+            "self_image_advisory": true,
+            "verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY"
+          },
+          "finite_size_min_image_unarmed": false,
+          "finite_size_verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
+          "homogeneity_verdict": "HOMOG_PASS",
+          "regime": "rubbery",
+          "relaxation_time_ns": 308191.6581,
+          "remedy": "extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': extend_ns=1.8 (1.5 x 20/17 independent-sample deficit) via restart-continuation (read_restart from npt_final's own .restart output, appended log/dump) at npt_prod_temp_K. Cap 2 per gate.",
+          "remedy_confidence": "high",
+          "residual_stress": {
+            "available": true,
+            "dev_atm": {
+              "Pxx": -52.6,
+              "Pyy": 50.2,
+              "Pzz": 2.4
+            },
+            "max_abs_dev_atm": 52.6,
+            "mean_pressure_atm": -37.5,
+            "resolved": false,
+            "von_mises_atm": 89.1,
+            "z_max": 1.12
+          },
+          "saved_to": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0002/raw/cooling.json",
+          "unmeasured_binding_gates": [],
+          "verdict": "EXTEND"
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "cooling"
+      },
+      "remedy_id": "continue_npt"
+    },
+    {
+      "application": 1,
+      "at": "2026-09-13T18:02:31.310420+00:00",
+      "finding": {
+        "code": "PROCESS_FAILED",
+        "confidence": "high",
+        "details": {
+          "error": "cool-check comprehensive analysis failed: Only -6 frames after skip in --dump_file \u2014 need \u226510."
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "cooling"
+      },
+      "remedy_id": "transient_retry"
+    },
+    {
+      "application": 2,
+      "at": "2026-09-13T18:03:00.428838+00:00",
+      "finding": {
+        "code": "PROCESS_FAILED",
+        "confidence": "high",
+        "details": {
+          "error": "cool-check comprehensive analysis failed: Only -6 frames after skip in --dump_file \u2014 need \u226510."
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "cooling"
+      },
+      "remedy_id": "transient_retry"
+    }
+  ],
+  "run_name": "PE_3",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T16:03:42.583023+00:00",
+          "input_hash": "1a028f41581b5e05bf0746555d82732d947e40fc7ef23b76e2e188a2d2df0d15",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T16:03:12.463977+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "1a028f41581b5e05bf0746555d82732d947e40fc7ef23b76e2e188a2d2df0d15",
+      "status": "accepted"
+    },
+    "cooling": {
+      "accepted_attempt": "attempt-0007",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T17:59:49.112772+00:00",
+          "input_hash": "89ac03b87a0297efbb1525bcc30cad4f5d1c691dc4af657a1893a9b883524f1d",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T16:57:41.775039+00:00",
+          "status": "remedy_required"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-13T18:02:02.190103+00:00",
+          "input_hash": "996c5b757bcd045fb9fbb613e037e8005c43bc576bb153e669909bde05edd332",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0002/executor_state.json",
+          "started_at": "2026-09-13T17:59:49.981064+00:00",
+          "status": "failed",
+          "status_before_supersede": "remedy_required",
+          "superseded": true,
+          "superseded_reason": "branch-rerun 2026-09-13: PE_1 ran npt_final 5 ns then exactly one 0.5 ns continuation; PE_3's 0.333 ns, three 0.088 ns crashes and agent-revised 0.6 ns continuations are superseded and one 0.5 ns continuation is taken from cooling attempt-0001"
+        },
+        {
+          "attempt_id": "attempt-0003",
+          "finished_at": "2026-09-13T18:02:31.259610+00:00",
+          "input_hash": "4b0c389af88d39436995b51953fa6362e6a57f384911ce2fe6a4320274d08cd7",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0003/executor_state.json",
+          "started_at": "2026-09-13T18:02:03.053969+00:00",
+          "status": "failed",
+          "superseded": true,
+          "superseded_reason": "branch-rerun 2026-09-13: PE_1 ran npt_final 5 ns then exactly one 0.5 ns continuation; PE_3's 0.333 ns, three 0.088 ns crashes and agent-revised 0.6 ns continuations are superseded and one 0.5 ns continuation is taken from cooling attempt-0001"
+        },
+        {
+          "attempt_id": "attempt-0004",
+          "finished_at": "2026-09-13T18:03:00.377618+00:00",
+          "input_hash": "4b0c389af88d39436995b51953fa6362e6a57f384911ce2fe6a4320274d08cd7",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0004/executor_state.json",
+          "started_at": "2026-09-13T18:02:32.191538+00:00",
+          "status": "failed",
+          "superseded": true,
+          "superseded_reason": "branch-rerun 2026-09-13: PE_1 ran npt_final 5 ns then exactly one 0.5 ns continuation; PE_3's 0.333 ns, three 0.088 ns crashes and agent-revised 0.6 ns continuations are superseded and one 0.5 ns continuation is taken from cooling attempt-0001"
+        },
+        {
+          "attempt_id": "attempt-0005",
+          "finished_at": "2026-09-13T18:03:29.523106+00:00",
+          "input_hash": "4b0c389af88d39436995b51953fa6362e6a57f384911ce2fe6a4320274d08cd7",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0005/executor_state.json",
+          "started_at": "2026-09-13T18:03:01.300131+00:00",
+          "status": "failed",
+          "superseded": true,
+          "superseded_reason": "branch-rerun 2026-09-13: PE_1 ran npt_final 5 ns then exactly one 0.5 ns continuation; PE_3's 0.333 ns, three 0.088 ns crashes and agent-revised 0.6 ns continuations are superseded and one 0.5 ns continuation is taken from cooling attempt-0001"
+        },
+        {
+          "attempt_id": "attempt-0006",
+          "finished_at": "2026-09-13T18:10:04.030884+00:00",
+          "input_hash": "c186941f49f85d68c699e1ba9aa0989af6e7db9bd88fc2e8a837c3098db8aade",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0006/executor_state.json",
+          "started_at": "2026-09-13T18:05:41.786554+00:00",
+          "status": "failed",
+          "status_before_supersede": "remedy_required",
+          "superseded": true,
+          "superseded_reason": "branch-rerun 2026-09-13: PE_1 ran npt_final 5 ns then exactly one 0.5 ns continuation; PE_3's 0.333 ns, three 0.088 ns crashes and agent-revised 0.6 ns continuations are superseded and one 0.5 ns continuation is taken from cooling attempt-0001"
+        },
+        {
+          "attempt_id": "attempt-0007",
+          "finished_at": "2026-09-13T22:25:42.321532+00:00",
+          "input_hash": "86bf07d3bb070f65a43e4c71c8dd040fd9aec5c654339ec22c0a90b59c87f7a3",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/executor_state.json",
+          "started_at": "2026-09-13T22:22:05.697501+00:00",
+          "status": "accepted",
+          "status_before_promotion": "remedy_required"
+        }
+      ],
+      "input_hash": "86bf07d3bb070f65a43e4c71c8dd040fd9aec5c654339ec22c0a90b59c87f7a3",
+      "operator_branch_acceptance": {
+        "decision": "operator, 2026-09-13: accept with annotation (new decision; the n_eff-only authorization did not cover energy_drift)",
+        "failing_binding_gates": [
+          "energy_drift",
+          "n_eff_density"
+        ],
+        "measured": {
+          "density_drift_pct": 0.4648,
+          "density_plateau_gcm3": 0.866135,
+          "energy_drift_pct": 2.4614,
+          "n_eff_density": 15,
+          "n_eff_min": 20,
+          "p": 0.0003
+        },
+        "pe_1_same_schedule": {
+          "energy_drift_pct": 2.0218,
+          "n_eff_density": 25,
+          "p": 0.0116,
+          "verdict": "PASS"
+        },
+        "schedule": "npt_final 5 ns (attempt-0001) + exactly one 0.5 ns continuation (attempt-0007), identical to PE_1",
+        "why": "D-03/F-03: replicates replay PE_1's schedule, and a significance test over a 0.5 ns standalone window measures statistical power, not convergence. PE_1 and PE_3 drifted comparably (2.02% vs 2.46%); the verdicts differ only by which side of the threshold p landed."
+      },
+      "status": "accepted"
+    },
+    "equilibration": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T16:57:40.903229+00:00",
+          "input_hash": "dffa435ad73379660fdf85be748e7ee618b1024c244c2e40e922586849ae0e44",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T16:03:42.585301+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "dffa435ad73379660fdf85be748e7ee618b1024c244c2e40e922586849ae0e44",
+      "status": "accepted"
+    },
+    "mechanical": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-14T02:35:17.730754+00:00",
+          "input_hash": "a5ece7bd388ff382b47289b44b8a41c370bb3f5d4a0c3db70c3f83f4bc68fab2",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/mechanical/attempt-0001/executor_state.json",
+          "started_at": "2026-09-14T02:08:06.358230+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "a5ece7bd388ff382b47289b44b8a41c370bb3f5d4a0c3db70c3f83f4bc68fab2",
+      "operator_acceptance": {
+        "B0_GPa": 1.9327,
+        "B0_prime": 8.2535,
+        "annotation": "LOO shift driven by the P~0 anchor; K' decreases with P over the 1-15000 atm ladder (rubbery-to-stiffened crossover); Murnaghan B0 likely slightly high against the low-P secant and fluctuation estimates; do not widen the ladder.",
+        "bm_gate_verdict": "BM_REPORTABLE",
+        "decision": "operator pre-authorization 2026-09-13"
+      },
+      "status": "accepted"
+    },
+    "summary": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-14T02:35:27.310879+00:00",
+          "input_hash": "4fab0a4bbf79028078c7b53258f4eead494d79023dfb9b903a5ca64061f72eb7",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/summary/attempt-0001/executor_state.json",
+          "started_at": "2026-09-14T02:35:23.851056+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "4fab0a4bbf79028078c7b53258f4eead494d79023dfb9b903a5ca64061f72eb7",
+      "stale_reason": "recovery agent bounded revision",
+      "status": "accepted"
+    },
+    "thermal": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-14T02:08:06.296409+00:00",
+          "input_hash": "bcd024e9e7c9af4b6a98ec3e5bc760063918c148f8d26787222e77575e47f270",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/thermal/attempt-0001/executor_state.json",
+          "started_at": "2026-09-14T01:07:28.680599+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "bcd024e9e7c9af4b6a98ec3e5bc760063918c148f8d26787222e77575e47f270",
+      "status": "accepted"
+    }
+  },
+  "status": "accepted",
+  "updated_at": "2026-09-14T02:35:27.314269+00:00"
+}

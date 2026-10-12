@@ -1,0 +1,273 @@
+{
+  "confidence": "high",
+  "cost_estimate": {
+    "cell_atoms_estimate": 7980,
+    "ff_family": "pcff",
+    "stages": {
+      "cool": {
+        "gpu_hours": 2.2565,
+        "confidence": "high",
+        "basis": "log-log interpolated between real measured points [(3020, 53.974), (5140, 46.822), (15040, 37.058)] -- 7980 atoms is within the measured [3020,15040] range",
+        "ns_per_day_used": 42.5439,
+        "simulated_ns": 4.0,
+        "steps": 4000000,
+        "note": "8 cool blocks x 250000 steps (500->300 K at dT=25 K) + npt_final 2000000; first blocks only -- adaptive extensions are not priced"
+      },
+      "murnaghan": {
+        "gpu_hours": 1.4103,
+        "confidence": "high",
+        "basis": "log-log interpolated between real measured points [(3020, 53.974), (5140, 46.822), (15040, 37.058)] -- 7980 atoms is within the measured [3020,15040] range",
+        "ns_per_day_used": 42.5439,
+        "simulated_ns": 2.5,
+        "steps": 2500000,
+        "note": "5 pressure point(s) x 500000 npt_steps each"
+      }
+    },
+    "unpriced_stages": [
+      {
+        "stage": "equil",
+        "reason": "stage-length knobs default to None, deferred to generate_equilibration_workflow's own atom-count-tiered default inside the MCP LAMMPS engine -- not resolvable from decided_params alone; not priced here to avoid guessing"
+      }
+    ],
+    "total_gpu_hours": 3.6668,
+    "confidence": "high",
+    "note": "Partial/lower-bound total -- see unpriced_stages for what is not included (notably: equil-stage length, and any deform stage beyond a single primary-direction leg)."
+  },
+  "decided_params": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 500.0,
+    "T_melt_hold_K": 500.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 625.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      3000,
+      7000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.61,
+    "dp_typical": 114,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "compass",
+    "stage8_min_steps": 2000000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "emc_seed": 200187,
+    "velocity_seed": 631302
+  },
+  "decisions": [
+    {
+      "acknowledgements": {
+        "ff_accuracy_prior_not_met": {
+          "prior": "pcff",
+          "chosen": "compass",
+          "detail": "Deliberate departure: seed-paired force-field comparison against PEG_3 (PCFF), reviewer comment 4. Only preferred_ff changes; charge_method, electrostatics, dt_fs and the hardware triple derive from the field and are identical for compass and pcff. No DOI-backed evidence covers compass for POXI: the only COMPASS PEO record in the PolyDatabase MD index (10.1002/polb.24355) is a reactive-MD 10-mer graphene-confinement study, not a neat bulk melt. The class ff_justification_doi does not cover compass. The run measures that gap; it does not close it by citation."
+        }
+      },
+      "alternatives": [],
+      "alternatives_note": "NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.POXI has no forcefield_alternatives, and this layer will not invent one. The moiety probe names what actually types this SMILES; the literature critic may name a candidate on the evidence.",
+      "choice": "compass",
+      "confidence": "high",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "critique": {
+        "findings": [
+          "DECLINED the critic's disagrees/suggested_override preferred_ff=opls/2024/opls-aa on D-01_ff; pcff stands. The critic's medium-confidence verdict rests on FF USAGE in two studies, not on any head-to-head accuracy comparison, and it states itself that this is 'a flagged literature disagreement for the adjudicating critic to weigh, not grounds for an automatic override.'",
+          "The stronger supporting source (10.3390/polym13224049, OPLS-AA, exact-SMILES bulk neat PEO melt) reports an MD Tg of 249 K against the experimental 158-233 K band that the same paper cites. OPLS-AA therefore overpredicts PEO Tg at stepwise-cooling rates by roughly the same sign and magnitude expected of PCFF. Adopting it would trade one FF offset for an unquantified other, with no benchmark showing the trade is favorable.",
+          "The second supporting source (10.1039/d4ra04898a, GAFF) is oligomers n=2-7 with ~4.3% density error, not a bulk melt at this run's DP=114, and the critic flagged an internal inconsistency in that evidence-store record (stored claim text says GAFF, the record's recommendation field says OPLS-AA). A morphology-mismatched record with a known data-quality defect is weak support for overriding a class constant.",
+          "Countervailing in-pipeline evidence is stronger than the external literature here: two internal_validated_run records show PCFF building and passing density/Tg/bulk_modulus gates on this exact SMILES (PEG1, PEG1_gate_validation), and polymer_rules.json:classes.POXI.ff_note records a PEO PCFF build-test PASS (2026-05-31). No external study validates PCFF on POXI, but no external study ranks any FF on POXI either.",
+          "Protocol-coherence hazard reinforcing the decline: preferred_ff is the only allowlisted key the override would touch, but decided_params.charge_method is 'bond-increment', a PCFF/Class-II bond-increment scheme. A single-key FF swap would leave a mismatched charge method, and the remaining POXI constants (cutoff_A=9.5, dt_fs=1.0, and the widened 5-point bm_pressures_atm series [-1000, 0, 3000, 7000, 15000] that is what resolves B0' for a rubbery PEO cell instead of clamping it) are all calibrated against PCFF runs. Switching the FF alone would invalidate that calibration for no measured accuracy gain.",
+          "CONCEDED to the critic, without changing the choice: the plan's D-01_ff literature_support evidence cites 'NkepsuMbitou2025' for the claim that PCFF outperforms GAFF2 on thermomechanical properties, and that reference has no resolvable DOI anywhere in the plan. It cannot be verified and should not be counted as literature support. The remaining PCFF justification rests on the class ff_note build-test and internal validated-run precedent, which is why this row is signed off at medium rather than high confidence.",
+          "ACCEPTED without change: electrostatics=pppm (critic confidence high, corroborated by Ewald summation in both studies and by the classification's implied_electrostatics=pppm on a polar_aprotic backbone ether). The critic's tg_target_K band (158-233 K) is an MD study's cited validation range, not verified curated ground truth, so it was NOT written to overrides.experimental_tg_K; the plan's already-resolved curated target (tg stage success criterion t_range_brackets_exp_tg=206 K, consistent with Wu2011's bulk PEO ~206 K) stands and continues to drive the rubbery regime determination.",
+          "parameter_coverage for this SMILES remains genuinely unmeasured: no EMC trial build was run and the moiety screen matched no rule in guides/ff_moiety_rules.json, which covers only 77% of measured failures. The internal_validated_run precedent on this exact SMILES is what makes that acceptable here rather than a blocking gap.",
+          "DECLINED the critic's disagrees/suggested_override preferred_ff='opls/2024/opls-aa' on D-01_ff; pcff stands. This round the decline rests on a MEASUREMENT, not on the earlier literature-weighing argument. Ran `mcp-servers/.venv/bin/python orchestration/scripts/forcefield.py capability '*CCO*' --fields pcff,compass,opls/2024/opls-aa,opls/2012/opls-aa,opls/2024/opls-ua,gaff2`. Result for the recommended field: types_smiles=false, candidate=false, typing_error='Error: core/script/field/entry.c:651 ScriptFieldEntryApply: | Missing force field parameters. | Program aborted.' A real EMC trial build cannot type this repeat unit with opls/2024/opls-aa in this installation, whatever the papers report. opls/2012/opls-aa fails too (types_smiles=false, 'core/fields.c:436 FieldsApply: | Missing rules. | Program aborted.'). This is the strongest available ground and it cost seconds.",
+          "The decline would also have happened without me: orchestration/langgraph/nodes.py:687-694 runs forcefield.check_typing on any preferred_ff override and, when types_smiles is false, executes `overrides.pop('preferred_ff', None)` and returns 'DECLINED -- a real EMC trial build could not type this repeat unit with it'. Writing the override would have been inert, not merely wrong.",
+          "FACT CORRECTION to this row's prior findings, per the operator note. The earlier protocol-coherence argument ('a single-key FF swap would leave a mismatched charge_method=bond-increment, and cutoff_A/dt_fs/bm_pressures_atm are calibrated against PCFF') is sound for OPLS-AA but must NOT be generalized into a claim that no swap is mechanically coherent. The probe shows compass is candidate=true with typing_evidence='built_cell' on this SMILES, and its required_styles are byte-identical to pcff's (pair lj/class2/coul/long; bond/angle/dihedral/improper class2), with gpu_accelerated=true and styles_without_kokkos=[] \u2014 so bond-increment charges, cutoff_A=9.5, dt_fs=1.0 and the hardware block (engine=kokkos) would all remain coherent under a compass swap. The coherence hazard is specific to the field proposed, not to FF swaps as such.",
+          "EVALUATED AND DECLINED compass on its merits, a field neither the plan nor the critic named (the critic searched literature, not this installation's field table). Nothing in this critique or in polymer_rules.json ranks compass above pcff for an aliphatic polyether. The two places the repo compares them cut against a swap here: PVNL's ff_note records a full-text-verified COMPASS PVC study at K=2.947 GPa numerically overlapping PolyJarvis's own PCFF-measured 2.7-2.9 GPa ('two independent Class-II variants converge on the same value... switching to COMPASS would likely not fix it'), and PSTR's ff_note, the one documented COMPASS advantage (aromatic-ring density deficit -6.3% -> -1.1%), closes with 'Do not generalize this aromatic-ring finding to non-aromatic classes' \u2014 PEO is an aliphatic ether, so that finding is scoped out by its own terms. Against zero measured POXI-specific gain stands the run goal: this is a 'rev2 replicate campaign, replicate 1 locks the protocol'. Changing the field is the one edit that would forfeit what the campaign exists to measure.",
+          "CORRECTION to this row's prior CONCEDED finding, which stated that 'NkepsuMbitou2025' has no resolvable DOI and cannot be counted as literature support. It is resolvable \u2014 grep of guides/polymer_rules.json returns _metadata.primary_sources[NkepsuMbitou2025] with doi='10.1016/j.commatsci.2025.113861', citation 'Nkepsu Mbitou, R. L.; Bedoui, F. A Review on All-Atom Force Fields Capabilities to Predict Polymer Properties: Case of Poly(methyl methacrylate) and Polyisobutylene Polymer Systems. Comput. Mater. Sci. 2025, 253, 113861.' The earlier finding was true of the plan file in isolation and false of the evidence chain, since the row's resolver points into polymer_rules.json. The right caveat is narrower: that review's case studies are PMMA and PIB, so it supports Class-II-over-Class-I generally (>40% Tg error under GAFF/GAFF2 vs <10% under Class II, polymer_rules.json global_notes) and does NOT validate PCFF on POXI specifically. I did not verify the paper's contents \u2014 the DOI's existence and citation text are what I checked.",
+          "UPGRADED, by the same probe: this row's parameter_coverage evidence states 'NOT MEASURED for this SMILES. No EMC trial build was run... whether pcff can type THIS repeat unit is unverified until the build stage runs.' It has now been measured. pcff returns types_smiles=true, candidate=true, typing_evidence='built_cell' on *CCO* \u2014 the front end built it to a runnable cell, not merely typed it. The moiety-screen gap that made this a live risk (guides/ff_moiety_rules.json covering 77% of measured failures) is closed for the build-feasibility question. It remains open for accuracy, which no probe can answer.",
+          "UNCHANGED and re-affirmed: electrostatics=pppm (critic confidence high, Ewald summation in both studies, classification implied_electrostatics=pppm). The critic's tg_target_K band 158-233 K was NOT written to overrides.experimental_tg_K \u2014 it is an MD study's own cited validation range, not curated ground truth. No pin is needed: guides/polymer_rules.json classes.POXI.experimental_tg_K.PEO=206 is already resolving for this SMILES (it is what the tg stage's t_range_brackets_exp_tg=206 criterion carries), and classes.POXI.experimental_density_gcm3.PEO=1.12 resolves through the same member-keyed path (independently consistent with the critic's source, which cites experimental 1.112 g/cm3). Adding either as an override would be a redundant restatement of an already-correct resolution. No curated K band exists for POXI \u2014 grep found no exp_K_min_GPa/exp_K_max_GPa/K_range for this class \u2014 so exp_K_* stay unset and degrade gracefully to a missing grading target for bulk_modulus.",
+          "Returned NO critic_evidence entries this round, deliberately. Both critic DOIs (10.3390/polym13224049, 10.1039/d4ra04898a) are already transcribed on this row with origin='critic' from the prior round, and what moved the decision this time was the capability probe, which carries no DOI. Re-appending the same two would double-count them in benchmarks/.../metrics/llm_contribution.py, which counts critic-tagged cited evidence as LLM contribution \u2014 inflating that metric with duplicates would corrupt the measurement the tag exists to support."
+        ],
+        "rounds": 1,
+        "status": "scientific_agent_decision"
+      },
+      "evidence": [
+        {
+          "claim": "polymer_rules.json:classes.POXI.ff_note: PCFF via EMC (build-tested 2026-05-31: PEO PASS). GAFF2 was rejected: PCFF (Class II) outperforms it for thermomechanical properties (NkepsuMbitou2025). Klajmon2023 benchmarks PLA/PEG/PVP with AA-MD and is this class's cited PEG/PEO reference (CrossRef-verified DOI); full text remains ACS-paywall-blocked, so PEG-specific Tg/density figures are treated as topic-relevant, not independently re-confirmed numerics.",
+          "criterion": "literature_support",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.POXI.ff_justification_doi",
+          "source_doi": "10.1021/acs.iecr.3c03038"
+        },
+        {
+          "citation": "Webb, M. A. et al. How to Determine Glass Transition Temperature of Polymer Electrolytes from Molecular Dynamics Simulations. J. Phys. Chem. B 2024, 128, 49, 11978\u201311991.",
+          "claim": "Definitive protocol comparison: stepwise vs continuous cooling, temperature ranges, cooling rates for polymer electrolytes. Protocol: 40-540 K sweep, 20 K steps, 2 ns eq + 2 ns prod per step.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Webb2024]",
+          "source_doi": "10.1021/acs.jpcb.4c06018"
+        },
+        {
+          "citation": "Hayashi, Y. et al. RadonPy: Automated Physical Property Calculation using All-atom Classical Molecular Dynamics Simulations for Polymer Informatics. npj Comput. Mater. 2022, 8, 222.",
+          "claim": "High-throughput GAFF2 polymer MD; 1 ns NVT anneal 300\u2192700 K; 10 chains ~10,000 atoms; LAMMPS; systematic Tg and density for 1070+ polymers. Primary reference for nchain, dp, and forcefield defaults.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Hayashi2022]",
+          "source_doi": "10.1038/s41524-022-00906-4"
+        },
+        {
+          "citation": "Wu, C. Simulated Glass Transition of Poly(ethylene oxide) Bulk and Film: A Comparative Study. J. Phys. Chem. B 2011, 115, 11044\u201311052.",
+          "claim": "All-atom stepwise-cooling MD for PEO bulk and thin film; density, energy, and MSD Tg methods compared. Bulk PEO density-Tg consistent with experimental ~206 K. Validates stepwise cooling protocol and density-based Tg extraction for POXI class PEO/PEG simulations.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Wu2011]",
+          "source_doi": "10.1021/jp205205x"
+        },
+        {
+          "citation": "Klajmon, M. et al. Glass Transition and Structure of Organic Polymers from All-Atom Molecular Simulations. Ind. Eng. Chem. Res. 2023, 62, 21437\u201321448.",
+          "claim": "All-atom MD benchmark for Tg and density of PLA, PEG, and PVP; quantifies equilibration protocol errors and polydispersity effects. Density identified as the most reliable Tg observable regardless of protocol. Informs PEST (PLA) and POXI (PEG) simulation setup. NOTE: paper covers PLA/PEG/PVP \u2014 not PC/PA/PEEK as previously annotated.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Klajmon2023]",
+          "source_doi": "10.1021/acs.iecr.3c03038"
+        },
+        {
+          "claim": "NOT MEASURED for this SMILES. No EMC trial build was run, so coverage is asserted from polymer_rules.json:classes.POXI.ff_accuracy_prior='pcff' only; whether 'pcff' can type THIS repeat unit is unverified until the build stage runs. The moiety screen ran and matched no rule, so no trial build was triggered. That narrows the risk and measures nothing: the rules cover 77% of the measured failures (guides/ff_moiety_rules.json), so this SMILES is UNSCREENED for the rest, not cleared.",
+          "criterion": "parameter_coverage",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.POXI.ff_accuracy_prior"
+        },
+        {
+          "claim": "pcff-family cell of 7980 atoms (50220.4 g/mol): estimate_ns_per_day at this run's 7980-atom estimate: 42.54386294176331 ns/day (high confidence). electrostatics=pppm, cutoff_A=9.5.",
+          "criterion": "computational_cost",
+          "origin": "autofill",
+          "resolver": "select_hardware.select_hardware"
+        },
+        {
+          "citation": "Temperature Dependence of Conformational Relaxation of Poly(ethylene oxide) Melts",
+          "claim": "All-atom PEO melt MD (up to 300 ns production per temperature) with OPLS-AA reports simulated density 1.071 g/cm3 at 300 K against experimental 1.112 g/cm3, and an MD Tg of 249 K that EXCEEDS the paper's own cited experimental PEO Tg range of 158-233 K, tracking instead a prior MD value of ~251 K. Read as MD-vs-MD consistency, not agreement with experiment: OPLS-AA overpredicts PEO Tg at stepwise-cooling rates, so it is not demonstrated to outperform PCFF on this class. Independently corroborates electrostatics=pppm (Ewald summation) for this repeat unit.",
+          "origin": "critic",
+          "source_doi": "10.3390/polym13224049"
+        },
+        {
+          "citation": "Thermophysical properties of polyethylene glycol oligomers via molecular dynamics simulations",
+          "claim": "PEG oligomer (n=2-7) MD with GAFF reproduces experimental density for the tetramer at 328 K to within ~4.3% (1096.0 kg/m3 exp vs 1143.3 kg/m3 sim), and also uses Ewald summation for long-range electrostatics. Short-chain oligomer morphology, not a bulk melt at this run's DP=114, so it constrains neither the bulk density nor the force-field ranking for this cell; recorded as the second of the two external MD studies found on this exact SMILES, both non-PCFF, which is the literature gap behind the critic's disagreement.",
+          "origin": "critic",
+          "source_doi": "10.1039/d4ra04898a"
+        }
+      ],
+      "id": "D-01_ff",
+      "resolved_by": "polymer_rules.json:classes.POXI.ff_accuracy_prior"
+    }
+  ],
+  "dominant_uncertainty": "none_dominant",
+  "goal": "density and bulk modulus for amorphous PEO/PEG under COMPASS, seed-paired to PEG_3 (PCFF) -- only preferred_ff changes (reviewer comment 4)",
+  "hardware": {
+    "engine": "kokkos",
+    "mpi_ranks": 1,
+    "gpu_per_run": 1,
+    "ff_family": "pcff"
+  },
+  "overrides": {
+    "preferred_ff": "compass"
+  },
+  "plan_mode": "reasoned",
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "cool",
+      "track": "cooling",
+      "success_criteria": {
+        "chain_submitted": true
+      }
+    },
+    {
+      "stage": "cool-check",
+      "track": "cooling",
+      "success_criteria": {
+        "cool_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "murnaghan",
+      "track": "mechanical",
+      "success_criteria": {
+        "chain_submitted": true
+      }
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "polymer_class": "POXI",
+  "properties": [
+    "density",
+    "bulk_modulus"
+  ],
+  "run_name": "PEG_COMPASS_3",
+  "schema_version": "2.0",
+  "smiles": "*CCO*",
+  "system_size": {
+    "acknowledgements": {
+      "MW_FLOOR_UNKNOWN": {
+        "class": "POXI",
+        "detail": "no documented entanglement Me for this class in polymer_rules.json:_metadata.global_notes -- bulk_modulus chain-length adequacy is UNASSESSED, not assumed adequate"
+      },
+      "nchain_below_production_minimum": {
+        "current_nchain": 10,
+        "detail": "nchain=10 is below the advisory PCFF production minimum 20. Its source (\"Bejagam 2020\") has no copy in this repo and no verified DOI, so the claim is unchecked; nchain>=10 (Wang 2021, verified) IS met, and Hayashi 2022 (RadonPy) ran nchain=10 across 1,077 polymers. Raising nchain to 20 at a fixed system-mass floor would halve per-chain MW (worse chain-length bias); raising it at fixed DP doubles cost for no criterion this module can state. Reported, not applied -- the L>=2*Rg finite-size gate (a separate, already-mechanized check) is the binding constraint on nchain; supply a nchain is now a pure function of the system-mass floor."
+      }
+    },
+    "dp_typical": 114,
+    "nchain": 10,
+    "reasons": [
+      "system size auto-filled {'dp_typical': 114, 'nchain': 10} via solve_system_size()",
+      "rigidity DP recommendation (backbone_rotatable_fraction=1.00, backbone_ring_fraction=0.00, longest_rigid_backbone_run=1 atoms -> flexible; DP_MW=114) does not exceed the existing recommendation 114"
+    ],
+    "resolved_by": "select_system_size.solve_system_size"
+  }
+}

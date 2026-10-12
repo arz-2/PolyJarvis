@@ -1,0 +1,131 @@
+{
+  "agent_escalations": [],
+  "created_at": "2026-09-12T23:00:41.947569+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 700.0,
+    "T_melt_hold_K": 700.0,
+    "T_workflow_K": 700.0,
+    "annealing_T_high_K": 780.0,
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.62,
+    "dp_typical": 12,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 750,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 250,
+    "tg_t_step_K": 20
+  },
+  "engine_version": "workflow-engine-v3",
+  "plan_hash": "9dfb5c8e2d5d7f8299f219e46e59f04000d1c3240a7296614f68cce79650baaa",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {},
+    "total": 0
+  },
+  "run_name": "PSU_3",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T23:02:42.174824+00:00",
+          "input_hash": "57d4868c8e1f29e6a825a7e78473c8ce9c315e27c722c7229f7fa5aacad2a79a",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PSU_3/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T23:00:41.948075+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "57d4868c8e1f29e6a825a7e78473c8ce9c315e27c722c7229f7fa5aacad2a79a",
+      "status": "accepted"
+    },
+    "cooling": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T09:41:58.184811+00:00",
+          "input_hash": "4d16aac4f4480d1f6a79b33310eebcfacb3a2507d6b640eafea6a53112f40f46",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PSU_3/attempts/cooling/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T07:03:45.905680+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "4d16aac4f4480d1f6a79b33310eebcfacb3a2507d6b640eafea6a53112f40f46",
+      "status": "accepted"
+    },
+    "equilibration": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T07:03:42.856227+00:00",
+          "input_hash": "b8aee28ed3657c65c9cc2081d0354c81b8c801b91490bc7422457c3e68d51faf",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PSU_3/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T23:02:42.177992+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "b8aee28ed3657c65c9cc2081d0354c81b8c801b91490bc7422457c3e68d51faf",
+      "status": "accepted"
+    },
+    "mechanical": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T14:28:31.443995+00:00",
+          "input_hash": "acde018a1eaf631fa7c9294cedf9854112482b65a0bf85bfb23bdb87172d646e",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PSU_3/attempts/mechanical/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T12:53:36.094744+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "acde018a1eaf631fa7c9294cedf9854112482b65a0bf85bfb23bdb87172d646e",
+      "status": "accepted"
+    },
+    "summary": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T14:28:44.077475+00:00",
+          "input_hash": "9efa9f1047f845073f118ff06a0619336352d321a4191406928ff5143dd88cf4",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PSU_3/attempts/summary/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T14:28:36.757129+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "9efa9f1047f845073f118ff06a0619336352d321a4191406928ff5143dd88cf4",
+      "status": "accepted"
+    },
+    "thermal": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T12:53:34.645389+00:00",
+          "input_hash": "3b4c9ff9765c4deaabd1d23c0fcb9a4dc37e080bffc693482706a6ca8622b247",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PSU_3/attempts/thermal/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T09:42:01.251203+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "3b4c9ff9765c4deaabd1d23c0fcb9a4dc37e080bffc693482706a6ca8622b247",
+      "status": "accepted"
+    }
+  },
+  "status": "accepted",
+  "updated_at": "2026-09-13T14:28:44.078682+00:00"
+}

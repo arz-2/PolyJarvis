@@ -1,0 +1,29 @@
+[
+  {
+    "field": "cte_glassy_per_K",
+    "gate_field": "slope_signs_valid",
+    "name": "cte_glass",
+    "produced_by": "tg",
+    "source_json": "thermal.json",
+    "track": "thermal",
+    "unit": "1/K"
+  },
+  {
+    "field": "cte_rubbery_per_K",
+    "gate_field": "slope_ordering_valid",
+    "name": "cte_rubber",
+    "produced_by": "tg",
+    "source_json": "thermal.json",
+    "track": "thermal",
+    "unit": "1/K"
+  },
+  {
+    "field": "transition_width_c_K",
+    "gate_field": "fit_quality",
+    "name": "tg_transition_width",
+    "produced_by": "tg",
+    "source_json": "thermal.json",
+    "track": "thermal",
+    "unit": "K"
+  }
+]

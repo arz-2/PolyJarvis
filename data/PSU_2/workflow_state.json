@@ -1,0 +1,408 @@
+{
+  "active_finding": null,
+  "agent_escalations": [],
+  "agent_escalations_archived": [
+    {
+      "at": "2026-09-13T04:25:24.390001+00:00",
+      "decision": {
+        "action": "stop",
+        "modifications": {},
+        "rationale": "[recovery-agent diagnosis via claude-opus-5[1m]] ROOT CAUSE: The TG_REVIEW label says 'breakpoint_ambiguity', but the grid is not too coarse to place the breakpoint. thermal.json shows breakpoint_spread_K=0.0 over 1 split, so there are no competing splits. extract_thermal.py:1119 sets the value as max(spread, 2*sigma), and the 180.9 K comes entirely from 2 x tg_uncertainty_K=90.5 K. The bilinear branches are nearly parallel (a_glassy=-2.87e-4, a_rubbery=-3.89e-4, ratio 1.35), so their crossing point is loose. The rubbery bins (600-710 K) are noisy: many plateau bins have n_points 3-15, relax_warning appears throughout 600-710 K, and density does not fall steadily with T (e.g. 585 K 1.1033 vs 590 K 1.0889; 690 K 1.0287 vs 695 K 1.0566). The primary hyperbola fit was degenerate (Tg=525 K) and was swapped for bilinear (401.1 K, R2=0.9596). That value sits well below both experiment (PSU 463 K) and PSU_1's validated Tg. The glassy branch (250-400 K, n=200/bin) is clean.\n\nWHY THE RIGHT LEVER IS NOT CLEAR: (1) tg_breakpoint (halve tg_t_step_K) is the wrong lever: spread is already 0, and 20/(100 K/ns x 1 fs) = 200000 steps/T is exactly PSFO's tg_min_steps_per_T floor, so the remedy declines by construction. remedy_history is empty, which is consistent with that. (2) This is not a protocol failure. PSU_1 ran the same class protocol (PCFF, 100 K/ns, dt 1 fs, PSFO sizing) and validated Tg=481.3 K with a GOOD fit (R2=0.9849) (system_characterization_cache.json). The same protocol gave a clean fit on another trajectory, so this looks like trajectory/seed noise on a DP=12 rigid aromatic cell. It matches the seed-noise pattern already recorded for PKTN/PSTR. (3) Lowering tg_rate_K_per_ns (e.g. 100 -> 50) carries EXTRA_INVALIDATION to cooling. That re-runs cooling (~2.7 h wall this run) plus a ~10 h sweep, roughly 13 h. At best it cuts per-point noise by about sqrt(2), taking 2*sigma to ~128 K, against a gate of 20 K, a 9x shortfall. I could not get a verdict from remedy_economics.py: both invocations were blocked by the permission layer. Supplied args: --gate-class C --lever cooling_rate_K_per_ns lower --history 100:180.9 --next-lever 50 --target-floor 20 --physical-target 463 --sem 90.5 --last-rung-hours 5.08 --cost-exponent -1. With one history point it could only return 'spend_limit: one rung', and the sqrt(2) arithmetic points toward STOP_ANNOTATE. (4) Changing velocity_seed maps to 'equilibration' (workflow_engine.py:121). That re-runs equilibration (~6.3 h), cooling and thermal, which amounts to re-rolling the gate on a different trajectory rather than fixing a cause. (5) retry: nothing transient happened. The attempt finished normally, and every per-T point was PASS/stable.\n\nDECISION NEEDED FROM A HUMAN: either (a) accept PSU_2's Tg as not reportable, with an annotation (sigma=90.5 K, near-parallel branches, noisy melt branch, and RIGID_BACKBONE_CHAIN_LENGTH_BIAS at DP=12, which the plan already flagged), and take Tg from PSU_1's validated 481.3 K while continuing to the mechanical stage; or (b) knowingly spend about 13 GPU-h on tg_rate_K_per_ns=50, which is unlikely to bring 2*sigma under 20 K. The planner's own note (critique finding #5) also left the rate untouched on purpose, to test the retired slowest_rate fallback, so any rate change is a policy choice."
+      },
+      "finding": {
+        "code": "TG_REVIEW",
+        "confidence": "high",
+        "details": {
+          "gate_output": {
+            "is_glassy": true,
+            "per_rate": [
+              {
+                "Tg_K": 401.1,
+                "fit_quality": "ACCEPTABLE",
+                "output_dir": "/home/alexzhao/PolyJarvis/data/PSU_2/attempts/thermal/attempt-0001/raw",
+                "r_squared": 0.9596,
+                "rate": 100.0,
+                "tg_gate_cause": "breakpoint_ambiguity",
+                "tg_gate_verdict": "TG_REVIEW",
+                "tg_melt_start_density_consistent": true,
+                "tg_per_t_sampling": [
+                  {
+                    "T_K": 700.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.045794253233831,
+                    "n_eff": 15,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 680.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.052239939800995,
+                    "n_eff": 15,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 660.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.0582256741293532,
+                    "n_eff": 45,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 640.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.0724478825870647,
+                    "n_eff": 34,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 620.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.0674258606965175,
+                    "n_eff": 10,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 600.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.0903896402985074,
+                    "n_eff": 18,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 580.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1064178895522387,
+                    "n_eff": 37,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 560.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1129635014925372,
+                    "n_eff": 30,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 540.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1188823676616917,
+                    "n_eff": 321,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 520.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1313123004975125,
+                    "n_eff": 19,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 500.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1332860696517413,
+                    "n_eff": 47,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 480.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1379851845771143,
+                    "n_eff": 66,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 460.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1450242810945273,
+                    "n_eff": 57,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 440.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1471213616915423,
+                    "n_eff": 128,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 420.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1552330756218905,
+                    "n_eff": 22,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 400.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.163334219402985,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 380.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.170241812437811,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 360.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.177837547761194,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 340.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.180368683084577,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 320.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1851761980099502,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 300.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1884087552238807,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 280.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.193501846766169,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 260.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.198380375124378,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 250,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1998456492537313,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  }
+                ],
+                "tg_start_cell": {
+                  "T_start_K": 700.0,
+                  "outcome": "MELT_HOLD_START",
+                  "start_data_path": "/home/alexzhao/PolyJarvis/data/PSU_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data"
+                },
+                "velocity_seed": 685700
+              }
+            ],
+            "tg_gate_cause": "breakpoint_ambiguity",
+            "tg_gate_verdict": "TG_REVIEW"
+          }
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "thermal"
+      },
+      "manifest": "attempt-0001"
+    }
+  ],
+  "created_at": "2026-09-12T14:20:28.655340+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 700.0,
+    "T_melt_hold_K": 700.0,
+    "T_workflow_K": 700.0,
+    "annealing_T_high_K": 780.0,
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.62,
+    "dp_typical": 12,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 750,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 250,
+    "tg_t_step_K": 20
+  },
+  "engine_version": "workflow-engine-v3",
+  "plan_decided_params": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 700.0,
+    "T_melt_hold_K": 700.0,
+    "T_workflow_K": 700.0,
+    "annealing_T_high_K": 780.0,
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.62,
+    "dp_typical": 12,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 750,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 250,
+    "tg_t_step_K": 20
+  },
+  "plan_hash": "0c393f0869f01fab8ecb766f674910aa0434744cc6b3978f3b8908294a8668fa",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {},
+    "total": 0
+  },
+  "run_name": "PSU_2",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T14:22:28.888897+00:00",
+          "input_hash": "57d4868c8e1f29e6a825a7e78473c8ce9c315e27c722c7229f7fa5aacad2a79a",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PSU_2/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T14:20:28.655879+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "57d4868c8e1f29e6a825a7e78473c8ce9c315e27c722c7229f7fa5aacad2a79a",
+      "status": "accepted"
+    },
+    "cooling": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T23:18:09.951179+00:00",
+          "input_hash": "44a609eb0c1c6685459ee7b78e88bdfd1807265dfec441a25199b17450e242a0",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PSU_2/attempts/cooling/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T20:38:57.568228+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "44a609eb0c1c6685459ee7b78e88bdfd1807265dfec441a25199b17450e242a0",
+      "status": "accepted"
+    },
+    "equilibration": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T20:38:54.454829+00:00",
+          "input_hash": "476010fc1eb2299a0a6a6060659fe49742f4bf741e7f1a528f71bb9ff8bcaefa",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PSU_2/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T14:22:28.892253+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "476010fc1eb2299a0a6a6060659fe49742f4bf741e7f1a528f71bb9ff8bcaefa",
+      "status": "accepted"
+    },
+    "mechanical": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T06:46:41.376492+00:00",
+          "input_hash": "f02ecc3e2645f073a326ee63bffb319edd88633aa68660a6b3e9a92116b222e4",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PSU_2/attempts/mechanical/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T05:11:30.489310+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "f02ecc3e2645f073a326ee63bffb319edd88633aa68660a6b3e9a92116b222e4",
+      "status": "accepted"
+    },
+    "summary": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T06:46:53.988212+00:00",
+          "input_hash": "b0842b71fbb4b37ae2119f7b01dcd4774a573d823d122e5a627d66aec97799a4",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PSU_2/attempts/summary/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T06:46:46.658723+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "b0842b71fbb4b37ae2119f7b01dcd4774a573d823d122e5a627d66aec97799a4",
+      "status": "accepted"
+    },
+    "thermal": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T04:23:18.810929+00:00",
+          "input_hash": "2d116ff1e0cd5ed68c54be2a97efe60574330d0f89d21cefd82ca14c08d93b64",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PSU_2/attempts/thermal/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T23:18:13.016428+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "2d116ff1e0cd5ed68c54be2a97efe60574330d0f89d21cefd82ca14c08d93b64",
+      "operator_acceptance": {
+        "decision": "Operator, 2026-09-13: thermal ACCEPTED so that mechanical and summary still run and PSU_2 contributes its density and bulk modulus, which the Tg fit does not affect. PSU_2's Tg is EXCLUDED from the replicate statistics; PSU's Tg comes from PSU_1 and PSU_3.",
+        "fit_method": "bilinear_curvefit",
+        "fit_quality": "ACCEPTABLE",
+        "gate": "TG_REVIEW / breakpoint_ambiguity",
+        "levers_declined": "tg_breakpoint declines by construction (spread already 0, and 20 K at 100 K/ns x 1 fs is exactly PSFO's 200000 tg_min_steps_per_T floor). tg_rate_K_per_ns 100->50 carries EXTRA_INVALIDATION to cooling: ~13 h to cut noise by sqrt(2), taking 2*sigma to ~128 K against a 20 K gate -- a 9x shortfall. Re-rolling velocity_seed maps to equilibration (~6.3 h + cooling + thermal) and re-rolls the trajectory rather than fixing a cause. Nothing transient occurred: every per-T point was PASS/stable.",
+        "not_a_protocol_failure": "PSU_1 ran the identical frozen protocol (PCFF, 100 K/ns, dt 1 fs, PSFO sizing) and returned Tg=481.3 K with a GOOD fit (R2=0.9849).",
+        "not_ordering": "n_T_steps_p2_flag=0 and n_T_steps_rg_cv_flag=0 -- no ordering and no Rg anomaly. This is fit-quality noise on a DP=12 rigid aromatic cell, matching the seed-noise pattern already recorded for PKTN and PSTR, and compounding the RIGID_BACKBONE_CHAIN_LENGTH_BIAS the plan flagged at this DP.",
+        "note": "remedy_economics.py could not be consulted -- both agent invocations were blocked by the permission layer; the sqrt(2) arithmetic was done by hand and points to STOP_ANNOTATE.",
+        "r_squared": 0.9596,
+        "tg_K_measured": 401.1,
+        "tg_reportable": false,
+        "tg_uncertainty_K": 90.5,
+        "why_not_reportable": "The review figure (180.9 K) is max(spread, 2*sigma) and comes ENTIRELY from 2 x tg_uncertainty_K=90.5 K; breakpoint_spread_K is 0.0 over one split, so the temperature grid is not the problem. The bilinear branches are nearly parallel (a_glassy -2.87e-4 vs a_rubbery -3.89e-4, ratio 1.35), which leaves the crossing point loosely determined. The glassy branch (250-400 K, n=200/bin) is clean; the rubbery bins are noisy -- n_points 3-15, relax_warning throughout 600-710 K, and density not falling monotonically with T (585 K 1.1033 vs 590 K 1.0889). The primary hyperbola fit was degenerate (525 K) and was swapped for bilinear."
+      },
+      "status": "accepted"
+    }
+  },
+  "status": "accepted",
+  "updated_at": "2026-09-13T14:29:29.358682+00:00"
+}

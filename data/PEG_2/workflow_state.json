@@ -1,0 +1,491 @@
+{
+  "active_finding": null,
+  "agent_escalations": [],
+  "agent_escalations_archived": [
+    {
+      "at": "2026-09-12T23:00:24.907187+00:00",
+      "decision": {
+        "action": "stop",
+        "modifications": {},
+        "rationale": "[recovery-agent diagnosis via claude-opus-5[1m]] remedy_history shows transient_retry already spent 2x on PROCESS_FAILED@equilibration with unchanged params; a third blind retry is ruled out. Evidence: all three failures occur only in the 625 K NVT anneal (attempt-0001 anneal_heat ~997k steps and attempt-0003 anneal_hold ~268k steps: cudaErrorIllegalAddress abort in the KOKKOS binary; attempt-0002 anneal_heat ~952k steps: 'ERROR: Out of range atoms - cannot compute PPPM' at pppm_kokkos.cpp:1150). Onset is stochastic (attempt-0003's anneal_heat completed cleanly), thermo at 1000-step resolution shows no precursor (T ~605-625 K, stable PE), and all earlier stages (minimize..npt_densify_hold, <=500 K) passed in every attempt. No other run under data/ has either signature. Root cause is ambiguous between two hypotheses requiring different fixes: (1) GPU 1 hardware/driver fault -- all three chains (run_state.json 37893711/49363cbc/02ba54ec) ran on gpu_ids=1, and Xid/ECC logs could not be checked from this session; (2) high-T integration instability of explicit-H PCFF/class2 PEO at dt_fs=1.0, weakened by PEEK_3 completing a 1M-step Kokkos-PPPM PCFF anneal_hold at 850 K with dt 1 fs. Neither contract lever is safe to pick blind: dt_fs=0.5 addresses only hypothesis 2, changes a POXI-calibrated constant, and (step counts appear fixed) halves simulated time per stage while doubling Tg-sweep cost; lowering annealing_T_high_K breaks the documented polymer_rules coupling to md_tg_ceiling_K=600 (_annealing_T_high_K_note: the anneal ceiling must clear the Tg sweep top by one cool block), so it needs a coordinated two-key change (e.g. md_tg_ceiling_K back to 440, which _md_tg_ceiling_K_note says was sized for PEO) whose downstream constraints are unverified. With one escalation left, a wrong guess re-burns ~1 GPU-h and ends the run. Human action: check GPU 1 for Xid/ECC errors (journalctl -k | grep -i xid; nvidia-smi -q -d ECC). As a discriminator, rerun anneal_hold from attempt-0003/work/anneal_heat/anneal_heat_out.restart on GPU 0. If it crashes there too, treat the cause as physics and apply dt_fs=0.5, or lower annealing_T_high_K together with md_tg_ceiling_K. If it survives on GPU 0, the cause is GPU 1: retry unchanged on another GPU."
+      },
+      "finding": {
+        "code": "PROCESS_FAILED",
+        "confidence": "high",
+        "details": {
+          "error": "Equilibration chain did not complete: {'run_id': '02ba54ec', 'status': 'failed', 'stage': 'anneal_hold'}"
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "equilibration"
+      },
+      "manifest": "attempt-0003"
+    }
+  ],
+  "created_at": "2026-09-12T19:52:37.735896+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 500.0,
+    "T_melt_hold_K": 500.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 625.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      3000,
+      7000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.61,
+    "dp_typical": 114,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "stage8_min_steps": 2000000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20
+  },
+  "engine_version": "workflow-engine-v3",
+  "operator_resets": [
+    {
+      "at": "2026-09-13T02:38:35.282005+00:00",
+      "restored_from": {
+        "agent_escalations": 1,
+        "remedy_counters": {
+          "by_id": {
+            "transient_retry": 2
+          },
+          "by_route": {
+            "transient_retry:equilibration": 2
+          },
+          "total": 2
+        }
+      },
+      "what": "restored transient_retry budget and the agent-escalation budget; equilibration -> pending",
+      "why": "Operator reset 2026-09-12: three attempts failed in the 625 K anneal with one physics signature ('Out of range atoms - cannot compute PPPM') and two CUDA illegal-address aborts that are the same out-of-bounds PPPM grid index expressed as a memory fault. ECC errors are 0 on all four GPUs with no retired/remapped pages, and GPU 1 -- where all three ran -- was concurrently running PSU_3 and had earlier run PE_1's equilibration, so the GPU-fault hypothesis is not supported (Xid could not be checked: dmesg needs privileges). PEG_1 passed the IDENTICAL protocol on a different seed with a clean anneal (T 298-636 K heat, 609-643 K hold, no warnings), so the protocol is marginally stable and seed-dependent at this temperature. Retrying unchanged, deliberately: the campaign's claim is that replicates share a protocol, so the protocol must not be edited to rescue one seed. The three failures stopped at very different points (997k, 952k, 268k steps), i.e. large run-to-run variation, which is what makes another attempt worth one try."
+    }
+  ],
+  "plan_decided_params": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 500.0,
+    "T_melt_hold_K": 500.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 625.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      3000,
+      7000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.61,
+    "dp_typical": 114,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "stage8_min_steps": 2000000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20
+  },
+  "plan_hash": "3448c68e38e1e40fa224eb69520ea2f668c60c9f472be30c4d5c1718a6c57ea1",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {
+      "agent_only:build": 0,
+      "agent_only:cooling": 0,
+      "agent_only:equilibration": 0,
+      "agent_only:mechanical": 0,
+      "agent_only:summary": 0,
+      "agent_only:thermal": 0,
+      "conditional_deformation:build": 1,
+      "conditional_deformation:cooling": 1,
+      "conditional_deformation:equilibration": 1,
+      "conditional_deformation:mechanical": 1,
+      "conditional_deformation:summary": 1,
+      "conditional_deformation:thermal": 1,
+      "continue_npt:build": 2,
+      "continue_npt:cooling": 2,
+      "continue_npt:equilibration": 2,
+      "continue_npt:mechanical": 2,
+      "continue_npt:summary": 2,
+      "continue_npt:thermal": 2,
+      "deformation_fallback:build": 1,
+      "deformation_fallback:cooling": 1,
+      "deformation_fallback:equilibration": 1,
+      "deformation_fallback:mechanical": 1,
+      "deformation_fallback:summary": 1,
+      "deformation_fallback:thermal": 1,
+      "finite_size_rebuild:build": 2,
+      "finite_size_rebuild:cooling": 2,
+      "finite_size_rebuild:equilibration": 2,
+      "finite_size_rebuild:mechanical": 2,
+      "finite_size_rebuild:summary": 2,
+      "finite_size_rebuild:thermal": 2,
+      "melt_homogeneity:build": 2,
+      "melt_homogeneity:cooling": 2,
+      "melt_homogeneity:equilibration": 2,
+      "melt_homogeneity:mechanical": 2,
+      "melt_homogeneity:summary": 2,
+      "melt_homogeneity:thermal": 2,
+      "murnaghan_ladder_extend:build": 1,
+      "murnaghan_ladder_extend:cooling": 1,
+      "murnaghan_ladder_extend:equilibration": 1,
+      "murnaghan_ladder_extend:mechanical": 1,
+      "murnaghan_ladder_extend:summary": 1,
+      "murnaghan_ladder_extend:thermal": 1,
+      "murnaghan_resample:build": 1,
+      "murnaghan_resample:cooling": 1,
+      "murnaghan_resample:equilibration": 1,
+      "murnaghan_resample:mechanical": 1,
+      "murnaghan_resample:summary": 1,
+      "murnaghan_resample:thermal": 1,
+      "negative_deformation:build": 1,
+      "negative_deformation:cooling": 1,
+      "negative_deformation:equilibration": 1,
+      "negative_deformation:mechanical": 1,
+      "negative_deformation:summary": 1,
+      "negative_deformation:thermal": 1,
+      "raise_minimize_tolerance:build": 2,
+      "raise_minimize_tolerance:cooling": 2,
+      "raise_minimize_tolerance:equilibration": 2,
+      "raise_minimize_tolerance:mechanical": 2,
+      "raise_minimize_tolerance:summary": 2,
+      "raise_minimize_tolerance:thermal": 2,
+      "rate_sensitivity:build": 1,
+      "rate_sensitivity:cooling": 1,
+      "rate_sensitivity:equilibration": 1,
+      "rate_sensitivity:mechanical": 1,
+      "rate_sensitivity:summary": 1,
+      "rate_sensitivity:thermal": 1,
+      "tg_breakpoint:build": 1,
+      "tg_breakpoint:cooling": 1,
+      "tg_breakpoint:equilibration": 1,
+      "tg_breakpoint:mechanical": 1,
+      "tg_breakpoint:summary": 1,
+      "tg_breakpoint:thermal": 1,
+      "transient_retry:build": 0,
+      "transient_retry:cooling": 0,
+      "transient_retry:equilibration": 0,
+      "transient_retry:mechanical": 0,
+      "transient_retry:summary": 0,
+      "transient_retry:thermal": 0
+    },
+    "note": "operator strict-replay pin, 2026-09-13: every parameter-changing route at cap; transient_retry (identical params) left available. Real history in remedy_counters_archived.",
+    "total": 0
+  },
+  "remedy_counters_archived": [
+    {
+      "at": "2026-09-13T20:53:09.718067+00:00",
+      "counters": {
+        "by_id": {
+          "continue_npt": 1
+        },
+        "by_route": {
+          "continue_npt:cooling": 1
+        },
+        "total": 1
+      }
+    }
+  ],
+  "remedy_history": [],
+  "remedy_history_archived": [
+    {
+      "application": 1,
+      "at": "2026-09-12T20:55:40.337612+00:00",
+      "finding": {
+        "code": "PROCESS_FAILED",
+        "confidence": "high",
+        "details": {
+          "error": "Equilibration chain did not complete: {'run_id': '37893711', 'status': 'failed', 'stage': 'anneal_heat'}"
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "equilibration"
+      },
+      "remedy_id": "transient_retry"
+    },
+    {
+      "application": 2,
+      "at": "2026-09-12T21:51:42.531007+00:00",
+      "finding": {
+        "code": "PROCESS_FAILED",
+        "confidence": "high",
+        "details": {
+          "error": "Equilibration chain did not complete: {'run_id': '49363cbc', 'status': 'failed', 'timestamp': '2026-09-12T17:51:23.898943', 'stage': 'unknown'}"
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "equilibration"
+      },
+      "remedy_id": "transient_retry"
+    },
+    {
+      "application": 1,
+      "at": "2026-09-13T12:41:28.444539+00:00",
+      "finding": {
+        "code": "EXTEND",
+        "confidence": "high",
+        "details": {
+          "advisory_gates": {
+            "ct": true,
+            "density_drift": true,
+            "energy_component_drift": false,
+            "msd_not_trapped": false,
+            "msid_gaussian": true,
+            "residual_stress": false,
+            "rg": true,
+            "torsion": true
+          },
+          "applicable_clause": "require_rubbery",
+          "binding_gates": {
+            "density_homogeneity": true,
+            "density_sem": true,
+            "energy_drift": false,
+            "energy_sem": true,
+            "finite_size": true,
+            "n_eff_density": true
+          },
+          "cooling_extrapolation_reliable": null,
+          "cooling_verdict": null,
+          "density_value_binding": "n/a",
+          "extension_ns": 0.5,
+          "failing_binding_gates": [
+            "energy_drift"
+          ],
+          "finite_size": {
+            "L_min_A": 42.78,
+            "L_over_2Rg": 0.888,
+            "L_over_2cutoff": 2.252,
+            "L_over_Ree": 0.748,
+            "available": true,
+            "box_A": [
+              42.78,
+              42.78,
+              42.78
+            ],
+            "cutoff_A": 9.5,
+            "graded_box": "actual_equilibrated",
+            "min_image_evaluated": true,
+            "pass": true,
+            "ree_self_image_flag": true,
+            "self_image_advisory": true,
+            "verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY"
+          },
+          "finite_size_min_image_unarmed": false,
+          "finite_size_verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
+          "homogeneity_verdict": "HOMOG_PASS",
+          "regime": "rubbery",
+          "relaxation_time_ns": 25304.893399999997,
+          "remedy": "extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': extend_ns = max(1.5, 1.5*ct_tau_relax_ps/1000), else 1.5 ns, via restart-continuation at npt_prod_temp_K (npt_final always runs at final_T_K, default 300 K \u2014 never a re-melt). Cap 2 per gate.",
+          "remedy_confidence": "high",
+          "residual_stress": {
+            "available": true,
+            "dev_atm": {
+              "Pxx": 74.9,
+              "Pyy": -15.8,
+              "Pzz": -59.1
+            },
+            "max_abs_dev_atm": 74.9,
+            "mean_pressure_atm": 17.5,
+            "resolved": true,
+            "von_mises_atm": 118.4,
+            "z_max": 2.89
+          },
+          "saved_to": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0001/raw/cooling.json",
+          "unmeasured_binding_gates": [],
+          "verdict": "EXTEND"
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "cooling"
+      },
+      "remedy_id": "continue_npt"
+    }
+  ],
+  "run_name": "PEG_2",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T19:55:07.999976+00:00",
+          "input_hash": "be385ae4b6453ad30b3a0ec16b43ca855607c610b6d459d7a33ac079b910291b",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T19:52:37.736480+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "be385ae4b6453ad30b3a0ec16b43ca855607c610b6d459d7a33ac079b910291b",
+      "status": "accepted"
+    },
+    "cooling": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T12:41:28.443270+00:00",
+          "input_hash": "ec0e140264b0ccc33d42a0fe383e3d36f2c367bdb98e65479948d954fbd75bf6",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T10:17:17.923301+00:00",
+          "status": "accepted",
+          "status_before_promotion": "remedy_required"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-13T13:01:07.291889+00:00",
+          "input_hash": "8acf76c49703909c9a09982673ee26f86fb56dead9fd0d11d5cc8224c235c59f",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/executor_state.json",
+          "started_at": "2026-09-13T12:41:32.151146+00:00",
+          "status": "failed",
+          "status_before_supersede": "accepted",
+          "superseded": true,
+          "superseded_reason": "branch-rerun 2026-09-13: PEG_1 ran no cooling continuation; attempt-0002's 0.5 ns continuation is discarded and mechanical/summary re-run from attempt-0001's cell"
+        }
+      ],
+      "input_hash": "ec0e140264b0ccc33d42a0fe383e3d36f2c367bdb98e65479948d954fbd75bf6",
+      "operator_branch_acceptance": {
+        "density_gcm3_from_own_cooling_json": 1.060015,
+        "failing_binding_gates": [
+          "energy_drift"
+        ],
+        "gate_verdict_recorded_honestly": "EXTEND",
+        "why": "branch-rerun 2026-09-13: PEG_1 ran no cooling continuation; attempt-0002's 0.5 ns continuation is discarded and mechanical/summary re-run from attempt-0001's cell"
+      },
+      "status": "accepted"
+    },
+    "equilibration": {
+      "accepted_attempt": "attempt-0004",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T20:55:40.285738+00:00",
+          "input_hash": "4f45300eadeda62047fb2c857eb80736ea092ff52a9c0894fbc25c430f51d3a8",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T19:55:08.004068+00:00",
+          "status": "failed"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-12T21:51:42.482030+00:00",
+          "input_hash": "4f45300eadeda62047fb2c857eb80736ea092ff52a9c0894fbc25c430f51d3a8",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/equilibration/attempt-0002/executor_state.json",
+          "started_at": "2026-09-12T20:55:40.341627+00:00",
+          "status": "failed"
+        },
+        {
+          "attempt_id": "attempt-0003",
+          "finished_at": "2026-09-12T22:56:44.810846+00:00",
+          "input_hash": "4f45300eadeda62047fb2c857eb80736ea092ff52a9c0894fbc25c430f51d3a8",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/equilibration/attempt-0003/executor_state.json",
+          "started_at": "2026-09-12T21:51:42.534701+00:00",
+          "status": "failed"
+        },
+        {
+          "attempt_id": "attempt-0004",
+          "finished_at": "2026-09-13T10:17:14.204501+00:00",
+          "input_hash": "4f45300eadeda62047fb2c857eb80736ea092ff52a9c0894fbc25c430f51d3a8",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/equilibration/attempt-0004/executor_state.json",
+          "started_at": "2026-09-13T04:27:16.352405+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "4f45300eadeda62047fb2c857eb80736ea092ff52a9c0894fbc25c430f51d3a8",
+      "stale_reason": "Operator reset 2026-09-12: three attempts failed in the 625 K anneal with one physics signature ('Out of range atoms - cannot compute PPPM') and two CUDA illegal-address aborts that are the same out-of-bounds PPPM grid index expressed as a memory fault. ECC errors are 0 on all four GPUs with no retired/remapped pages, and GPU 1 -- where all three ran -- was concurrently running PSU_3 and had earlier run PE_1's equilibration, so the GPU-fault hypothesis is not supported (Xid could not be checked: dmesg needs privileges). PEG_1 passed the IDENTICAL protocol on a different seed with a clean anneal (T 298-636 K heat, 609-643 K hold, no warnings), so the protocol is marginally stable and seed-dependent at this temperature. Retrying unchanged, deliberately: the campaign's claim is that replicates share a protocol, so the protocol must not be edited to rescue one seed. The three failures stopped at very different points (997k, 952k, 268k steps), i.e. large run-to-run variation, which is what makes another attempt worth one try.",
+      "status": "accepted"
+    },
+    "mechanical": {
+      "accepted_attempt": "attempt-0002",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T17:15:21.597261+00:00",
+          "input_hash": "d13174c97f8d470c52416953ea9e5b6f32fc9b341e107195d69e22f364f61570",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/mechanical/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T15:41:42.320808+00:00",
+          "status": "failed",
+          "status_before_supersede": "accepted",
+          "superseded": true,
+          "superseded_reason": "branch-rerun 2026-09-13: PEG_1 ran no cooling continuation; attempt-0002's 0.5 ns continuation is discarded and mechanical/summary re-run from attempt-0001's cell"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-13T22:28:36.077908+00:00",
+          "input_hash": "17566bf82bd164c7cf9c6c298ad841d1f94cd8add6211f24d685d2198a4752cf",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/mechanical/attempt-0002/executor_state.json",
+          "started_at": "2026-09-13T20:53:24.914977+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "17566bf82bd164c7cf9c6c298ad841d1f94cd8add6211f24d685d2198a4752cf",
+      "stale_reason": "branch-rerun 2026-09-13: PEG_1 ran no cooling continuation; attempt-0002's 0.5 ns continuation is discarded and mechanical/summary re-run from attempt-0001's cell",
+      "status": "accepted"
+    },
+    "summary": {
+      "accepted_attempt": "attempt-0002",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T17:15:33.272543+00:00",
+          "input_hash": "474a60a0fa87ec6143a422f7bbc8c6b950f8ef892db50d23f75cd6e685efee1c",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/summary/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T17:15:26.405595+00:00",
+          "status": "failed",
+          "status_before_supersede": "accepted",
+          "superseded": true,
+          "superseded_reason": "branch-rerun 2026-09-13: PEG_1 ran no cooling continuation; attempt-0002's 0.5 ns continuation is discarded and mechanical/summary re-run from attempt-0001's cell"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-13T22:28:50.332803+00:00",
+          "input_hash": "e1096f9cf6f514c8965cfe6fa93e0c5dab45d505186f38ce55c1dfba24c48589",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/summary/attempt-0002/executor_state.json",
+          "started_at": "2026-09-13T22:28:42.186778+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "e1096f9cf6f514c8965cfe6fa93e0c5dab45d505186f38ce55c1dfba24c48589",
+      "stale_reason": "branch-rerun 2026-09-13: PEG_1 ran no cooling continuation; attempt-0002's 0.5 ns continuation is discarded and mechanical/summary re-run from attempt-0001's cell",
+      "status": "accepted"
+    },
+    "thermal": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T15:41:42.103877+00:00",
+          "input_hash": "b417f385c515f1f55f193c9b1d91f0b57257e3abbc187d9ecedda69709786061",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/thermal/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T13:01:11.021484+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "b417f385c515f1f55f193c9b1d91f0b57257e3abbc187d9ecedda69709786061",
+      "stale_reason": "remedy transient_retry",
+      "status": "accepted"
+    }
+  },
+  "status": "accepted",
+  "updated_at": "2026-09-13T22:28:50.334740+00:00"
+}

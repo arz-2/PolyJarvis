@@ -1,0 +1,21 @@
+{
+  "rho_melt": 0.8855542609830056,
+  "rho_glass": 0.9882481158964144,
+  "tg_K": 373.0,
+  "t_equil_K": 573.0,
+  "final_T_K": 300.0,
+  "expected_contraction": 1.1383,
+  "actual_contraction": 1.116,
+  "contraction_shortfall": 0.9804,
+  "extrapolation_reliable": true,
+  "verdict": "OK",
+  "remedy": "cooling contraction is self-consistent with its own thermal-expansion prediction.",
+  "under_annealed_cooling": false,
+  "density_provenance": {
+    "rho_melt": "plateau_mean(npt_melt_hold.log)",
+    "rho_glass": "plateau_mean(npt_final.log)"
+  },
+  "rho_melt_sd": 0.008139654055579162,
+  "rho_glass_sd": 0.004335536202254858,
+  "markdown": "### Cooling-contraction self-consistency check\n\n- Melt \u03c1(T_equil)=0.8856, glass \u03c1(300K)=0.9882\n- Cooling contraction: actual \u00d71.116 vs expected \u00d71.138 (shortfall 0.980)\n- **Verdict: OK** \u2014 cooling contraction is self-consistent with its own thermal-expansion prediction."
+}

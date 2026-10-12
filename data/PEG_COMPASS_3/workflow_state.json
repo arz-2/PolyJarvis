@@ -1,0 +1,128 @@
+{
+  "active_finding": {
+    "code": "PROCESS_FAILED",
+    "confidence": "high",
+    "details": {
+      "error": "Equilibration chain did not complete: {'run_id': '9ec501f1', 'status': 'failed', 'stage': 'nvt_melt_hold'}"
+    },
+    "remedy_id": null,
+    "severity": "blocking",
+    "stage": "equilibration"
+  },
+  "agent_escalations": [],
+  "created_at": "2026-09-15T01:06:49.189512+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 500.0,
+    "T_melt_hold_K": 500.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 625.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      3000,
+      7000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.61,
+    "dp_typical": 114,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 200187,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "compass",
+    "stage8_min_steps": 2000000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 631302
+  },
+  "engine_version": "workflow-engine-v3",
+  "plan_hash": "9ce6547d94217fb11aa4c8c649f2b8616baae128281e0498611d8502ad17b451",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {},
+    "total": 12
+  },
+  "replicate_protocol_lock": {
+    "at": "2026-09-15T01:06:49.189901+00:00",
+    "consequence": "A process failure is not retried: _apply_remedy declines at the total cap and _escalate returns escalation_required (no_recovery_agent_configured).",
+    "mechanism": {
+      "MAX_AUTOMATIC_REMEDIES": 12,
+      "env": {
+        "POLYJARVIS_GATES_ADVISORY": "1"
+      },
+      "launch": "agent_api.py resume PEG_COMPASS_3 (no --recovery-agent-command)",
+      "recovery_agent": null,
+      "remedy_counters.total": 12
+    },
+    "only_change": {
+      "preferred_ff": [
+        "pcff",
+        "compass"
+      ]
+    },
+    "paired_with": "PEG_3",
+    "pinned_seeds": {
+      "emc_seed": 200187,
+      "source": "PEG_3 emc_build.log -seed= and equilibration 'velocity all create'",
+      "velocity_seed": 631302
+    },
+    "why": "Controlled force-field comparison (reviewer comment 4): PEG_COMPASS_3 must execute PEG_3's frozen PCFF protocol with preferred_ff=compass as the ONLY change. Any automatic remedy or agent decision would alter the executed protocol (extra continuations, changed parameters) and break the pairing, so the run is locked exactly like the rev2 replicates: every automatic remedy is refused and gate verdicts are recorded, not acted on."
+  },
+  "run_name": "PEG_COMPASS_3",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T01:10:50.501922+00:00",
+          "input_hash": "77840fcbc14856781e5cdfbea22ff6940f3b8436df752ed93ac00623de607b47",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T01:07:49.776893+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "77840fcbc14856781e5cdfbea22ff6940f3b8436df752ed93ac00623de607b47",
+      "status": "accepted"
+    },
+    "cooling": {
+      "attempts": [],
+      "status": "pending"
+    },
+    "equilibration": {
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T03:42:53.755590+00:00",
+          "input_hash": "dfc4192bac2a513eb37c967b22e29a58ad9a11174eccc2472e22f80b1b2d120f",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T01:10:50.505633+00:00",
+          "status": "failed"
+        }
+      ],
+      "input_hash": "dfc4192bac2a513eb37c967b22e29a58ad9a11174eccc2472e22f80b1b2d120f",
+      "status": "escalation_required"
+    },
+    "mechanical": {
+      "attempts": [],
+      "status": "pending"
+    },
+    "summary": {
+      "attempts": [],
+      "status": "pending"
+    }
+  },
+  "status": "escalation_required",
+  "updated_at": "2026-09-15T03:42:53.756659+00:00"
+}

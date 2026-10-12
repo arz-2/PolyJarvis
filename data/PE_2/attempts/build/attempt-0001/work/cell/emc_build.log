@@ -1,0 +1,264 @@
+$ perl /home/alexzhao/emc/scripts/emc_setup.pl -field=trappe-ua -seed=783028 -temperature=300.0 -replace emc_build.esh
+# exit 0
+EMC Setup v4.1.5 (March 30, 2024), (c) 2004-2024 Pieter J. in 't Veld
+
+Info: reading script from "./emc_build.esh"
+Info: phase1 = {poly}
+Info: project = emc_build
+Info: direction = x
+Info: shape = 1
+Info: force field type = "trappe"
+Info: force field name = "trappe/2014/trappe-ua"
+Info: force field location = "~/emc/field"
+Info: build for LAMMPS script in "../build"
+Info: creating LAMMPS run script "emc_build.in"
+Info: adding pressure sampling
+Info: creating EMC build script "build.emc"
+
+$ /home/alexzhao/emc/bin/emc_linux_x86_64 build.emc
+# exit 0
+(* EMC: Enhanced Monte Carlo simulations *)
+
+version 9.4.4, build Jul 21 2026 07:58:38, date Sun Sep 13 09:28:09 2026
+
+valid until Jun 30, 2027
+
+Info: script v1.0 started at Sun Sep 13 09:28:09 2026
+Info: variables = {seed -> 783028, ntotal -> 3000, fshape -> 1, output ->
+        "emc_build", field -> "trappe/2014/trappe-ua", location1 ->
+        "~/emc/field/", nav -> 0.6022141179, temperature -> 300, radius -> 5, 
+        nrelax -> 100, weight_nonbond -> 0.0001, weight_bond -> 0.0001, 
+        weight_focus -> 1, cutoff -> 14, charge_cutoff -> 14, kappa -> 4, 
+        density1 -> 0.65, lprevious -> 0, lphase -> 0, f_poly -> 10, 
+        chem_repeat -> "*CC*", chem_cap -> "*C"}
+Info: output = 
+      {detail -> 3, wide -> false, expand -> false, math -> true, reduced ->
+        false, info -> true, strict -> true, warning -> true, message -> true,
+        debug -> false, exit -> true, ignore -> false}
+Info: field = {id -> trappe-ua, mode -> trappe, style -> none, name ->
+        {"~/emc/field/trappe/2014/trappe-ua.prm", 
+          "~/emc/field/trappe/2014/trappe-ua.top"}, compress -> false, error
+        -> true, debug -> false, check -> {atomistic -> true, charge -> true}}
+Info: importing '~/emc/field/trappe/2014/trappe-ua.prm'
+Info: groups = {ngroups -> 2, group -> {
+          {id -> repeat, chemistry -> "*CC*", depth -> 8, charges -> field, 
+            charge -> 0, terminator -> false, nconnects -> 4, connects -> {
+              {source -> $end1, destination -> {index -> cap, site -> $end1}}, 
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end2}}, 
+              {source -> $end2, destination -> {index -> cap, site -> $end1}}, 
+              {source -> $end2, destination -> {index -> repeat, site ->
+                  $end1}}}}, 
+          {id -> cap, chemistry -> "*C", depth -> 8, charges -> field, charge
+            -> 0, terminator -> false, nconnects -> 2, connects -> {
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end1}}, 
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end2}}}}}, ndeletes -> 0, npolymers -> 0}
+Info: field = {mode -> apply, style -> none, error -> true, debug -> false, 
+        check -> {atomistic -> true, charge -> true}}
+Info: applying '~/emc/field/trappe/2014/trappe-ua.prm'
+Info: variables = {lg_repeat -> 2, lg_cap -> 1, norm_poly -> 100, l_poly ->
+        360, mg_repeat -> 28.0536, mg_cap -> 15.0347, m_poly -> 5051.6638, 
+        n_poly -> 10, ntotal -> 0, mtotal -> 0}
+Info: simulation = {units -> {permittivity -> 1, seed -> seed}, types -> {
+          coulomb -> {pair -> {active -> true, cutoff -> charge_cutoff}}}}
+Info: clusters = {progress -> none, nbodys -> 0, nclusters -> 0, ngrafts -> 0,
+        npolymers -> 1, 
+        polymer -> 
+        {id -> poly, system -> main, type -> alternate, niterations -> 1000, n
+          -> 10, groups -> {repeat, cap}, weights -> {1, 1}, nrepeat -> {179, 
+            0}}}
+      delta = {systems -> 1, bodies -> 0, clusters -> 10, sites -> 3600}
+Info: field = {mode -> apply, style -> none, error -> true, debug -> false, 
+        check -> {atomistic -> true, charge -> true}}
+Info: applying '~/emc/field/trappe/2014/trappe-ua.prm'
+Info: types = {trappe -> {pair -> {active -> true, mode -> repulsive}}}
+Info: variables = {nphase1 -> 3600, mphase1 -> 50516.638, vphase1 ->
+        129053.607854, lbox -> 50.5347416859, lphase1 -> 50.5347416859, lxx ->
+        50.5347416859, lyy -> 50.5347416859, lzz -> 50.5347416859, lzy -> 0, 
+        lzx -> 0, lyx -> 0, lphase -> 50.5347416859, ntotal -> 3600, mtotal ->
+        50516.638, vtotal -> 129053.607854}
+Info: build = {
+        system -> {id -> main, temperature -> 300, density -> 0.65, split ->
+          false, flag -> {charge -> true, map -> true, pbc -> true, geometry
+            -> true}, periodic -> {x -> true, y -> true, z -> true}, geometry
+          -> {xx -> 50.5347416859, yy -> 50.5347416859, zz -> 50.5347416859, 
+            zy -> 0, zx -> 0, yx -> 0}, deform -> {xx -> 1, yy -> 1, zz -> 1, 
+            zy -> 0, zx -> 0, yx -> 0}}, 
+        select -> {progress -> list, frequency -> 1, message -> nkt, center ->
+          false, origin -> {x -> 0, y -> 0, z -> 0}, order -> random, check ->
+          true, nclusters -> 1, cluster -> poly, 
+          relax -> {ncycles -> 100, radius -> 5}, name -> "error", type ->
+          xyz, compress -> false, 
+          grow -> {check -> all, method -> energetic, cutoff -> 0, focus ->
+            all, 
+            weight -> {nonbonded -> 0.0001, bonded -> 0.0001, focus -> 1}, 
+            theta -> 0, dphi -> 1, nbonded -> 20, ntrials -> 20, niterations
+            -> 1000}}}
+Info: building 3600 sites.
+
+   progress/%      E[0]/nkT
+---------------------------
+            0             0
+            1      1.073099
+            2      1.423989
+            3      1.856965
+            4      1.854956
+            5      1.938976
+            6      1.916891
+            7      1.939931
+            8      1.994976
+            9      1.953014
+           10      1.966947
+           11      2.069125
+           12      2.054237
+           13      2.119135
+           14      2.100254
+           15      2.135886
+           16      2.176875
+           17      2.190826
+           18      2.216826
+           19      2.255546
+           20      2.235754
+           21      2.242903
+           22      2.304642
+           23      2.440954
+           24      2.489997
+           25      2.517827
+           26       2.50436
+           27      2.487854
+           28      2.465533
+           29      2.505325
+           30      2.482406
+           31      2.500193
+           32      2.546001
+           33      2.583282
+           34      2.554976
+           35      2.593676
+           36      2.691477
+           37      2.750028
+           38      2.762088
+           39      2.786004
+           40      2.782108
+           41      2.810713
+           42      2.801531
+           43      2.919801
+           44      2.977869
+           45       2.97382
+           46      2.990266
+           47      3.020811
+           48      3.023623
+           49       3.02135
+           50      3.043288
+           51      3.047112
+           52      3.057851
+           53      3.067708
+           54      3.073256
+           55       3.10542
+           56      3.092396
+           57      3.164068
+           58       3.24413
+           59      3.267114
+           60      3.282297
+           61      3.297178
+           62      3.292592
+           63      3.273453
+           64      3.263977
+           65      3.264192
+           66      3.299769
+           67      3.337323
+           68      3.410278
+           69      3.459854
+           70      3.601479
+           71      3.668087
+           72      3.681688
+           73      3.729844
+           74      3.772893
+           75      3.800052
+           76      3.818772
+           77      3.826465
+           78      3.853951
+           79       3.90063
+           80      4.002591
+           81      4.066936
+           82      4.094455
+           83      4.098518
+           84      4.131082
+           85      4.153917
+           86      4.223041
+           87      4.249972
+           88      4.345204
+           89      4.386536
+           90      4.363903
+           91      4.413943
+           92      4.441198
+           93       4.54193
+           94       4.58105
+           95      4.716171
+           96      4.773665
+           97      4.876986
+           98      4.957157
+           99      4.989955
+          100      4.970826
+---------------------------
+      average      3.092889
+
+      niterations = 3600, <niterations> = 1
+Info: force = {style -> none, message -> nkt}
+
+(* Energy *)
+
+                         E[0]/nkT 
+---------------------------------
+trappe.angle            0.9432349 
+trappe.bond             0.6261123 
+trappe.improper                 0 
+trappe.pair              1.716613 
+trappe.torsion           1.684866 
+---------------------------------
+total                    4.970826 
+
+Info: force = {style -> init, message -> nkt}
+
+(* Energy *)
+
+                         E[0]/nkT 
+---------------------------------
+trappe.angle            0.9432349 
+trappe.bond             0.6261123 
+trappe.improper                 0 
+trappe.pair              1.716613 
+trappe.torsion           1.684866 
+---------------------------------
+total                    4.970826 
+
+Info: variables = {nl_poly -> 10}
+Info: put = {name -> "emc_build", compress -> true, detail -> 3}
+Info: pdb = {name -> "emc_build", compress -> true, extend -> false, mode ->
+        put, system -> main, length -> auto, forcefield -> trappe, atomistic
+        -> full, depth -> auto, charges -> false, detect -> false, atom ->
+        index, residue -> index, segment -> index, rank -> false, hexadecimal
+        -> false, cut -> false, pbc -> true, map -> false, unwrap -> clusters,
+        rigid -> true, fixed -> true, licorice -> false, vdw -> false, 
+        connectivity -> false, crystal -> false, element -> auto, parameters
+        -> false, flag -> {charge -> true, map -> true, pbc -> true, geometry
+          -> true}}
+Info: lammps = {name -> "emc_build", compress -> false, system -> main, mode
+        -> put, length -> auto, units -> none, forcefield -> trappe, shake ->
+        auto, atomistic -> none, detect -> true, cutoff -> false, charges ->
+        true, ewald -> true, ellipsoid -> false, sphere -> false, bonds ->
+        false, types -> false, data -> true, parameters -> true, cross ->
+        false, variables -> true, coefficients -> true, comment -> true, map
+        -> true, unwrap -> true, flag -> {charge -> true, map -> true, pbc ->
+          true, geometry -> true}}
+Info: tsc: bonded = {3.714, 1.077, 0.8369, 1.225, 0.007783, 0} s
+Info: tsc: simulation = 9.12 s, threads = 3.801 s
+Info: tsc: thread = 3.27 s
+Info: script v1.0 finished at Sun Sep 13 09:28:18 2026
+
+Info: Thank you for using EMC v9.4.4
+Info: In any publication of scientific results based in part or
+Info: completely on the use of EMC, please include this reference:
+Info: P.J. in 't Veld and G.C. Rutledge, Macromolecules 2003, 36, 7358
+

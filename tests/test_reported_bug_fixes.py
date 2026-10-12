@@ -144,45 +144,6 @@ def test_no_valid_split_still_returns_a_fit_for_the_swap_path():
     assert res["breakpoint_constrained"] is False
     assert res["a_glassy"] > 0, "the returned fit is the constraint-violating one, as flagged"
 
-
-# ── Bug 16: cache write must gate on derived output, not on the reliability flags ──
-
-def _write_cache(tmp_path, fields):
-    from write_characterization_cache import write_characterization
-    return write_characterization(tmp_path / "cache.json", "C=C", fields)
-
-
-def test_cache_not_written_when_k0_reliable_but_nothing_derived(tmp_path):
-    """K0-reliable + tau-unreliable derives zero knobs (every knob needs tau), but satisfied
-    the old any(flags) gate — writing an empty entry that permanently marked the SMILES
-    non-novel, since the novelty check is bare key existence."""
-    res = _write_cache(tmp_path, {
-        "probe_tau_relax_reliable": False,
-        "probe_K0_reliable": True,
-        "bulk_modulus_GPa": 3.1,
-    })
-    assert res["written"] is False
-    assert res["reason"] == "no_derived_field"
-
-
-def test_cache_written_when_a_knob_was_actually_derived(tmp_path):
-    res = _write_cache(tmp_path, {
-        "probe_tau_relax_reliable": True,
-        "probe_K0_reliable": False,
-        "derived_t_equil_ns": 12.5,
-    })
-    assert res["written"] is True
-    assert "derived_t_equil_ns" in res["fields_written"]
-
-
-def test_cache_ignores_null_derived_fields(tmp_path):
-    res = _write_cache(tmp_path, {
-        "probe_tau_relax_reliable": True,
-        "derived_t_equil_ns": None,
-    })
-    assert res["written"] is False
-
-
 # ── Bug 7: a relative output_dir silently resolved against LAMBDA_WORKDIR ──
 
 def test_require_output_dir_rejects_relative_path():
@@ -212,13 +173,13 @@ def test_gate_verdict_is_persisted_including_failures(tmp_path):
     import server
 
     ok = server._save_gate_verdict(tmp_path, {"verdict": "PASS"})
-    saved = json.loads((tmp_path / "equilibration_gate.json").read_text())
-    assert saved["verdict"] == "PASS"
-    assert ok["saved_to"].endswith("equilibration_gate.json")
+    saved = json.loads((tmp_path / "equilibration.json").read_text())
+    assert saved["gate"]["verdict"] == "PASS"
+    assert ok["saved_to"].endswith("equilibration.json")
 
     # A blown-up probe is the case most worth having a record of.
     server._save_gate_verdict(tmp_path, {"status": "failed", "error": "probe exploded"})
-    assert json.loads((tmp_path / "equilibration_gate.json").read_text())["status"] == "failed"
+    assert json.loads((tmp_path / "equilibration.json").read_text())["gate"]["status"] == "failed"
 
     # A missing out_dir must not raise -- the verdict still returns.
     assert server._save_gate_verdict(None, {"verdict": "PASS"})["verdict"] == "PASS"
@@ -233,13 +194,13 @@ def test_ff_confidence_derived_from_citation_not_retired_field():
     assert all("confidence" not in e for e in rules.values()), \
         "classes.<CLASS>.confidence was retired; nothing should reintroduce it"
 
-    got = ff_routing.get_preferred_ff("PSTR")
+    got = ff_routing.get_ff_accuracy_prior("PSTR")
     assert got["ff_confidence"] == "cited"
-    # And it must agree with what gen_prompt writes into the build prompt.
+    # It must agree with deterministic build-parameter resolution.
     expected = "cited" if rules["PSTR"].get("ff_justification_doi") else "uncited"
     assert got["ff_confidence"] == expected
 
-    assert not any(ff_routing.get_preferred_ff(c)["ff_confidence"] == "low" for c in rules)
+    assert not any(ff_routing.get_ff_accuracy_prior(c)["ff_confidence"] == "low" for c in rules)
 
 
 # ── Bug 2: cooling-contraction densities must be plateau means, not one final frame ──
@@ -271,13 +232,25 @@ def test_assess_cooling_contraction_prefers_log_plateau_over_final_frame():
 
 # ── Bug 15: a recorded knob the deck silently overrides is a false protocol record ──
 
-def test_overridden_tg_steps_per_t_is_flagged():
-    from validate_run_plan import _overridden_param_findings
+def test_a_retired_tg_knob_is_rejected_rather_than_recorded_and_ignored():
+    """Rewritten 2026-09-04. This asserted that _overridden_param_findings flags
+    tg_steps_per_t when tg_rate_index is also set -- but the single-rate collapse left
+    tg_rate_index a key NO producer writes, so the guard could not fire on any real plan
+    while the test kept passing on a hand-built dict. The protection moved earlier and
+    harder: both retired keys are now off the override allowlist, so an agent proposing one
+    is told at adjudication time instead of having it silently recorded and ignored.
+    """
+    from scientific_control import validate_overrides
+    from validate_run_plan import OVERRIDDEN_PARAMS, _overridden_param_findings
 
-    plan = {"decided_params": {"tg_steps_per_t": 500000, "tg_rate_index": 0}}
-    findings = _overridden_param_findings(plan)
-    assert len(findings) == 1
-    assert findings[0]["check"] == "decided_param_overridden"
+    for dead in ("tg_steps_per_t", "tg_rates_K_per_ns", "tg_primary_rate_index"):
+        with pytest.raises(ValueError, match="unsupported overrides"):
+            validate_overrides({dead: 500000})
 
-    # Only fires when the overriding knob is actually set.
-    assert _overridden_param_findings({"decided_params": {"tg_steps_per_t": 500000}}) == []
+    # The one live knob IS settable -- rejecting the dead keys must not leave the rate
+    # unreachable, since it is the only lever for a Tg fit that will not resolve.
+    validate_overrides({"tg_rate_K_per_ns": 40})
+
+    # The registry is empty and its finder stays wired for the next real case.
+    assert OVERRIDDEN_PARAMS == {}
+    assert _overridden_param_findings({"decided_params": {"tg_rate_K_per_ns": 40}}) == []

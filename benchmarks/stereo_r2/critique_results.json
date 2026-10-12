@@ -1,0 +1,258 @@
+[
+  {
+    "system": "PEEK",
+    "run_name": "PEEK_1",
+    "polymer_class_used": "PKTN",
+    "classifier_said": "PKTN",
+    "critic_verdict": "agrees",
+    "grounding_path": "/home/arz2/PolyJarvis_v2/data/PEEK_1/raw/literature_grounding.json",
+    "adjudication": {
+      "overrides": {},
+      "confidence": "medium"
+    },
+    "before": {
+      "confidence": "low",
+      "dominant_uncertainty": "adjudication call failed (headless claude exited 1: ); running the deterministic baseline",
+      "overrides": {
+        "bm_pressures_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ],
+        "emc_seed": 244828755,
+        "velocity_seed": 62028104
+      },
+      "d01_choice": "pcff",
+      "evidence_origins": [
+        "autofill"
+      ],
+      "n_evidence": 6
+    },
+    "after": {
+      "confidence": "medium",
+      "dominant_uncertainty": "Tg on a stiff aromatic backbone at DP=18 (~6,120 atoms): the melt-start sweep fix is untested for PKTN and chain-length bias is unquantified; PCFF's ~5% amorphous-PEEK density deficit is an anticipated systematic, not the open gap.",
+      "overrides": {},
+      "d01_choice": "pcff",
+      "evidence_origins": [
+        "autofill",
+        "critic"
+      ],
+      "n_evidence": 7
+    },
+    "changed": {
+      "confidence": [
+        "low",
+        "medium"
+      ],
+      "dominant_uncertainty": [
+        "adjudication call failed (headless claude exited 1: ); running the deterministic baseline",
+        "Tg on a stiff aromatic backbone at DP=18 (~6,120 atoms): the melt-start sweep fix is untested for PKTN and chain-length bias is unquantified; PCFF's ~5% amorphous-PEEK density deficit is an anticipated systematic, not the open gap."
+      ],
+      "overrides": [
+        {
+          "bm_pressures_atm": [
+            -1000,
+            0,
+            1500,
+            3000,
+            5000
+          ],
+          "emc_seed": 244828755,
+          "velocity_seed": 62028104
+        },
+        {}
+      ],
+      "evidence_origins": [
+        [
+          "autofill"
+        ],
+        [
+          "autofill",
+          "critic"
+        ]
+      ],
+      "n_evidence": [
+        6,
+        7
+      ]
+    }
+  },
+  {
+    "system": "iPMMA",
+    "run_name": "iPMMA_1",
+    "polymer_class_used": "PACR",
+    "classifier_said": "PACR",
+    "critic_verdict": "agrees",
+    "grounding_path": "/home/arz2/PolyJarvis_v2/data/iPMMA_1/raw/literature_grounding.json",
+    "adjudication": {
+      "overrides": {
+        "experimental_tg_K": 319,
+        "bm_pressures_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ],
+        "emc_seed": 431883951,
+        "velocity_seed": 622568557
+      },
+      "confidence": "medium"
+    },
+    "before": {
+      "confidence": "medium",
+      "dominant_uncertainty": "Stereo-transferability of PCFF: no verified source validates it on isotactic PMMA, so the stereo-specific 319 K Tg target is graded against a force field calibrated on atactic data.",
+      "overrides": {
+        "experimental_tg_K": 319,
+        "bm_pressures_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ],
+        "emc_seed": 431883951,
+        "velocity_seed": 622568557
+      },
+      "d01_choice": "pcff",
+      "evidence_origins": [
+        "autofill",
+        "critic"
+      ],
+      "n_evidence": 9
+    },
+    "after": {
+      "confidence": "medium",
+      "dominant_uncertainty": "Stereo-transferability of PCFF: no verified source validates it on isotactic PMMA, so the stereo-specific 319 K Tg target is graded against a force field calibrated on atactic data.",
+      "overrides": {
+        "experimental_tg_K": 319,
+        "bm_pressures_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ],
+        "emc_seed": 431883951,
+        "velocity_seed": 622568557
+      },
+      "d01_choice": "pcff",
+      "evidence_origins": [
+        "autofill",
+        "critic"
+      ],
+      "n_evidence": 9
+    },
+    "changed": {}
+  },
+  {
+    "system": "aPS",
+    "run_name": "aPS_1",
+    "polymer_class_used": "PSTR",
+    "classifier_said": "PSTR",
+    "critic_verdict": "disagrees",
+    "grounding_path": "/home/arz2/PolyJarvis_v2/data/aPS_1/raw/literature_grounding.json",
+    "adjudication": {
+      "overrides": {},
+      "confidence": "low"
+    },
+    "before": {
+      "confidence": "low",
+      "dominant_uncertainty": "PCFF melt-stage density deficit for PS \u2014 round-1 saw MELT_STAGE_DEFICIT 2.3-5.6% below the exp-extrapolated melt density on all four PS replicates, which no cooling change can fix, and the COMPASS alternative cannot be tested inside a fixed-FF replicate design.",
+      "overrides": {},
+      "d01_choice": "pcff",
+      "evidence_origins": [
+        "autofill",
+        "critic"
+      ],
+      "n_evidence": 9
+    },
+    "after": {
+      "confidence": "low",
+      "dominant_uncertainty": "PCFF melt-stage density deficit for PS \u2014 round-1 saw MELT_STAGE_DEFICIT 2.3-5.6% below the exp-extrapolated melt density on all four PS replicates, which no cooling change can fix, and the COMPASS alternative cannot be tested inside a fixed-FF replicate design; the row's own PCFF-vs-COMPASS benzene/toluene density figures attributed to Sun 1998 could not be confirmed by the critic, so that argument is weaker than the row states in both directions.",
+      "overrides": {},
+      "d01_choice": "pcff",
+      "evidence_origins": [
+        "autofill",
+        "critic"
+      ],
+      "n_evidence": 9
+    },
+    "changed": {
+      "dominant_uncertainty": [
+        "PCFF melt-stage density deficit for PS \u2014 round-1 saw MELT_STAGE_DEFICIT 2.3-5.6% below the exp-extrapolated melt density on all four PS replicates, which no cooling change can fix, and the COMPASS alternative cannot be tested inside a fixed-FF replicate design.",
+        "PCFF melt-stage density deficit for PS \u2014 round-1 saw MELT_STAGE_DEFICIT 2.3-5.6% below the exp-extrapolated melt density on all four PS replicates, which no cooling change can fix, and the COMPASS alternative cannot be tested inside a fixed-FF replicate design; the row's own PCFF-vs-COMPASS benzene/toluene density figures attributed to Sun 1998 could not be confirmed by the critic, so that argument is weaker than the row states in both directions."
+      ]
+    }
+  },
+  {
+    "system": "sPVC",
+    "run_name": "sPVC_1",
+    "polymer_class_used": "PVNL",
+    "classifier_said": "PHAL",
+    "critic_verdict": "agrees",
+    "grounding_path": "/home/arz2/PolyJarvis_v2/data/sPVC_1/raw/literature_grounding.json",
+    "adjudication": {
+      "overrides": {},
+      "confidence": "medium"
+    },
+    "before": {
+      "confidence": "medium",
+      "dominant_uncertainty": "No stereo-specific validation: every verified MD study on record is atactic PVC, while the run's targets (Tg 371 K, rho 1.391) are syndiotactic experimental curation \u2014 so the force field is grounded and the stereo response is not.",
+      "overrides": {},
+      "d01_choice": "pcff",
+      "evidence_origins": [
+        "autofill"
+      ],
+      "n_evidence": 7
+    },
+    "after": {
+      "confidence": "medium",
+      "dominant_uncertainty": "No stereo-specific validation: every verified MD study on record is atactic PVC, while the run's targets (Tg 371 K, rho 1.391) are syndiotactic experimental curation \u2014 so the force field is grounded and the stereo response is not.",
+      "overrides": {},
+      "d01_choice": "pcff",
+      "evidence_origins": [
+        "autofill"
+      ],
+      "n_evidence": 7
+    },
+    "changed": {}
+  },
+  {
+    "system": "PLLA",
+    "run_name": "PLLA_1",
+    "polymer_class_used": "PEST",
+    "classifier_said": "PEST",
+    "critic_verdict": "agrees",
+    "grounding_path": "/home/arz2/PolyJarvis_v2/data/PLLA_1/raw/literature_grounding.json",
+    "adjudication": {
+      "overrides": {},
+      "confidence": "medium"
+    },
+    "before": {
+      "confidence": "medium",
+      "dominant_uncertainty": "no PCFF-specific neat-bulk-PLA MD benchmark; FF support is same-family Class-II (COMPASS) only",
+      "overrides": {},
+      "d01_choice": "pcff",
+      "evidence_origins": [
+        "autofill",
+        "critic"
+      ],
+      "n_evidence": 8
+    },
+    "after": {
+      "confidence": "medium",
+      "dominant_uncertainty": "no PCFF-specific neat-bulk-PLA MD benchmark; FF support is same-family Class-II (COMPASS) only",
+      "overrides": {},
+      "d01_choice": "pcff",
+      "evidence_origins": [
+        "autofill",
+        "critic"
+      ],
+      "n_evidence": 8
+    },
+    "changed": {}
+  }
+]

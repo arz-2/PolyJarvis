@@ -1,0 +1,149 @@
+{
+  "purpose": "Controlled Tg sensitivity legs for reviewer comment 1, second half: cooling rate, temperature grid, equilibration duration and fitting procedure. Round 1 has no data on any of these axes -- tg_t_step_K is 20 K in all 36 round-1 runs and all 21 stereo_r2 plans, and schema 2.0 collapsed the rate to a single scalar.",
+  "method": "Each leg is a thermal-stage-only fork off an anchor's ALREADY-GATED melt cell. track_registry.macro_stages_for(['tg']) is (build, equilibration, thermal, summary) -- no cooling -- and stage_params._resolve_tg_params starts the staircase from the equilibration stage's melt_start_data_path. The leg's workflow_state records build and equilibration as accepted, pointing at the ANCHOR's own executor_state.json; workflow_engine._accepted_manifest re-verifies every artifact's sha256, so a leg cannot silently run against a moved or truncated cell.",
+  "cost_law": "steps_per_T = tg_t_step_K / (rate * dt * 1e-6), floored at tg_min_steps_per_T. Sweep cost is proportional to span/(rate*dt) while the floor is inactive, i.e. for rate <= 5 * tg_t_step_K at dt=1 fs. The floor caps the FAST end; the 1/rate law makes the slow end the entire budget.",
+  "anchors": {
+    "iPMMA_1": {
+      "role": "primary -- glassy, PCFF, the representative system named in manuscript_v2/revision.md section A",
+      "baseline": {
+        "tg_rate_K_per_ns": 100,
+        "tg_t_step_K": 20,
+        "dt_fs": 1.0
+      },
+      "priced_baseline_gpu_h": 4.4,
+      "fallback": "PLLA_1",
+      "fallback_reason": "iPMMA carries an unvalidated eq_annealing_cycles 5->10 change. PLLA_1 is the cleanest round-1 family (all four replicates failed only the legitimate glassy C(t) carve-out). Do NOT fall back to aPS_1 -- its MELT_STAGE_DEFICIT is unresolved."
+    },
+    "PE_1": {
+      "role": "secondary -- cheapest system in the set, 12x cheaper per ns than any PCFF member, so it carries the wide-span axes",
+      "baseline": {
+        "tg_rate_K_per_ns": 40,
+        "tg_t_step_K": 20,
+        "dt_fs": 2.0
+      },
+      "priced_baseline_gpu_h": 0.92,
+      "note": "PE is rubbery at 300 K and semicrystalline in practice. It buys rate span cheaply; the glassy PCFF anchor carries the reviewer's 'representative system' weight."
+    }
+  },
+  "legs": [
+    {
+      "id": "L1",
+      "axis": "rate",
+      "anchor": "PE_1",
+      "override": {
+        "tg_rate_K_per_ns": 20
+      },
+      "gpu_h": 1.85
+    },
+    {
+      "id": "L2",
+      "axis": "rate",
+      "anchor": "PE_1",
+      "override": {
+        "tg_rate_K_per_ns": 10
+      },
+      "gpu_h": 3.7,
+      "note": "10 K/ns is PHYC's validated rate floor. Below it a 50+ ns TraPPE-UA descent risks crystallising, and the leg would measure ordering rather than Tg."
+    },
+    {
+      "id": "L3",
+      "axis": "rate",
+      "anchor": "iPMMA_1",
+      "override": {
+        "tg_rate_K_per_ns": 50
+      },
+      "gpu_h": 8.8,
+      "note": "50 K/ns sits inside PACR's validated rate set [40, 80, 100]."
+    },
+    {
+      "id": "L4",
+      "axis": "t_grid",
+      "anchor": "PE_1",
+      "override": {
+        "tg_t_step_K": 10,
+        "tg_rate_K_per_ns": 20
+      },
+      "gpu_h": 1.85
+    },
+    {
+      "id": "L5",
+      "axis": "t_grid",
+      "anchor": "PE_1",
+      "override": {
+        "tg_t_step_K": 40,
+        "tg_rate_K_per_ns": 20
+      },
+      "gpu_h": 1.85
+    },
+    {
+      "id": "L6",
+      "axis": "t_grid",
+      "anchor": "iPMMA_1",
+      "override": {
+        "tg_t_step_K": 40
+      },
+      "gpu_h": 4.6,
+      "note": ""
+    }
+  ],
+  "t_grid_axis_is_exactly_controlled_on_PE": "At rate 20 K/ns and dt 2 fs, tg_t_step_K in {10, 20, 40} gives 250000 / 500000 / 1000000 steps per bin over 48 / 24 / 12 bins = 12 M steps in every case. Identical cost, identical total simulated time; only the staircase resolution differs. dT=10 sits exactly on PHYC's tg_min_steps_per_T floor of 250000. L1 doubles as the dT=20 member of this axis.",
+  "reportable_infeasibility": "tg_t_step_K=10 at the iPMMA baseline rate of 100 K/ns is rejected at plan time by make_deterministic_plan._assert_tg_rate_feasible (100000 steps < the 200000 floor). That is a finding to report -- the temperature grid cannot be refined below 20 K at the production rate without dropping under the per-bin sampling floor. Do NOT override tg_min_steps_per_T to dodge it: that would change the sampling this axis exists to hold fixed.",
+  "production_rate_is_the_ceiling": "Measured across all 21 classes in guides/polymer_rules.json: steps_per_T / tg_min_steps_per_T == exactly 1.00 for every one. The per-class default rate is the FASTEST rate that class's own sampling floor permits at its own tg_t_step_K and dt_fs -- 100 K/ns for the 18 dt=1fs classes, 40 K/ns for PHYC and PDIE (dt=2fs, floor 250000), 50 K/ns for PSIL (dT=10). Two consequences: 100 K/ns needs no leg (it is iPMMA_1's baseline and that of five other stereo_r2 systems, free from the campaign's own thermal stages, making it the most-measured rate in the study); and the ladder can only ever probe SLOWER, so every rate sensitivity reported here is a sensitivity at the production boundary. PE can reach 100 K/ns only at dT=50 (exactly 250000 steps/T), which moves rate and grid together -- a legitimate combined probe, deliberately excluded from the rate ladder.",
+  "deferred": {
+    "equilibration_duration": "t_equil_ns does not exist in v2 (grep returns nothing in orchestration/scripts) and every stereo_r2 plan carries it as null -- the duration is deferred to generate_equilibration_workflow's atom-count-tiered default. The real knobs are melt_hold_min_steps / nvt_melt_min_steps, both stages_for(...) == ('equilibration',). Harvest the pilot's own adaptive EXTEND attempts first: they are a second duration value at zero GPU cost. Fund dedicated legs only if that yields no usable contrast.",
+    "fitting_procedure": "Analysis-only, zero GPU. Re-fit every stereo_r2 run and every leg varying the bilinear breakpoint window and the fit form. Runs whenever."
+  },
+  "comparison_rule": "Predeclared before any leg runs. An axis is SENSITIVE when |Tg(leg) - Tg(anchor baseline)| exceeds the pooled within-system SD across all completed stereo_r2 runs (many degrees of freedom); the anchor's own 3-seed SD is reported as a secondary, system-specific check. The pooled figure is primary because an n=3 SD carries 2 dof and is itself uncertain to roughly +/-50% -- quoting it alone would reproduce the conflation reviewer comment 1 caught the first time.",
+  "seeds": "A leg keeps its anchor's emc_seed and velocity_seed unchanged, deliberately: the axis under test must be the only thing that moves. verify_matrix asserts it.",
+  "anchor_status_20260910": {
+    "iPMMA_1": {
+      "state": "equilibration ACCEPTED at attempt-0005 (18:24Z), after being `failed` earlier the same day",
+      "how": "NOT by re-running. workflow_state.json was hand-edited (equilibration failed->accepted, accepted_attempt None->attempt-0005); backup at workflow_state.pre_neff_regate_20260910.json. The justification is a NEW autocorrelation correction to the drift p-value in check_equilibration_comprehensive.py (_drift_significance), re-graded into attempts/equilibration/attempt-0005/raw/equilibration_regate_neff_20260910.json.",
+      "what_the_correction_does": "linregress assumes independent samples; an MD thermo series is not. Scaling t by sqrt(n_eff/n) against n_eff-2 dof flips dihedral p 0.0 -> 0.1034 at tau=68, n_eff=22. drift_pct is UNCHANGED at 4.14% -- only the significance moved. By construction the correction can only turn FAIL into PASS.",
+      "disclosure_debt": [
+        "The sha256-pinned artifact raw/equilibration.json still records dihedral pass=False, and attempt-0005's own executor_state findings still carry EXTEND with energy_component_drift=false. The regate file is NOT among the pinned artifacts, so enforce_gate.py and the reviewer-comment-2 per-run gate table will read FAIL for a stage recorded as accepted.",
+        "operator_interventions is null on iPMMA_1 -- the hand promotion is unrecorded, unlike PLLA_1's and sPVC_1's. Reviewer comment 3 is about autonomy claims; an unlogged manual promotion is the exact thing the intervention count exists to catch.",
+        "The gate change is UNCOMMITTED (working tree only), so it is not in the commit the manuscript would cite under reviewer comment 6."
+      ],
+      "cross_attempt_check_20260910": {
+        "why": "_drift_significance's own docstring states it cannot notice drift persisting ACROSS attempts, and no gate performs that comparison. Attempts 0004 and 0005 both ran at 600 K, so they are directly comparable (0003 ran at 550 K and is not).",
+        "result": {
+          "density": "+0.41 combined SEM_eff -- not significant",
+          "E_vdwl": "-1.01 combined SEM_eff -- not significant",
+          "E_dihed": "-1.92 combined SEM_eff -- borderline, ~p=0.055, in the direction of continued relaxation"
+        },
+        "reading": "Density -- the property the melt gate actually binds and the one Tg descends from -- shows no significant between-attempt movement, which supports the fluctuation reading. The dihedral energy carries a ~1.9 sigma hint of ongoing relaxation. Disclose it; it does not disqualify the cell.",
+        "caveat": "One pair of attempts, one comparison at ~2 sigma. This is a check, not a proof of equilibration."
+      }
+    },
+    "PLLA_1": {
+      "state": "accepted through summary; melt cell at attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data",
+      "role_now": "verified fallback anchor -- dry-run confirmed forkable. Not in use now that iPMMA_1 is accepted, but its bin arithmetic is recorded below.",
+      "chemistry_caveat": "PEST, not PACR. Round-1 PLA multirate returned slope b<0 (wrong Tg-vs-rate sign) and PLA1's single-rate Tg was a FAIL. A null or wrong-sign L3 result REPRODUCES a known round-1 finding rather than discovering one -- report it as such.",
+      "bin_counts": {
+        "dT20_baseline": 27,
+        "dT40_L6": 14,
+        "note": "620 K -> 100 K span. dT=40 lands exactly on the tg_t_low bound (140 -> 100), so L6 carries NO partial final bin -- the non-integer trap flagged for iPMMA (11.5 bins) does not arise on PLLA."
+      }
+    },
+    "PE_1": {
+      "state": "raw/run_plan.json only -- never built",
+      "affects": [
+        "L1",
+        "L2",
+        "L4",
+        "L5"
+      ],
+      "consequence": "four of six legs are blocked on a base-campaign run that must happen anyway; the legs are not extra cost, they are downstream of it"
+    },
+    "aPS_1": {
+      "state": "accepted through summary, but equilibration took 7 attempts; MELT_STAGE_DEFICIT resolution unconfirmed -- do NOT use as a fallback anchor without checking it"
+    },
+    "measured_costs": {
+      "thermal_attempt_disk": "61 MB (PLLA_1 attempt-0001) -- legs are disk-free in practice",
+      "L3_on_PLLA_gpu_h": 9.4,
+      "L6_on_PLLA_gpu_h": 4.9
+    }
+  },
+  "denominator_availability_20260910": "The comparison_rule's pooled within-system SD is NOT YET AVAILABLE: it needs replicates 2-3, and only replicate 1 exists for 4 of 7 systems. Legs run now produce a delta with no denominator -- the sensitivity VERDICT waits on the base campaign. The legs themselves do not change."
+}

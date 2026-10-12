@@ -1,0 +1,251 @@
+{
+  "_what": "EMC force-field coverage measured over every EMC-routed polymer in RadonPy's PI1070 (real PoLyInfo chemistry). Produced by tools/ff_coverage/sweep.py; raw per-probe records in arm0.jsonl (class-preferred field) and arm1.jsonl (every other registered EMC field, run on arm0's failures). A probe is a real EMC trial build at dp=4/nchains=2 -- typing is what is under test, not packing.",
+  "_generated": "2026-09-02",
+  "population": {
+    "n": 982,
+    "excluded": "PAMD/PCBN/PURA (RadonPy-routed) are not asking the EMC question"
+  },
+  "arm0_class_default": {
+    "built": 635,
+    "failed": 347,
+    "rate": 0.647,
+    "note": "reproduces the 71/109 (65%) figure of the 2026-08-31 stratified sample on the full population"
+  },
+  "arm1_cascade": {
+    "rescued_by_another_emc_field": 21,
+    "buildable_by_no_registered_emc_field": 326,
+    "ceiling_with_per_smiles_cascade": 0.668,
+    "verdict": "A per-SMILES field cascade moves coverage 65% -> 67%. It is NOT a general lever. The recovery is concentrated: PHAL 4/4, PHYC 5/15, PDIE 3/9, PACR 7/33, and PIMD 0/230.",
+    "rescuing_field": {
+      "pcff": 12,
+      "opls/2024/opls-aa": 5,
+      "opls/2012/opls-ua": 1,
+      "trappe-ua": 3
+    }
+  },
+  "failure_causes": {
+    "amide_imide_urea_N_typed_na": {
+      "n": 244,
+      "classes_spanned": [
+        "PACR",
+        "PEST",
+        "PIMD",
+        "POXI",
+        "PSTR",
+        "PURT",
+        "PVNL"
+      ],
+      "examples": [
+        "PI94",
+        "PI95",
+        "PI96",
+        "PI155",
+        "PI156"
+      ]
+    },
+    "missing_torsion_row": {
+      "n": 34,
+      "classes_spanned": [
+        "PACR",
+        "PDIE",
+        "PEST",
+        "PHYC",
+        "POXI"
+      ],
+      "examples": [
+        "PI68",
+        "PI69",
+        "PI75",
+        "PI77",
+        "PI80"
+      ]
+    },
+    "stereo_slash_breaks_esh_parser": {
+      "n": 24,
+      "classes_spanned": [
+        "PDIE",
+        "PHYC",
+        "PIMD",
+        "PVNL"
+      ],
+      "examples": [
+        "PI46",
+        "PI47",
+        "PI55",
+        "PI58",
+        "PI60"
+      ]
+    },
+    "unclassified": {
+      "n": 21,
+      "classes_spanned": [
+        "PACR",
+        "PEST",
+        "PHAL",
+        "PIMD",
+        "POXI",
+        "PSFO",
+        "PSUL"
+      ],
+      "examples": [
+        "PI486",
+        "PI502",
+        "PI503",
+        "PI504",
+        "PI508"
+      ]
+    },
+    "phosphazene_P_double_O_increment": {
+      "n": 13,
+      "classes_spanned": [
+        "PIMD",
+        "PVNL"
+      ],
+      "examples": [
+        "PI380",
+        "PI1009",
+        "PI1010",
+        "PI1011",
+        "PI1051"
+      ]
+    },
+    "nitro_group_no_typing_template": {
+      "n": 11,
+      "classes_spanned": [
+        "PACR",
+        "POXI",
+        "PSTR",
+        "PVNL"
+      ],
+      "examples": [
+        "PI222",
+        "PI267",
+        "PI369",
+        "PI392",
+        "PI393"
+      ]
+    }
+  },
+  "headline": "Every failure cause spans 2-7 PoLyInfo backbone classes; none is confined to one. The backbone class is not the unit that determines whether a cell builds -- the functional groups present are. One mis-typing (amide/imide/urea N assigned PCFF's 'na', sp3 amine) accounts for 244 of 347 failures across 7 classes.",
+  "per_class": {
+    "PACR": {
+      "field": "pcff",
+      "built": 85,
+      "n": 118,
+      "rate": 0.72,
+      "rescued_by_other_field": 7
+    },
+    "PANH": {
+      "field": "pcff",
+      "built": 1,
+      "n": 1,
+      "rate": 1.0,
+      "rescued_by_other_field": 0
+    },
+    "PDIE": {
+      "field": "trappe-ua",
+      "built": 0,
+      "n": 9,
+      "rate": 0.0,
+      "rescued_by_other_field": 3
+    },
+    "PEST": {
+      "field": "pcff",
+      "built": 60,
+      "n": 67,
+      "rate": 0.896,
+      "rescued_by_other_field": 1
+    },
+    "PHAL": {
+      "field": "opls/2024/opls-aa",
+      "built": 4,
+      "n": 8,
+      "rate": 0.5,
+      "rescued_by_other_field": 4
+    },
+    "PHYC": {
+      "field": "trappe-ua",
+      "built": 68,
+      "n": 83,
+      "rate": 0.819,
+      "rescued_by_other_field": 5
+    },
+    "PIMD": {
+      "field": "pcff",
+      "built": 31,
+      "n": 261,
+      "rate": 0.119,
+      "rescued_by_other_field": 0
+    },
+    "PIMN": {
+      "field": "pcff",
+      "built": 11,
+      "n": 11,
+      "rate": 1.0,
+      "rescued_by_other_field": 0
+    },
+    "PKTN": {
+      "field": "pcff",
+      "built": 1,
+      "n": 1,
+      "rate": 1.0,
+      "rescued_by_other_field": 0
+    },
+    "POXI": {
+      "field": "pcff",
+      "built": 52,
+      "n": 67,
+      "rate": 0.776,
+      "rescued_by_other_field": 0
+    },
+    "PPHS": {
+      "field": "pcff",
+      "built": 1,
+      "n": 1,
+      "rate": 1.0,
+      "rescued_by_other_field": 0
+    },
+    "PPNL": {
+      "field": "pcff",
+      "built": 6,
+      "n": 6,
+      "rate": 1.0,
+      "rescued_by_other_field": 0
+    },
+    "PSFO": {
+      "field": "pcff",
+      "built": 3,
+      "n": 4,
+      "rate": 0.75,
+      "rescued_by_other_field": 0
+    },
+    "PSTR": {
+      "field": "pcff",
+      "built": 153,
+      "n": 161,
+      "rate": 0.95,
+      "rescued_by_other_field": 1
+    },
+    "PSUL": {
+      "field": "pcff",
+      "built": 10,
+      "n": 11,
+      "rate": 0.909,
+      "rescued_by_other_field": 0
+    },
+    "PURT": {
+      "field": "pcff",
+      "built": 4,
+      "n": 11,
+      "rate": 0.364,
+      "rescued_by_other_field": 0
+    },
+    "PVNL": {
+      "field": "pcff",
+      "built": 145,
+      "n": 162,
+      "rate": 0.895,
+      "rescued_by_other_field": 0
+    }
+  }
+}

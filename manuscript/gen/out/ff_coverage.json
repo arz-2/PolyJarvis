@@ -1,0 +1,197 @@
+{
+ "trial_builds": [
+  {
+   "system": "PE",
+   "prior": "trappe-ua",
+   "outcomes": {
+    "pcff": "builds",
+    "opls/2024/opls-aa": "builds",
+    "trappe-ua": "builds",
+    "compass": "builds"
+   }
+  },
+  {
+   "system": "PEG",
+   "prior": "pcff",
+   "outcomes": {
+    "pcff": "builds",
+    "opls/2024/opls-aa": "missing parameters",
+    "trappe-ua": "builds",
+    "compass": "builds"
+   }
+  },
+  {
+   "system": "PLLA",
+   "prior": "pcff",
+   "outcomes": {
+    "pcff": "builds",
+    "opls/2024/opls-aa": "missing parameters",
+    "trappe-ua": "no typing rule",
+    "compass": "missing parameters"
+   }
+  },
+  {
+   "system": "aPS",
+   "prior": "pcff",
+   "outcomes": {
+    "pcff": "builds",
+    "opls/2024/opls-aa": "builds",
+    "trappe-ua": "builds",
+    "compass": "builds"
+   }
+  },
+  {
+   "system": "sPVC",
+   "prior": "pcff",
+   "outcomes": {
+    "pcff": "builds",
+    "opls/2024/opls-aa": "missing parameters",
+    "trappe-ua": "no typing rule",
+    "compass": "element not typed"
+   }
+  },
+  {
+   "system": "PEEK",
+   "prior": "pcff",
+   "outcomes": {
+    "pcff": "builds",
+    "opls/2024/opls-aa": "no typing rule",
+    "trappe-ua": "missing parameters",
+    "compass": "no typing rule"
+   }
+  },
+  {
+   "system": "PSU",
+   "prior": "pcff",
+   "outcomes": {
+    "pcff": "builds",
+    "opls/2024/opls-aa": "no typing rule",
+    "trappe-ua": "no typing rule",
+    "compass": "no typing rule"
+   }
+  },
+  {
+   "system": "PTFE",
+   "prior": "opls/2024/opls-aa",
+   "outcomes": {
+    "pcff": "builds",
+    "opls/2024/opls-aa": "builds",
+    "trappe-ua": "no typing rule",
+    "compass": "element not typed"
+   }
+  }
+ ],
+ "pcff_fluorine": {
+  "sections_with_f": {
+   "atom_types": 1,
+   "equivalence": 1,
+   "auto_equivalence": 1,
+   "bond_increments": 32,
+   "quartic_bond": 4,
+   "quartic_angle": 12,
+   "torsion_3": 6,
+   "nonbond(9-6)": 1
+  },
+  "versions_refs": {
+   "atom_types": [
+    "v2.1 ref 8"
+   ],
+   "equivalence": [
+    "v1.0 ref 1"
+   ],
+   "auto_equivalence": [
+    "v2.0 ref 1"
+   ],
+   "bond_increments": [
+    "v1.0 ref 4",
+    "v2.0 ref 2",
+    "v2.0 ref 3",
+    "v2.1 ref 8",
+    "v3.1 ref 12"
+   ],
+   "quartic_bond": [
+    "v1.0 ref 4",
+    "v2.1 ref 8",
+    "v3.1 ref 12"
+   ],
+   "quartic_angle": [
+    "v2.1 ref 8",
+    "v3.1 ref 12"
+   ],
+   "torsion_3": [
+    "v2.1 ref 8",
+    "v3.1 ref 12"
+   ],
+   "nonbond(9-6)": [
+    "v2.1 ref 8"
+   ]
+  },
+  "cross_term_rows_with_f": 0
+ },
+ "phal_sweep": {
+  "opls/2024/opls-aa": [
+   {
+    "smiles": "*C(C*)Cl",
+    "built": false,
+    "has_Cl": true
+   },
+   {
+    "smiles": "*C(C*)(F)F",
+    "built": true,
+    "has_Cl": false
+   },
+   {
+    "smiles": "*CC(*)(Cl)Cl",
+    "built": false,
+    "has_Cl": true
+   },
+   {
+    "smiles": "*C(F)C(*)(F)F",
+    "built": true,
+    "has_Cl": false
+   },
+   {
+    "smiles": "*C(F)(F)C(F)(F)*",
+    "built": true,
+    "has_Cl": false
+   },
+   {
+    "smiles": "*C(C(*)(F)F)(Cl)F",
+    "built": false,
+    "has_Cl": true
+   },
+   {
+    "smiles": "*CCC=C(*)Cl",
+    "built": false,
+    "has_Cl": true
+   },
+   {
+    "smiles": "*C(F)(F)C(*)(F)C(F)(F)F",
+    "built": true,
+    "has_Cl": false
+   }
+  ],
+  "pcff": [
+   {
+    "smiles": "*C(C*)Cl",
+    "built": true,
+    "has_Cl": true
+   },
+   {
+    "smiles": "*CC(*)(Cl)Cl",
+    "built": true,
+    "has_Cl": true
+   },
+   {
+    "smiles": "*C(C(*)(F)F)(Cl)F",
+    "built": true,
+    "has_Cl": true
+   },
+   {
+    "smiles": "*CCC=C(*)Cl",
+    "built": true,
+    "has_Cl": true
+   }
+  ]
+ }
+}

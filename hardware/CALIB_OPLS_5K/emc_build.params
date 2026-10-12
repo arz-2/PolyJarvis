@@ -1,0 +1,149 @@
+# LAMMPS parameters created by EMC v9.4.4, build Jul 21 2026 07:58:38
+
+# Variables
+
+variable	seed		index	103
+variable	ntotal		index	5040
+variable	fshape		index	1
+variable	output		index	emc_build
+variable	field		index	opls/2024/opls-aa
+variable	location1	index	/home/arz2/emc/field/
+variable	nav		index	0.6022141179
+variable	temperature	index	300
+variable	radius		index	5
+variable	nrelax		index	100
+variable	weight_nonbond	index	0.0001
+variable	weight_bond	index	0.0001
+variable	weight_focus	index	1
+variable	cutoff		index	9.5
+variable	charge_cutoff	index	9.5
+variable	kappa		index	4
+variable	density1	index	0.49
+variable	lprevious	index	0
+variable	lphase		index	50.1044301552
+variable	f_poly		index	20
+variable	chem_repeat	index	*O[Si](*)(C)C
+variable	chem_cap	index	*[H]
+variable	lg_repeat	index	10
+variable	lg_cap		index	1
+variable	norm_poly	index	100
+variable	l_poly		index	252
+variable	mg_repeat	index	58.1544
+variable	mg_cap		index	0
+variable	m_poly		index	1453.86
+variable	n_poly		index	20
+variable	mtotal		index	37117.216
+variable	nphase1		index	5040
+variable	mphase1		index	37117.216
+variable	vphase1		index	125784.863152
+variable	lbox		index	50.1044301552
+variable	lphase1		index	50.1044301552
+variable	lxx		index	50.1044301552
+variable	lyy		index	50.1044301552
+variable	lzz		index	50.1044301552
+variable	lzy		index	0
+variable	lzx		index	0
+variable	lyx		index	0
+variable	vtotal		index	125784.863152
+variable	nl_poly		index	20
+
+# Types
+
+variable	type_c4		index	1
+variable	type_h1		index	2
+variable	type_h1o	index	3
+variable	type_h1si	index	4
+variable	type_o2		index	5
+variable	type_o2h	index	6
+variable	type_si4	index	7
+
+variable	type_bond_c4_h1	index	1
+variable	type_bond_c4_si4 index	2
+variable	type_bond_h1o_o2h index	3
+variable	type_bond_h1si_si4 index	4
+variable	type_bond_o2_si4 index	5
+variable	type_bond_o2h_si4 index	6
+
+variable	type_angle_c4_si4_c4 index	1
+variable	type_angle_c4_si4_h1si index	2
+variable	type_angle_c4_si4_o2 index	3
+variable	type_angle_c4_si4_o2h index	4
+variable	type_angle_h1_c4_h1 index	5
+variable	type_angle_h1_c4_si4 index	6
+variable	type_angle_h1o_o2h_si4 index	7
+variable	type_angle_h1si_si4_o2 index	8
+variable	type_angle_o2_si4_o2 index	9
+variable	type_angle_o2_si4_o2h index	10
+variable	type_angle_si4_o2_si4 index	11
+
+# Clusters
+
+variable	n0_poly		index	1
+variable	n1_poly		index	20
+variable	nl_poly		index	20
+
+# Flags
+
+variable	flag_charged	index	1
+
+# Masses
+
+mass		1    12.01100  # c4
+mass		2     1.00790  # h1
+mass		3     1.00790  # h1o
+mass		4     1.00790  # h1si
+mass		5    15.99940  # o2
+mass		6    15.99940  # o2h
+mass		7    28.08500  # si4
+
+# Potentials
+
+pair_modify	mix geometric tail yes
+special_bonds	lj/coul 0 0 0.5
+
+# Pair Coeffs
+
+pair_coeff	 1  1    0.06600    3.50000  # c4,c4
+pair_coeff	 2  2    0.03000    2.50000  # h1,h1
+pair_coeff	 3  3    0.00000    2.50000  # h1o,h1o
+pair_coeff	 4  4    0.03000    2.50000  # h1si,h1si
+pair_coeff	 5  5    0.14000    2.90000  # o2,o2
+pair_coeff	 6  6    0.17000    3.12000  # o2h,o2h
+pair_coeff	 7  7    0.10000    4.00000  # si4,si4
+
+# Bond Coeffs
+
+bond_coeff	1  340.00000    1.09000  # c4,h1
+bond_coeff	2  187.00000    1.86000  # c4,si4
+bond_coeff	3  553.00000    0.94500  # h1o,o2h
+bond_coeff	4  166.00000    1.48000  # h1si,si4
+bond_coeff	5  374.00000    1.64000  # o2,si4
+bond_coeff	6  374.00000    1.64000  # o2h,si4
+
+# Angle Coeffs
+
+angle_coeff	 1   60.00000  110.00000  # c4,si4,c4
+angle_coeff	 2   35.00000  110.50000  # c4,si4,h1si
+angle_coeff	 3   60.00000  100.00000  # c4,si4,o2
+angle_coeff	 4   60.00000  100.00000  # c4,si4,o2h
+angle_coeff	 5   33.00000  107.80000  # h1,c4,h1
+angle_coeff	 6   35.00000  109.50000  # h1,c4,si4
+angle_coeff	 7   50.00000  115.00000  # h1o,o2h,si4
+angle_coeff	 8   35.00000  110.50000  # h1si,si4,o2
+angle_coeff	 9   60.00000  110.00000  # o2,si4,o2
+angle_coeff	10   60.00000  110.00000  # o2,si4,o2h
+angle_coeff	11   20.00000  145.00000  # si4,o2,si4
+
+# Dihedral Coeffs
+
+dihedral_coeff	 1    0.09000   -0.27000    0.00000    0.36000    0.00000  # c4,si4,c4,h1
+dihedral_coeff	 2    0.00000    0.00000    0.00000    0.00000    0.00000  # c4,si4,o2,si4
+dihedral_coeff	 3    0.00000    0.00000    0.00000    0.00000    0.00000  # c4,si4,o2h,h1o
+dihedral_coeff	 4    0.09000   -0.27000    0.00000    0.36000    0.00000  # h1,c4,si4,h1si
+dihedral_coeff	 5    0.00000    0.00000    0.00000    0.00000    0.00000  # h1,c4,si4,o2
+dihedral_coeff	 6    0.00000    0.00000    0.00000    0.00000    0.00000  # h1,c4,si4,o2h
+dihedral_coeff	 7    0.00000    0.00000    0.00000    0.00000    0.00000  # h1o,o2h,si4,o2
+dihedral_coeff	 8    0.00000    0.00000    0.00000    0.00000    0.00000  # h1si,si4,o2,si4
+dihedral_coeff	 9    0.00000    0.00000    0.00000    0.00000    0.00000  # o2,si4,o2,si4
+dihedral_coeff	10    0.00000    0.00000    0.00000    0.00000    0.00000  # o2h,si4,o2,si4
+

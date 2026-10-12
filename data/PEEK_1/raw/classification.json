@@ -1,0 +1,163 @@
+{
+  "smiles": "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1",
+  "class_id": 19,
+  "polyinfo_class": "PKTN",
+  "polymer_class": "PKTN",
+  "class_source": "radonpy_polyinfo",
+  "priority_rank": 10,
+  "flags": {
+    "PURT": false,
+    "PURA": false,
+    "PIMD": false,
+    "PANH": false,
+    "PCBN": false,
+    "PEST": false,
+    "PAMD": false,
+    "PSIL": false,
+    "PPHS": false,
+    "PKTN": true,
+    "PSFO": false,
+    "POXI": true,
+    "PSUL": false,
+    "PIMN": false,
+    "PPNL": true,
+    "PSTR": false,
+    "PACR": false,
+    "PHAL": false,
+    "PDIE": false,
+    "PHYC": false,
+    "PVNL": false
+  },
+  "co_occurring": [
+    "POXI",
+    "PPNL"
+  ],
+  "runner_up": "POXI",
+  "groups": {
+    "PKTN": {
+      "location": "backbone",
+      "source": "polyinfo_flags",
+      "smarts_var": "ketone"
+    },
+    "POXI": {
+      "location": "backbone",
+      "source": "polyinfo_flags",
+      "smarts_var": "ether"
+    },
+    "PPNL": {
+      "location": "backbone",
+      "source": "polyinfo_flags",
+      "smarts_var": "phenylene"
+    }
+  },
+  "chemistry": {
+    "screened_on": "2-mer",
+    "functional_groups": [
+      {
+        "id": "benzene_ring",
+        "label": "benzene ring",
+        "polarity": "apolar",
+        "count": 3,
+        "count_2mer": 6,
+        "location": "backbone",
+        "locations": {
+          "backbone": 6,
+          "pendant": 0
+        },
+        "hbond_donors": 0,
+        "hbond_acceptors": 0,
+        "note": "Quadrupolar, not dipolar. Drives pi-stacking and stiffness, and PCFF's aromatic ring charges are why PSTR prefers it over TraPPE-UA -- but it is not what pppm is for."
+      },
+      {
+        "id": "ether_aryl",
+        "label": "aryl ether",
+        "polarity": "polar_aprotic",
+        "count": 1,
+        "count_2mer": 3,
+        "location": "backbone",
+        "locations": {
+          "backbone": 3,
+          "pendant": 0
+        },
+        "hbond_donors": 0,
+        "hbond_acceptors": 1,
+        "note": null
+      },
+      {
+        "id": "ketone",
+        "label": "ketone",
+        "polarity": "polar_aprotic",
+        "count": 1,
+        "count_2mer": 2,
+        "location": "backbone",
+        "locations": {
+          "backbone": 2,
+          "pendant": 0
+        },
+        "hbond_donors": 0,
+        "hbond_acceptors": 1,
+        "note": null
+      }
+    ],
+    "backbone_groups": [
+      "ketone",
+      "ether_aryl",
+      "benzene_ring"
+    ],
+    "pendant_groups": [],
+    "tm_estimate": {
+      "tm_estimated_K": 714,
+      "tg_K": 357,
+      "tg_source": "group_contribution",
+      "tg_confidence": "very_low",
+      "backbone_symmetric": true,
+      "boyer_ratio_tg_over_tm": 0.5,
+      "n_asymmetric_backbone_atoms": 0,
+      "method": "boyer_beaman",
+      "mae_vs_experimental_K": 130,
+      "valid_only_if_crystallizable": true,
+      "caution": "+-130 K mean absolute error; meaningless for amorphous polymers, which have no Tm. Evidence only -- not a basis for setting T_equil_K."
+    },
+    "tg_estimate": {
+      "tg_estimated_K": 357,
+      "T_equil_K": 557,
+      "method": "structural_motif_group_contribution",
+      "confidence": "very_low",
+      "unmatched_heavy_frac": 0.5
+    },
+    "polarity_class": "polar_aprotic",
+    "hydrocarbon_only": false,
+    "apolar_aliphatic": false,
+    "implied_electrostatics": "pppm",
+    "elements": {
+      "C": 19,
+      "H": 12,
+      "O": 3
+    },
+    "n_heavy_atoms": 22,
+    "heteroatom_fraction": 0.136,
+    "aromatic_atom_fraction": 0.818,
+    "descriptor_basis": "2-mer, divided to one repeat unit",
+    "n_aromatic_rings": 3,
+    "hbond_donors": 0,
+    "hbond_acceptors": 3,
+    "rotatable_bonds": 5,
+    "tpsa": 35.53,
+    "mw_repeat_unit": 288.302,
+    "formal_charge": 0
+  },
+  "chemistry_consistency": {
+    "findings": [],
+    "n_warnings": 0,
+    "verdict": "consistent",
+    "polarity_class": "polar_aprotic",
+    "backbone_groups": [
+      "benzene_ring",
+      "ether_aryl",
+      "ketone"
+    ],
+    "pendant_groups": []
+  },
+  "generated_at": "2026-09-11T20:45:58.071501+00:00",
+  "run_name": "PEEK_1"
+}

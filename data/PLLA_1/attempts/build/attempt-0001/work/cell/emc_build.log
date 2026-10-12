@@ -1,0 +1,291 @@
+$ perl /home/arz2/emc/scripts/emc_setup.pl -field=pcff -seed=686928993 -temperature=300.0 -replace emc_build.esh
+# exit 0
+EMC Setup v4.1.5 (March 30, 2024), (c) 2004-2024 Pieter J. in 't Veld
+
+Info: reading script from "./emc_build.esh"
+Info: phase1 = {poly}
+Info: project = emc_build
+Info: direction = x
+Info: shape = 1
+Info: force field type = "cff"
+Info: force field name = "pcff/pcff"
+Info: force field location = "~emc/field"
+Info: build for LAMMPS script in "../build"
+Info: creating LAMMPS run script "emc_build.in"
+Info: adding pressure sampling
+Info: creating EMC build script "build.emc"
+
+$ /home/arz2/emc/bin/emc_linux_x86_64 build.emc
+# exit 0
+(* EMC: Enhanced Monte Carlo simulations *)
+
+version 9.4.4, build Jul 21 2026 07:58:38, date Tue Sep  8 18:28:49 2026
+
+valid until Jun 30, 2027
+
+Info: script v1.0 started at Tue Sep  8 18:28:49 2026
+Info: variables = {seed -> 686928993, ntotal -> 3000, fshape -> 1, output ->
+        "emc_build", field -> "pcff/pcff", location1 ->
+        "/home/arz2/emc/field/", nav -> 0.6022141179, temperature -> 300, 
+        radius -> 5, nrelax -> 100, weight_nonbond -> 0.0001, weight_bond ->
+        0.0001, weight_focus -> 1, cutoff -> 9.5, charge_cutoff -> 9.5, kappa
+        -> 4, density1 -> 0.63, lprevious -> 0, lphase -> 0, f_poly -> 10, 
+        chem_repeat -> "*[C@@H](C)C(=O)O*", chem_cap -> "*[H]"}
+Info: output = 
+      {detail -> 3, wide -> false, expand -> false, math -> true, reduced ->
+        false, info -> true, strict -> true, warning -> true, message -> true,
+        debug -> false, exit -> true, ignore -> false}
+Info: field = {id -> pcff, mode -> cff, style -> none, name ->
+        {"/home/arz2/emc/field/pcff/pcff.frc", 
+          "/home/arz2/emc/field/pcff/pcff_templates.dat"}, compress -> false, 
+        error -> true, debug -> false, check -> {atomistic -> true, charge ->
+          true}}
+Info: importing '/home/arz2/emc/field/pcff/pcff.frc'
+Warning: duplicate field.bond entry 40 [c:c] omitted.
+Warning: duplicate field.bond entry 51 [c:h] omitted.
+Warning: duplicate field.bond entry 62 [c:o_2] omitted.
+Warning: duplicate field.bond entry 176 [c=:c=1] omitted.
+Warning: duplicate field.bond entry 328 [c_1:o_1] omitted.
+Warning: duplicate field.bond entry 364 [cp:cp] omitted.
+Warning: duplicate field.bond entry 365 [cp:cp] omitted.
+Warning: duplicate field.bond entry 367 [cp:h] omitted.
+Warning: duplicate field.bond entry 689 [o:p] omitted.
+Info: groups = {ngroups -> 2, group -> {
+          {id -> repeat, chemistry -> "*[C@@H](C)C(=O)O*", depth -> 8, charges
+            -> field, charge -> 0, terminator -> false, nconnects -> 4, 
+            connects -> {
+              {source -> $end1, destination -> {index -> cap, site -> $end1}}, 
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end2}}, 
+              {source -> $end2, destination -> {index -> cap, site -> $end1}}, 
+              {source -> $end2, destination -> {index -> repeat, site ->
+                  $end1}}}}, 
+          {id -> cap, chemistry -> "*[H]", depth -> 8, charges -> field, 
+            charge -> 0, terminator -> false, nconnects -> 2, connects -> {
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end1}}, 
+              {source -> $end1, destination -> {index -> repeat, site ->
+                  $end2}}}}}, ndeletes -> 0, npolymers -> 0}
+Info: field = {mode -> apply, style -> none, error -> true, debug -> false, 
+        check -> {atomistic -> true, charge -> true}}
+Info: applying '/home/arz2/emc/field/pcff/pcff.frc'
+Info: variables = {lg_repeat -> 9, lg_cap -> 1, norm_poly -> 100, l_poly ->
+        632, mg_repeat -> 44.05358, mg_cap -> 0, m_poly -> 3083.7506, n_poly
+        -> 10, ntotal -> 0, mtotal -> 0}
+Info: simulation = {units -> {permittivity -> 1, seed -> seed}, types -> {
+          coulomb -> {pair -> {active -> true, cutoff -> charge_cutoff}}}}
+Info: clusters = {progress -> none, nbodys -> 0, nclusters -> 0, ngrafts -> 0,
+        npolymers -> 1, 
+        polymer -> 
+        {id -> poly, system -> main, type -> alternate, niterations -> 1000, n
+          -> 10, groups -> {repeat, cap}, weights -> {1, 1}, nrepeat -> {70, 
+            0}}}
+      delta = {systems -> 1, bodies -> 0, clusters -> 10, sites -> 6320}
+Info: field = {mode -> apply, style -> none, error -> true, debug -> false, 
+        check -> {atomistic -> true, charge -> true}}
+Info: applying '/home/arz2/emc/field/pcff/pcff.frc'
+Info: types = {cff -> {pair -> {active -> true, mode -> repulsive}}}
+Info: variables = {nphase1 -> 6320, mphase1 -> 50465.0507, vphase1 ->
+        133014.575212, lbox -> 51.0465517814, lphase1 -> 51.0465517814, lxx ->
+        51.0465517814, lyy -> 51.0465517814, lzz -> 51.0465517814, lzy -> 0, 
+        lzx -> 0, lyx -> 0, lphase -> 51.0465517814, ntotal -> 6320, mtotal ->
+        50465.0507, vtotal -> 133014.575212}
+Info: build = {
+        system -> {id -> main, temperature -> 300, density -> 0.63, split ->
+          false, flag -> {charge -> true, map -> true, pbc -> true, geometry
+            -> true}, periodic -> {x -> true, y -> true, z -> true}, geometry
+          -> {xx -> 51.0465517814, yy -> 51.0465517814, zz -> 51.0465517814, 
+            zy -> 0, zx -> 0, yx -> 0}, deform -> {xx -> 1, yy -> 1, zz -> 1, 
+            zy -> 0, zx -> 0, yx -> 0}}, 
+        select -> {progress -> list, frequency -> 1, message -> nkt, center ->
+          false, origin -> {x -> 0, y -> 0, z -> 0}, order -> random, check ->
+          true, nclusters -> 1, cluster -> poly, 
+          relax -> {ncycles -> 100, radius -> 5}, name -> "error", type ->
+          xyz, compress -> false, 
+          grow -> {check -> all, method -> energetic, cutoff -> 0, focus ->
+            all, 
+            weight -> {nonbonded -> 0.0001, bonded -> 0.0001, focus -> 1}, 
+            theta -> 0, dphi -> 1, nbonded -> 20, ntrials -> 20, niterations
+            -> 1000}}}
+Info: building 6320 sites.
+
+   progress/%      E[0]/nkT
+---------------------------
+            0             0
+            1      1.628349
+            2      2.420784
+            3      2.510172
+            4      3.019861
+            5      2.986271
+            6      2.879888
+            7      2.944987
+            8      3.252505
+            9      3.109676
+           10      3.192148
+           11      3.247514
+           12      3.280268
+           13      3.350245
+           14      3.443194
+           15      3.416813
+           16      3.460421
+           17      3.418703
+           18      3.426878
+           19      3.380231
+           20      3.504632
+           21      3.481303
+           22      3.474611
+           23      3.462167
+           24      3.480443
+           25      3.635088
+           26      3.561457
+           27      3.622271
+           28      3.535197
+           29      3.540635
+           30      3.587495
+           31      3.578886
+           32      3.643196
+           33      3.641135
+           34      3.538092
+           35      3.551445
+           36      3.528177
+           37       3.54415
+           38      3.541355
+           39      3.486235
+           40      3.467553
+           41      3.552788
+           42      3.553001
+           43      3.570765
+           44      3.564381
+           45      3.583668
+           46      3.650002
+           47       3.73532
+           48      3.780456
+           49      3.691347
+           50      3.691442
+           51      3.649589
+           52      3.652253
+           53      3.688885
+           54      3.695556
+           55      3.724817
+           56      3.775347
+           57      3.846079
+           58      3.955418
+           59      3.883957
+           60      3.893198
+           61      3.929449
+           62      3.862441
+           63       3.85442
+           64      3.848231
+           65      3.846802
+           66      3.889004
+           67      3.864912
+           68      3.846294
+           69      3.902619
+           70      3.893248
+           71      3.918517
+           72      3.958793
+           73      3.982837
+           74      3.998452
+           75      4.110572
+           76      4.203218
+           77      4.178767
+           78      4.309857
+           79      4.358601
+           80      4.306806
+           81      4.296114
+           82      4.317462
+           83      4.373738
+           84      4.389893
+           85      4.443697
+           86      4.428563
+           87        4.4586
+           88      4.455085
+           89      4.477763
+           90      4.492171
+           91      4.528208
+           92      4.693443
+           93      4.798521
+           94      4.712769
+           95      4.699418
+           96      4.677556
+           97      4.702407
+           98      4.677785
+           99      4.669146
+          100      4.641803
+---------------------------
+      average       3.74169
+
+      niterations = 4220, <niterations> = 0.667722
+Info: force = {style -> none, message -> nkt}
+
+(* Energy *)
+
+                         E[0]/nkT 
+---------------------------------
+cff.angle_angle_tor    -0.0048694 
+cff.angle_angle      -0.001317284 
+cff.angle_torsion      -0.1243289 
+cff.angle                 1.87447 
+cff.bond_angle         0.01163568 
+cff.bond_bond_13                0 
+cff.bond_bond        -0.001453984 
+cff.bond                 0.644345 
+cff.end_bond_torsio  3.264966e-05 
+cff.improper           0.07628026 
+cff.middle_bond_tor   -0.06519486 
+cff.pair                 2.232204 
+cff.torsion                     0 
+---------------------------------
+total                    4.641803 
+
+Info: force = {style -> init, message -> nkt}
+
+(* Energy *)
+
+                         E[0]/nkT 
+---------------------------------
+cff.angle_angle_tor    -0.0048694 
+cff.angle_angle      -0.001317284 
+cff.angle_torsion      -0.1243289 
+cff.angle                 1.87447 
+cff.bond_angle         0.01163568 
+cff.bond_bond_13                0 
+cff.bond_bond        -0.001453984 
+cff.bond                 0.644345 
+cff.end_bond_torsio  3.264966e-05 
+cff.improper           0.07628026 
+cff.middle_bond_tor   -0.06519486 
+cff.pair                 2.232204 
+cff.torsion                     0 
+---------------------------------
+total                    4.641803 
+
+Info: variables = {nl_poly -> 10}
+Info: put = {name -> "emc_build", compress -> true, detail -> 3}
+Info: pdb = {name -> "emc_build", compress -> true, extend -> false, mode ->
+        put, system -> main, length -> auto, forcefield -> cff, atomistic ->
+        full, depth -> auto, charges -> false, detect -> false, atom -> index,
+        residue -> index, segment -> index, rank -> false, hexadecimal ->
+        false, cut -> false, pbc -> true, map -> false, unwrap -> clusters, 
+        rigid -> true, fixed -> true, licorice -> false, vdw -> false, 
+        connectivity -> false, crystal -> false, element -> auto, parameters
+        -> false, flag -> {charge -> true, map -> true, pbc -> true, geometry
+          -> true}}
+Info: lammps = {name -> "emc_build", compress -> false, system -> main, mode
+        -> put, length -> auto, units -> none, forcefield -> cff, shake ->
+        auto, atomistic -> none, detect -> true, cutoff -> false, charges ->
+        true, ewald -> true, ellipsoid -> false, sphere -> false, bonds ->
+        false, types -> false, data -> true, parameters -> true, cross ->
+        false, variables -> true, coefficients -> true, comment -> true, map
+        -> true, unwrap -> true, flag -> {charge -> true, map -> true, pbc ->
+          true, geometry -> true}}
+Info: tsc: bonded = {37.07, 12.78, 6.546, 15.63, 0.2193, 0.1335} s
+Info: tsc: simulation = 106.1 s, threads = 62.43 s
+Info: tsc: thread = 59.72 s
+Info: script v1.0 finished at Tue Sep  8 18:30:35 2026
+
+Info: Thank you for using EMC v9.4.4
+Info: In any publication of scientific results based in part or
+Info: completely on the use of EMC, please include this reference:
+Info: P.J. in 't Veld and G.C. Rutledge, Macromolecules 2003, 36, 7358
+

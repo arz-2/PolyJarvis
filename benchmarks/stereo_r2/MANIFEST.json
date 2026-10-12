@@ -1,0 +1,250 @@
+{
+  "campaign": "stereo_r2",
+  "purpose": "Fixed-protocol, independent-seed replicate campaign answering reviewer comment 1 (manuscript_v2/revision.md section A): round-1 'replicates' varied cooling rate, chain length, chain count, annealing and pressure ladder, conflating stochastic uncertainty with protocol and finite-size effects. Here decided_params are frozen per system and ONLY the two seeds vary.",
+  "design": {
+    "systems": 7,
+    "replicates_per_system": 3,
+    "properties": [
+      "density",
+      "tg",
+      "bulk_modulus"
+    ],
+    "within_system_varying": [
+      "emc_seed",
+      "velocity_seed"
+    ],
+    "across_system_varying": [
+      "chemistry",
+      "stereochemistry",
+      "force field family"
+    ],
+    "stereo_note": "Each system carries ONE stereochemistry for all three of its replicates, so seed variance and stereo effect are never confounded. Stereochemistry is expressed only in the repeat-unit SMILES (@/@@) -- guides/polymer_rules.json:263: tacticity is not a parameter and is rejected as a run-plan override."
+  },
+  "master_seed": 20260908,
+  "seed_derivation": "seed = 1 + int(sha256(f'{master_seed}|{system}|{replicate}|{kind}').hexdigest(), 16) % 999999999, kind in {emc, velocity}",
+  "seed_knobs": [
+    "emc_seed",
+    "velocity_seed"
+  ],
+  "seed_knobs_note": "This checkout has exactly TWO seed knobs (scientific_control.py OVERRIDE_RANGES). revision.md section A step 3 asks for 'EMC build seed + SEED_HOT/SEED_COLD'; SEED_HOT/SEED_COLD are derived from velocity_seed inside the deck generator (mcp-servers/mcp-lammps-engine/script_generator.py: SEED_HOT=vseed, SEED_COLD=vseed+1), so pinning velocity_seed pins both.",
+  "planning_path": "make_deterministic_plan.py run-plan --polymer_class <CLASS> --with-ff-probe --baseline  ->  agent_api.py start --plan <scaffold> --dry-run. --baseline stamps confidence=low so the plan materializes with NO LLM in the loop: a fixed-protocol claim cannot rest on a critic pass that is not rerun for replicates 2 and 3.",
+  "polymer_class_is_passed_explicitly": "run_graph.py classifies from the SMILES and is deliberately NOT used here: RadonPy's polyinfo_classifier returns PHAL for any 2-mer PVC dyad (measured 2026-09-08). guides/class_overrides.json is not the right home for that -- its own scope rule admits only molecules that appear in polymer_rules.json member_smiles -- so the class is stated per system instead.",
+  "systems": {
+    "iPMMA": {
+      "polymer": "poly(methyl methacrylate)",
+      "polymer_class": "PACR",
+      "classifier_says": "PACR",
+      "smiles": "*[C@@](C)(C(=O)OC)C*",
+      "repeat_unit": "1-mer",
+      "monomers_per_repeat": 1,
+      "stereochemistry": "isotactic",
+      "stereo_expression": "One defined backbone stereocentre in a 1-mer: every repeat is built with the same configuration, which is isotactic by construction. The @ vs @@ choice is inert here -- the two are enantiomeric chains and physically indistinguishable.",
+      "overrides": {
+        "experimental_tg_K": 319.0,
+        "bm_pressures_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ],
+        "T_equil_K": 600.0,
+        "T_melt_hold_K": 600.0,
+        "annealing_T_high_K": 700.0
+      },
+      "override_citations": {
+        "experimental_tg_K": "db/experimental_db.sqlite tg_measurements, form='isotactic' for poly(methyl methacrylate): 311.15, 318.0, 319.15, 323.15, 325.15 K (PolymerHandbook4ed / PolymerDataHandbook1999). Median 319 K. PACR's class default 378 K is the ATACTIC value and would score a correct isotactic run as a ~60 K failure. Corroborated by Macromolecules 2021 10.1021/acs.macromol.1c01341 (320 K) and Soldera 2005 10.1016/j.compositesa.2004.10.019 (~333 K).",
+        "bm_pressures_atm": "PACR declares no ladder; pinned to the shared glassy ladder so the Murnaghan series is defined and priceable rather than falling through to protocol_policy's conservative_unscreened default.",
+        "T_equil_K": "PROTOCOL, not grading. experimental_tg_K=319 (isotactic) is the value the Tg RESULT is graded against; it must not size the melt. Left to the derivation max(T_equil_K, Tg+200) it produced a 550 K melt hold -- 28 K below the 578 K the curated class Tg (378 K, atactic PMMA) would have given -- and iPMMA_1's melt came back kinetically trapped on 2026-09-09: chain COM displacement 0.493x Rg^2, g3(t) exponent 0.073 (r2 0.825), C(t) 3.8% decayed, against 2.79-4.85x for the other three systems. 600 K is PACR's own md_tg_ceiling_K -- the class bound on how hot its chemistry's MD Tg gets -- chosen over the 578 K class-derived value because PCFF PMMA is the slowest-relaxing chemistry in the set: of the four round-1 PMMA campaigns, two sat below 1.0x Rg^2 even at 578 K. annealing_T_high_K 700 records what the resolver commands (T_equil + 100), 100 K of margin above the melt, comparable to PLLA_1's 80 K. stage_params.temperature_schedule now floors the protocol term by the curated class Tg so a grading override can never cool a melt again; this pin sits ON TOP of that floor."
+      },
+      "unpinned_and_why": {
+        "experimental_density_gcm3": "Class member value 1.19 resolves through the stereo-stripped SMILES match. Tacticity shifts PMMA density by well under 1%, so the atactic value stands."
+      }
+    },
+    "aPS": {
+      "polymer": "polystyrene",
+      "polymer_class": "PSTR",
+      "classifier_says": "PSTR",
+      "smiles": "*CC(*)c1ccccc1",
+      "repeat_unit": "1-mer",
+      "monomers_per_repeat": 1,
+      "stereochemistry": "atactic",
+      "stereo_expression": "No stereo marker: EMC places each backbone centre without stereocontrol, which is the atactic build. This is the set's stereochemical control.",
+      "overrides": {
+        "bm_pressures_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ]
+      },
+      "override_citations": {
+        "bm_pressures_atm": "PSTR declares no ladder; shared glassy ladder."
+      },
+      "open_protocol_question": "Round 1 found MELT_STAGE_DEFICIT on all four PS replicates -- melt density already 2.3-5.6% below the exp-extrapolated melt value, so slower re-cooling cannot fix it. Gated on the pilot: do not launch replicates 2 and 3 until replicate 1's melt density is assessed."
+    },
+    "sPVC": {
+      "polymer": "poly(vinyl chloride)",
+      "polymer_class": "PVNL",
+      "classifier_says": "PHAL",
+      "class_divergence_reason": "RadonPy's polyinfo_classifier returns PVNL for the 1-mer *CC(*)Cl (via guides/class_overrides.json) but PHAL for ANY 2-mer PVC dyad, stereo or not -- measured 2026-09-08 on *CC(Cl)CC(Cl)*, *C[C@@H](Cl)C[C@H](Cl)* and *C[C@@H](Cl)C[C@@H](Cl)*. It is a repeat-unit-cut artifact of matching on the extracted mainchain, not a stereo effect. PHAL routes to OPLS-AA; OPLS-AA is a recorded EMC build failure for PVC (polymer_rules.json PVNL ff_note), so PVNL/PCFF is the correct protocol.",
+      "smiles": "*C[C@H](Cl)C[C@@H](Cl)*",
+      "repeat_unit": "dyad",
+      "monomers_per_repeat": 2,
+      "stereochemistry": "syndiotactic",
+      "stereo_expression": "Syndiotactic requires a period-2 repeat: a 1-mer can only build all-same (isotactic). The racemo dyad alternates configuration along the chain. Parity anchor: the isotactic dyad used by the i-PVC1 run (2026-08-15, measured m=0.988) is *C[C@H](Cl)C[C@H](Cl)*; @/@@ is the other stereo class and therefore syndiotactic. CIP labels are useless here -- RDKit reports (S),(S) for the syndiotactic dyad and (S),(R) for the isotactic one, because the two *-terminated arms carry different CIP priorities.",
+      "dp_unit_rule": "decided_params.dp_typical counts DYADS. dp_typical=41 is 82 vinyl chloride monomers per chain. Any consumer wanting a monomer count (the DP>=30 glassy carve-out in the equilibration gate, run-summary dp) needs 2x. Do not 'correct' 41 to 82 in the plan.",
+      "overrides": {
+        "experimental_tg_K": 371.0,
+        "T_workflow_K": 530.0,
+        "experimental_density_gcm3": 1.391,
+        "bm_pressures_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ]
+      },
+      "override_citations": {
+        "experimental_tg_K": "db/experimental_db.sqlite tg_measurements for poly(vinyl chloride), PolymerHandbook4ed: the 354.15 K row carries the note 'Increasing syndiotactic content increases Tg to 371K', and a separate DSC row (20 deg/min, Mn->infinity, onset, varied annealing) reads 371.15 K. PVNL's class default 354 K is the atactic/commercial value.",
+        "T_workflow_K": "REQUIRED, not cosmetic. The dyad matches no PVNL member_smiles, so resolve_member_value refuses, _regime_exp_tg falls through to the group-contribution estimate (196 K + 80 K uncertainty = 276 K), and workflow_reference_temperature collapses T_workflow_K from 530 to 300 -- which makes stage_params._regime call glassy PVC RUBBERY at final_T_K=300 and drops the deform fallback from the mechanical stage. Measured on the scaffold: sPVC came out at T_workflow_K=300.0 where every other glassy system is at its class T_equil_K. 530.0 is PVNL's own class value. materialize_plan only rewrites T_workflow_K when T_equil_K is overridden, so pinning experimental_tg_K alone leaves the stale 300 K in the file.",
+        "experimental_density_gcm3": "db/experimental_db.sqlite density_measurements, PolymerDataHandbook1999: 1.391 g/cm3 at 293.15 K, phase='amorphous'. CAVEAT, carried into the grading: the row's own note discloses 11.3% crystallinity (typical commercial PVC, Pham et al. Makromol Chem 175, 1974). It is therefore an UPPER BOUND for a fully amorphous cell, and is the weakest experimental target in this set. PVNL curates no experimental_density_gcm3 at all, so without this pin density has no comparator.",
+        "bm_pressures_atm": "PVNL declares no ladder; shared glassy ladder."
+      },
+      "capability_vs_accuracy": "sPVC is primarily a CAPABILITY member. Fully syndiotactic PVC is crystalline experimentally, and the prior i-PVC1 run found iso-vs-atactic density and bulk modulus consistent with no effect. The deliverable here is that the requested stereochemistry is expressed and measurable in the built cell; the Tg comparison carries the crystallinity caveat above."
+    },
+    "PLLA": {
+      "polymer": "poly(L-lactic acid)",
+      "polymer_class": "PEST",
+      "classifier_says": "PEST",
+      "smiles": "*[C@@H](C)C(=O)O*",
+      "repeat_unit": "1-mer",
+      "monomers_per_repeat": 1,
+      "stereochemistry": "L-enantiopure",
+      "stereo_expression": "L-enantiopure. Verified by capping, not by reading @/@@: substituting the two * with their real continuation atoms gives O[C@@H](C)C(=O)O, which RDKit assigns CIP (S) and canonicalises to C[C@H](O)C(=O)O -- byte-identical to the L-(+)-lactic acid reference. The opposite parity gives (R) = D-lactic acid.",
+      "overrides": {
+        "experimental_tg_K": 331.0,
+        "T_workflow_K": 620.0,
+        "experimental_density_gcm3": 1.248
+      },
+      "override_citations": {
+        "experimental_density_gcm3": "db/experimental_db.sqlite density_measurements, Garlotta2001 citing Mikos et al. (1994) Polymer 35(5):1068: amorphous PLLA 1.248 g/cm3, phase='amorphous', ~298 K. PEST curates no experimental_density_gcm3, so density had no comparator without this.",
+        "experimental_tg_K": "polymer_rules.json PEST.experimental_tg_K.PLA = 331 K, inside db/experimental_db.sqlite's own L-PLA range 326-337 K (PolymerHandbook4ed). Pinned rather than resolved because this cut does not match member_smiles.PLA, so resolve_member_value refuses.",
+        "T_workflow_K": "REQUIRED, same failure as sPVC. Without the member match, _regime_exp_tg falls to the group-contribution estimate (173 K + 80 K = 253 K), which is BELOW final_T_K=300 and flips PLLA from glassy to rubbery. 620.0 is PEST's own class T_equil_K."
+      },
+      "smiles_cut_note": "NOT PEST's member_smiles.PLA cut. `*OC(C)C(*)=O` -- the curated member entry -- FAILS to build under PCFF/EMC: 'ScriptFieldEntryApply: Missing force field parameters' at dp=4, nchains=2 (measured 2026-09-08). The achiral form of that same cut fails identically, so it is a repeat-unit-cut problem, not a stereo one. This cut is the one round-1's PLA1..PLA4 actually built with (git show origin/main:manuscript/data/PLA1/raw/run_plan.json -> smiles '*C(C)C(=O)O*'), and it builds. polymer_rules.json PEST ff_note claims 'build-tested: PLA PASS' -- true of this cut, not of the member_smiles entry it sits next to.",
+      "unpinned_and_why": {
+        "bm_pressures_atm": "PEST already declares [-1000, 0, 1500, 3000, 5000].",
+        "exp_K_GPa": "PEST's [3.0, 4.5] carries an explicit unverified-provenance warning; indicative for PLLA, not binding."
+      }
+    },
+    "PE": {
+      "polymer": "polyethylene",
+      "polymer_class": "PHYC",
+      "classifier_says": "PHYC",
+      "smiles": "*CC*",
+      "repeat_unit": "1-mer",
+      "monomers_per_repeat": 1,
+      "stereochemistry": "achiral",
+      "stereo_expression": "Symmetric backbone, no stereocentre. The set's achiral aliphatic reference.",
+      "overrides": {},
+      "unpinned_and_why": {
+        "everything": "PHYC curates experimental_tg_K (195 K), experimental_density_gcm3 (0.855, fully amorphous TraPPE-UA comparator), exp_K_GPa (rubbery amorphous [1.5, 2.0]) and its own bm_pressures_atm ladder. Nothing needs pinning.",
+        "bm_pressures_atm": "PHYC's own [1, 1000, 2500, 5000, 10000, 15000] is kept. It contains no zero and would FAIL the override validator's four-unique-points-including-zero rule, so it must stay a class value and must not be re-pinned."
+      },
+      "regime_note": "PE is the set's only rubbery-at-300 K member (Tg 195 K). Its bulk modulus and equilibration gating follow the rubbery branch."
+    },
+    "PEEK": {
+      "polymer": "poly(ether ether ketone)",
+      "polymer_class": "PKTN",
+      "classifier_says": "PKTN",
+      "smiles": "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1",
+      "repeat_unit": "1-mer",
+      "monomers_per_repeat": 1,
+      "stereochemistry": "achiral",
+      "stereo_expression": "Rigid aromatic backbone, no stereocentre.",
+      "overrides": {
+        "bm_pressures_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ]
+      },
+      "override_citations": {
+        "bm_pressures_atm": "PKTN declares no ladder; shared glassy ladder."
+      },
+      "open_protocol_question": "Round 1 found UNDER_ANNEALED_COOLING on all four PEEK replicates and raised eq_annealing_cycles 8->12; that change has never been validated by a completed run. Gated on the pilot. Also the set's wall-time risk: T_equil = 770 K.",
+      "unpinned_and_why": {
+        "experimental_density_gcm3": "PKTN carries a bare scalar 1.263, which _exp_density_point accepts outright."
+      }
+    },
+    "PSU": {
+      "polymer": "polysulfone (bisphenol-A, Udel)",
+      "polymer_class": "PSFO",
+      "classifier_says": "PSFO",
+      "smiles": "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1",
+      "repeat_unit": "1-mer",
+      "monomers_per_repeat": 1,
+      "stereochemistry": "achiral",
+      "stereo_expression": "Aromatic sulfone backbone, no stereocentre.",
+      "overrides": {
+        "experimental_density_gcm3": 1.235,
+        "bm_pressures_atm": [
+          -1000,
+          0,
+          1500,
+          3000,
+          5000
+        ]
+      },
+      "override_citations": {
+        "experimental_density_gcm3": "db/experimental_db.sqlite density_equations, Mark2007 Table 7.2 glass branch for bisphenol-A polysulfone: rho(t_C) = 1.242 - 2.59e-4 * t, valid 30-186 C, evaluated at the run's own final_T_K = 300 K (26.85 C) -> 1.235 g/cm3. Independently corroborated by Zoller1978_PSU (1.234 measured at 27 C on Union Carbide P-1700) and PolymerDataHandbook1999 (1.24). PSFO curates no experimental_density_gcm3.",
+        "bm_pressures_atm": "PSFO declares no ladder; shared glassy ladder."
+      },
+      "known_bias": "Round 1 recorded a systematic PCFF bias on PSU: density -4%, Tg +8%. Expected, disclosed, not corrected for.",
+      "selection_note": "PSU replaced BPA-PC in this set. PCBN declares preferred_builder='radonpy' with DREIDING and QM RESP charges; run_campaign.py:306-310 refuses any preferred_builder other than 'emc', and select_hardware cannot price the gaff family on this host, so BPA-PC is neither runnable nor priceable as the class table stands."
+    }
+  },
+  "shared_glassy_ladder": {
+    "value": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "why": "One ladder across all six glassy systems removes a varying axis from the benchmark. It is PEST's own curated ladder; 5 unique points, contains zero, 3 positive, so it satisfies _validate_protocol_relationships. Spans 5000 atm on the compression side, which the PEST calibration note requires for stiff aromatic backbones. PHYC is excluded -- it keeps its own rubbery ladder."
+  },
+  "known_limitations": [
+    "sPVC's experimental density is a commercial value carrying 11.3% crystallinity and is an upper bound only.",
+    "PEST's exp_K_GPa band has unverified provenance and is indicative for PLLA, not binding.",
+    "PE, PEEK and PSU are semicrystalline or crystallisable in practice; all three are graded against amorphous-phase comparators and that choice is disclosed rather than hidden.",
+    "The built stereochemistry is not yet measured by any tool in this checkout (run_campaign.py:390 says so outright). Until a dyad m/r-fraction measurement exists, the stereo claim rests on the SMILES and on the i-PVC1 parity anchor, not on the built cell.",
+    "guides/polymer_rules.json PEST.member_smiles.PLA (*OC(C)C(*)=O) does not build under PCFF/EMC. Not fixed here -- this campaign routes around it by using the buildable cut -- but it should be corrected in the class table, since anything resolving PLA through member_smiles inherits it."
+  ],
+  "forcefield_resolution": {
+    "mechanism": "forcefield.select_by_moiety(smiles, class_prior) selects the build field. SMARTS from guides/ff_moiety_rules.json (3 rules, measured over 982 real EMC trial builds on RadonPy's PI1070) narrow the candidates; a real EMC trial build decides among them. No blocker -> the class ff_accuracy_prior stands. Blocker matched -> probe ranked candidates and take whichever field actually types the repeat unit, which can move the field off the prior. Nothing types it -> field=None, D-01 admissible: [], refuse. The class supplies a prior, not the answer (preferred_ff was demoted to ff_accuracy_prior 2026-09-03).",
+    "what_happened_here": "Measured 2026-09-08: all 7 SMILES cleared the screen with blockers: [] and unscreened: False, so each D-01.choice is its class prior and resolved_by reads polymer_rules.json:classes.<CLASS>.ff_accuracy_prior.",
+    "claim_limit": "The chemistry was screened and cleared for all seven. None exercises the branch where chemistry moves the field OFF the prior, or the refusal path. A set demonstrating FF override rather than FF confirmation would need a member tripping carbonyl_adjacent_N (PAMD, PIMD, PURT, PURA).",
+    "unscreened_caveat": "ff_moiety_rules.json's coverage_gap: the 3 rules match 266 of 347 measured failures (77%); a SMILES matching no rule is a screen passing, not a coverage measurement."
+  },
+  "recovery_configuration": {
+    "state": "NO recovery agent wired. The pilots were launched as `agent_api.py resume <RUN>` with no --recovery-agent-command, so WorkflowEngine.recovery_agent is None.",
+    "consequence": "Two tiers, only one live. Deterministic auto-remedies (_auto_remedy: registry-routed, per-route capped, revision validated against the same bounds an agent decision must pass) DO fire and land in remedy_history / recovery_log.jsonl. Agent escalation does not: workflow_engine.py:1092-1093 returns escalation_required with reason 'no_recovery_agent_configured' and the run halts.",
+    "why_this_may_be_correct": "Any recovery, agent or deterministic, mutates effective_parameters for ONE run. If replicate 1 takes a remedy and replicates 2-3 run the frozen plan, the three stop being replicates -- the exact round-1 defect this campaign exists to fix. The right response to a pilot finding is to fold the remedy into the canonical plan, re-freeze, and launch all three replicates from the corrected version. That is what 'pilot, gate, then expand' means.",
+    "cost": "This campaign exercises NONE of the recovery-agent architecture (structured issues only, capped at two calls). That benchmark axis needs its own demonstration and cannot be read off these runs.",
+    "if_a_pilot_halts": "escalation_required with agent_escalations: [] leaves the full budget of two agent calls unspent, so resuming that run with --recovery-agent-command wired is legitimate and re-burns nothing.",
+    "watch": "A NON-ZERO remedy_history on any pilot means its effective_parameters have diverged from the frozen canonical plan. Do not launch that system's replicates 2-3 until the remedy is folded back into the canonical plan and re-frozen."
+  },
+  "planning_configuration": {
+    "state": "NO LLM in the planning loop. Plans were built with make_deterministic_plan.py run-plan --baseline, which stamps confidence='low' so materialize_plan proceeds without a critic pass.",
+    "deviation": "The approved plan said to run each system through run_graph's full classify->plan->critique->adjudicate path so the critic's verdict would be the llm_contribution datum. Changed during implementation because run_graph.py has no --polymer_class flag and would have classified the sPVC dyad as PHAL, silently routing PVC to OPLS-AA; a uniform planning path across all seven was preferred to a mixed one.",
+    "consequence": "Every D-01 evidence row is origin='autofill' (the deterministic tool transcribing polymer_rules.json's ff_note, DOIs and primary sources). Zero rows are origin='critic'. No literature_grounding.json or classification.json exists for any of the 21 runs. The llm_contribution benchmark axis is empty.",
+    "audit_gap": "plan_mode reads 'reasoned' while confidence reads 'low' -- the plans are labelled as though an agent reasoned over them when none did. Same audit-consistency gap revision.md flagged on PLA1 in round 1.",
+    "remedy_available": "A critic pass over the seven frozen canonical plans costs no GPU time and does not touch the running pilots, whose decided_params are already fixed."
+  }
+}

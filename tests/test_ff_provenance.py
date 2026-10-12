@@ -15,18 +15,19 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
-from ff_provenance import (  # noqa: E402
+from forcefield import (  # noqa: E402
+    EMC_ROOT,
     FrcField,
     PrmField,
     _match,
     _tok,
-    assess,
+    assess_provenance,
     open_field,
     parse_params,
 )
 
 ARCHIVE = REPO_ROOT / "manuscript" / "data"
-EMC = Path.home() / "emc"
+EMC = Path(EMC_ROOT)  # the tree the code under test reads, not a guess at it
 
 
 def _cells():
@@ -124,7 +125,7 @@ def test_no_source_row_is_zero_across_the_archive():
         field = _field_of(cell)
         if not field:
             continue
-        r = assess(str(cell), field)
+        r = assess_provenance(str(cell), field)
         n = r.get("counts", {}).get("NO_SOURCE_ROW", 0)
         if n:
             offenders[cell.parents[1].name] = n
@@ -138,7 +139,7 @@ def test_no_local_patch_under_pcff():
     for cell in _cells():
         if _field_of(cell) != "pcff":
             continue
-        r = assess(str(cell), "pcff")
+        r = assess_provenance(str(cell), "pcff")
         assert not r["counts"].get("LOCAL_PATCH"), cell
 
 
@@ -148,7 +149,7 @@ def test_zero_impropers_are_advisory_not_blocking():
     """A zero out-of-plane term is the norm for sp3 centres and appears in every
     archived cell. Escalating it would make the whole archive unrunnable."""
     cell = next(c for c in _cells() if c.parents[1].name.startswith("PMMA"))
-    r = assess(str(cell), "pcff")
+    r = assess_provenance(str(cell), "pcff")
     zeros = [f for f in r["findings"] if "ZERO_SUBSTITUTED" in f["flags"]]
     assert zeros, "PMMA cells carry zeroed improper rows"
     assert all(f["kind"] == "improper" and f["severity"] == "advisory" for f in zeros)
@@ -162,7 +163,7 @@ def test_check_is_existence_not_value_equality():
     """A wrong-but-present parameter is out of scope, and the note must keep saying so
     -- reproducing EMC's values would trade a reliable check for an unreliable one."""
     cell = next(c for c in _cells() if c.parents[1].name.startswith("PMMA"))
-    r = assess(str(cell), "pcff")
+    r = assess_provenance(str(cell), "pcff")
     assert "Existence check only" in r["note"]
 
 
@@ -170,7 +171,7 @@ def test_no_source_row_never_blocks():
     """A gap in this parser must not demote a field or reject a plan -- that would let
     a lookup bug silently change which force field a run uses. cis-PBD under PCFF was
     the live case: one unmatched out-of-plane permutation demoted the field entirely."""
-    from ff_provenance import _severity
+    from forcefield import _severity
     assert _severity(["NO_SOURCE_ROW"], "improper") == "self_check"
     assert _severity(["NO_SOURCE_ROW"], "torsion") == "self_check"
     assert _severity(["LOCAL_PATCH"], "torsion") == "blocking"
@@ -192,5 +193,62 @@ def test_out_of_plane_matching_permutes_substituents():
 @needs_emc
 def test_cross_terms_are_reported_unchecked_not_dropped():
     cell = next(c for c in _cells() if c.parents[1].name.startswith("PMMA"))
-    r = assess(str(cell), "pcff")
+    r = assess_provenance(str(cell), "pcff")
     assert r["unchecked_cross_terms"], "Class II cross terms must be reported, not hidden"
+
+
+# --- params parsing, WITHOUT the archive ----------------------------------------
+# Every test above that exercises parse_params is @needs_archive, and manuscript/data is
+# absent from a fresh checkout. So when acd07dd's consolidation dropped the _KINDS table --
+# keeping the arity table that sat beside it -- parse_params raised NameError on every call,
+# run_campaign._ff_provenance swallowed it as {"available": false}, and do_build's
+# ZERO_SUBSTITUTED gate silently stopped running for every build. Nothing failed.
+# These two run everywhere.
+
+_MINI_PARAMS = """\
+# Pair Coeffs
+
+pair_coeff 1 1 0.0540 4.0100 # c,c
+pair_coeff 1 2 0.0230 3.3000 # c,hc
+
+# Bond Coeffs
+
+bond_coeff 1 1.5300 299.6700 -501.7700 679.8100 # c,c
+
+# Angle Coeffs
+
+angle_coeff 1 110.7700 39.5160 -7.4430 -9.5583 # c,c,c
+
+# BondBond Coeffs
+
+angle_coeff 1 bb 0.0000 1.5300 1.5300 # c,c,c
+
+# Dihedral Coeffs
+
+dihedral_coeff 1 0.0000 0.0000 0.0316 0.0000 # c,c,c,c
+
+# Improper Coeffs
+
+improper_coeff 1 0.0000 0.0000 # c,c,c,c
+"""
+
+
+def test_every_primary_section_maps_to_a_kind(tmp_path):
+    """The five primary sections must resolve to a kind; a Class II cross term must not.
+    parse_params reads the kind off a module-level table, so a missing table is a NameError
+    at the first coeff row rather than a wrong answer."""
+    path = tmp_path / "emc_build.params"
+    path.write_text(_MINI_PARAMS)
+    rows = parse_params(path)
+    by_section = {r["section"]: r["kind"] for r in rows}
+    assert by_section == {"Pair": "pair", "Bond": "bond", "Angle": "angle",
+                          "BondBond": None, "Dihedral": "torsion", "Improper": "improper"}
+    pair = next(r for r in rows if r["section"] == "Pair")
+    assert pair["index"] == "1 1" and pair["types"] == ["c", "c"]
+    assert next(r for r in rows if r["section"] == "Bond")["index"] == "1"
+
+
+def test_every_checkable_kind_has_an_arity():
+    """The two tables are read together on every row. They were split apart once already."""
+    import forcefield as ff
+    assert set(ff._KINDS.values()) == set(ff._LAMMPS_COEFF_ARITY)

@@ -1,0 +1,163 @@
+{
+  "critique": {
+    "D-01_ff": {
+      "autofilled_choice": "trappe-ua",
+      "verdict": "agrees",
+      "confidence": "high",
+      "reason": "Three independent peer-reviewed MD studies, all matched at exact-SMILES tier in the evidence store, corroborate TraPPE-UA + lj/cut electrostatics for this exact repeat unit (*CC*): the TraPPE-UA founding parameterization paper (Martin1998), a chemistry-specific downstream validation on a C192 PE melt showing Tg=187K against an extrapolated experimental range of 185-195K in better agreement than a competing (PYS) force field (Ramos2015 -- already the resolver's own cited source), and an independent 2024 HDPE MD study using TraPPE with LJ-only nonbonded treatment at the same 14.0 A cutoff. Nothing surfaced contradicts the resolver's choice; the resolver's own evidence chain (D-01 rows citing Ramos2015 and Martin1998 verbatim) is itself corroborated rather than merely asserted.",
+      "supporting_dois": [
+        "10.3390/polym16020304",
+        "10.1021/acs.macromol.5b00823",
+        "10.1021/jp972543+"
+      ],
+      "suggested_override": null
+    }
+  },
+  "dominant_uncertainty": "Parameter-coverage risk is unmeasured, not a literature gap: no EMC trial build has confirmed TraPPE-UA can actually type this exact SMILES via the builder pipeline -- the physics choice itself is unanimously supported in the literature.",
+  "electrostatics": {
+    "confidence": "high",
+    "recommendation": "lj_cut",
+    "sources": [
+      {
+        "doi": "10.3390/polym16020304",
+        "claim": "TraPPE PE MD study uses no explicit electrostatics method -- van der Waals/Lennard-Jones with a 14.0 A cutoff only. This matches the PHYC class's own cutoff_A=14.0 default exactly.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "2f9fb19a4f78"
+      },
+      {
+        "doi": "10.1021/jp972543+",
+        "claim": "TraPPE-UA hydrocarbon pseudo-atoms carry no partial charges by construction (LJ 12-6 only), so PPPM/Ewald electrostatics is not needed for this force field on a purely aliphatic backbone.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "7adc23b7150e"
+      }
+    ]
+  },
+  "forcefield": {
+    "confidence": "high",
+    "recommendation": "trappe",
+    "sources": [
+      {
+        "doi": "10.3390/polym16020304",
+        "claim": "Uses TraPPE (Transferable Potential for Phase Equilibria) force field for PE MD; amorphous-region density ~0.85 g/cm3 at 300 K, consistent with experimental values; LJ-only nonbonded treatment with 14.0 A cutoff, no explicit electrostatics method employed.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "db2330056662"
+      },
+      {
+        "doi": "10.1021/acs.macromol.5b00823",
+        "claim": "MD comparison of two force fields for a C192 polyethylene model (melt dynamics, glass transition, nonisothermal crystallization) found TraPPE-UA in better quantitative agreement with experimental data than the alternative (PYS) force field; simulated Tg=187.0 K vs experimental extrapolated range 185-195 K (Gordon-Taylor equation).",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "8ad9f9e4e184"
+      },
+      {
+        "doi": "10.1021/jp972543+",
+        "claim": "Founding TraPPE-UA paper: proposes united-atom Lennard-Jones 12-6 interaction parameters for n-alkane pseudo-atoms (CH2/CH3), fit to critical temperature and saturated-liquid density; nonbonded interactions are governed solely by LJ 12-6 potentials (no partial charges). Validated only against small-molecule (C1-C12) VLE/critical-point data, not bulk polymer melt -- downstream chemistry-specific validation (Ramos2015 above) is what supports PE specifically.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "1859a539a9b4"
+      }
+    ]
+  },
+  "md_studies": [
+    {
+      "doi": "10.3390/polym16020304",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10819154/",
+      "title": "Preparation and Characterization of High-Density Polyethylene with Alternating Lamellar Stems Using Molecular Dynamics Simulations",
+      "year": 2024,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "evidence_store",
+      "force_field": "TraPPE-UA",
+      "force_field_type": "United Atom",
+      "electrostatics": "lj_cut",
+      "ensemble": null,
+      "T_K": 300,
+      "P_atm": null,
+      "system_type": "neat_polymer",
+      "material_morphology": "other",
+      "chain_length_or_mw": null,
+      "number_of_chains": null,
+      "reported_properties": [
+        {
+          "property": "density",
+          "value": 0.85,
+          "unit": "g/cm3"
+        }
+      ],
+      "note": "System is high-density PE with alternating lamellar stems (semicrystalline morphology), not a simple amorphous bulk cell -- comparable for FF/electrostatics choice but not a direct density/Tg analog to this run's amorphous cell."
+    },
+    {
+      "doi": "10.1021/acs.macromol.5b00823",
+      "url": "https://doi.org/10.1021/acs.macromol.5b00823",
+      "title": "Molecular Dynamics Simulations for the Description of Experimental Molecular Conformation, Melt Dynamics, and Phase Transitions in Polyethylene",
+      "year": 2015,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "evidence_store",
+      "force_field": "TraPPE-UA",
+      "force_field_type": "United Atom",
+      "electrostatics": "lj_cut",
+      "ensemble": "melt dynamics, cooling through glass transition, nonisothermal crystallization; compared against a second (PYS) force field",
+      "T_K": null,
+      "P_atm": null,
+      "system_type": "neat_polymer",
+      "material_morphology": "bulk",
+      "chain_length_or_mw": "C192 united-atom chain",
+      "number_of_chains": null,
+      "reported_properties": [
+        {
+          "property": "glass_transition_temp",
+          "value": 187,
+          "unit": "K"
+        }
+      ],
+      "note": "This is the same paper already cited by the resolver's own D-01 evidence (Ramos2015); best-comparable chemistry-specific bulk-amorphous validation of TraPPE-UA for PE, directly corroborates the class default."
+    },
+    {
+      "doi": "10.1021/jp972543+",
+      "url": "https://doi.org/10.1021/jp972543+",
+      "title": "Transferable Potentials for Phase Equilibria. 1. United-Atom Description of n-Alkanes",
+      "year": 1998,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "evidence_store",
+      "force_field": "TraPPE-UA",
+      "force_field_type": "United Atom",
+      "electrostatics": "lj_cut",
+      "ensemble": "Monte Carlo VLE/critical-point fitting (not MD, not bulk polymer)",
+      "T_K": null,
+      "P_atm": null,
+      "system_type": "other",
+      "material_morphology": null,
+      "chain_length_or_mw": "C1-C12 n-alkanes",
+      "number_of_chains": null,
+      "reported_properties": [],
+      "note": "Founding parameterization paper only -- validates the LJ functional form and charge-free construction of TraPPE-UA via small-molecule VLE, not a bulk-polymer MD result; chemistry-specific PE validation rests on Ramos2015, not this paper directly."
+    }
+  ],
+  "notes": "PolyDatabase (db/query_polydatabase.py) returned \"not_ingested\" for polyethylene -- a soft miss, not a blocker -- so no fresh WebSearch was needed since the evidence store already held three exact-SMILES, peer_reviewed_doi hits fully covering force field, electrostatics, and Tg target, all agreeing with the resolver's own citations.",
+  "polymer_class": "PHYC",
+  "polymer_name": "Polyethylene (PE)",
+  "smiles": "*CC*",
+  "tg_target_K": {
+    "range": [
+      185,
+      195
+    ],
+    "confidence": "high",
+    "sources": [
+      {
+        "doi": "10.1021/acs.macromol.5b00823",
+        "claim": "TraPPE-UA MD simulated Tg=187.0 K for linear PE, cited by the authors as good agreement with their own extrapolated (Gordon-Taylor) experimental Tg range of 185-195 K -- this is the same range and MD value (187 K) already recorded in the PHYC class default's experimental_tg_K.PE=195 and ff_note.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "b9f588b561aa"
+      }
+    ]
+  },
+  "generated_at": "2026-09-11T20:43:23.627270+00:00",
+  "plan_reviewed": "/home/alexzhao/PolyJarvis/data/PE_1/raw/run_plan.json"
+}

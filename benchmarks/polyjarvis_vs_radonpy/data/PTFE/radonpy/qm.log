@@ -1,0 +1,94 @@
+RadonPy info: GPU package is available.
+RadonPy debug info: 3 conformers were generated.
+RadonPy info: Start optimization of 3 conformers by MM level.
+RadonPy debug info: Using alternate bond type h2,c3 instead of h2,c3f
+RadonPy debug info: Using alternate bond type c3,f instead of c3f,f
+RadonPy debug info: Using alternate bond type c3,f instead of c3f,f
+RadonPy debug info: Using alternate bond type c3,c3 instead of c3f,c3f
+RadonPy debug info: Using alternate bond type c3,h2 instead of c3f,h2
+RadonPy debug info: Using alternate bond type c3,f instead of c3f,f
+RadonPy debug info: Using alternate bond type c3,f instead of c3f,f
+RadonPy debug info: Using alternate angle type h2,c3,f instead of h2,c3f,f
+RadonPy debug info: Using alternate angle type h2,c3,f instead of h2,c3f,f
+RadonPy debug info: Using alternate angle type h2,c3,c3 instead of h2,c3f,c3f
+RadonPy debug info: Using alternate angle type f,c3,f instead of f,c3f,f
+RadonPy debug info: Using alternate angle type f,c3,c3 instead of f,c3f,c3f
+RadonPy debug info: Using alternate angle type f,c3,c3 instead of f,c3f,c3f
+RadonPy debug info: Using alternate angle type c3,c3,h2 instead of c3f,c3f,h2
+RadonPy debug info: Using alternate angle type c3,c3,f instead of c3f,c3f,f
+RadonPy debug info: Using alternate angle type c3,c3,f instead of c3f,c3f,f
+RadonPy debug info: Using alternate angle type h2,c3,f instead of h2,c3f,f
+RadonPy debug info: Using alternate angle type h2,c3,f instead of h2,c3f,f
+RadonPy debug info: Using alternate angle type f,c3,f instead of f,c3f,f
+RadonPy debug info: Using alternate dihedral type h2,c3,c3,h2 instead of h2,c3f,c3f,h2
+RadonPy debug info: Using alternate dihedral type h2,c3,c3,f instead of h2,c3f,c3f,f
+RadonPy debug info: Using alternate dihedral type h2,c3,c3,f instead of h2,c3f,c3f,f
+RadonPy debug info: Using alternate dihedral type f,c3,c3,h2 instead of f,c3f,c3f,h2
+RadonPy debug info: Using alternate dihedral type f,c3,c3,h2 instead of f,c3f,c3f,h2
+RadonPy warning: OPENMP package is not available. Parallel number of OPENMP is changed to zero.
+RadonPy debug info: mpirun -n 14 /home/arz2/lammps-install/bin/lmp  -in radon_lmp.in -sc none -log log.lammps
+RadonPy warning: OPENMP package is not available. Parallel number of OPENMP is changed to zero.
+RadonPy debug info: mpirun -n 14 /home/arz2/lammps-install/bin/lmp  -in radon_lmp.in -sc none -log log.lammps
+RadonPy warning: OPENMP package is not available. Parallel number of OPENMP is changed to zero.
+RadonPy debug info: mpirun -n 14 /home/arz2/lammps-install/bin/lmp  -in radon_lmp.in -sc none -log log.lammps
+RadonPy debug info: Clusters:((2,), (1,), (0,))
+RadonPy debug info: 3 conformers were reduced to 3 conformers by clustering.
+RadonPy debug info: Changing conformer ID 0 -> 0
+RadonPy debug info: Changing conformer ID 1 -> 1
+RadonPy debug info: Changing conformer ID 2 -> 2
+RadonPy info: Start optimization of 3 conformers by DFT level.
+RadonPy debug info: DFT optimization of conformer 0
+  Threads set to 4 by Python driver.
+
+  Memory set to 953.674 MiB by Python driver.
+RadonPy info: Psi4 optimization is running...
+Some dependencies such as QCElemental have not yet finished migration to pydantic v2. If issues are encountered please downgrade pydantic or upgrade QCElemental as appropriate
+Optimizer: Optimization complete!
+RadonPy info: Normal termination of psi4 optimization. Elapsed time = 0:00:41.741391
+RadonPy debug info: DFT optimization of conformer 1
+RadonPy info: Psi4 optimization is running...
+	Previous geometry is closer to target in internal coordinates, so using that one.
+
+	Best geometry has RMS(Delta(q)) = 3.30e-04
+
+	Previous geometry is closer to target in internal coordinates, so using that one.
+
+	Best geometry has RMS(Delta(q)) = 4.57e-08
+
+Optimizer: Optimization complete!
+RadonPy info: Normal termination of psi4 optimization. Elapsed time = 0:00:38.732371
+RadonPy debug info: DFT optimization of conformer 2
+RadonPy info: Psi4 optimization is running...
+	Previous geometry is closer to target in internal coordinates, so using that one.
+
+	Best geometry has RMS(Delta(q)) = 3.45e-04
+
+	Previous geometry is closer to target in internal coordinates, so using that one.
+
+	Best geometry has RMS(Delta(q)) = 4.24e-08
+
+Optimizer: Optimization complete!
+RadonPy info: Normal termination of psi4 optimization. Elapsed time = 0:00:39.246713
+RadonPy debug info: Conformer IDs were sorted by DFT energy.
+RadonPy debug info: Changing conformer ID 0 -> 0
+RadonPy debug info: Changing conformer ID 1 -> 1
+RadonPy debug info: Changing conformer ID 2 -> 2
+RadonPy info: Psi4 RESP charge calculation is running...
+RadonPy debug info: First stage of RESP charge calculation
+RadonPy debug info: Second stage of RESP charge calculation
+RadonPy info: Normal termination of psi4 RESP charge calculation. Elapsed time = 0:00:05.382180
+RadonPy info: Psi4 single point calculation is running...
+RadonPy info: Normal termination of psi4 single point calculation. Elapsed time = 0:00:06.682636
+RadonPy info: Psi4 polarizability calculation (finite field) is running...
+RadonPy info: Normal termination of psi4 polarizability calculation (finite field). Elapsed time = 0:01:28.985251
+RadonPy info: Psi4 optimization is running...
+	Previous geometry is closer to target in internal coordinates, so using that one.
+
+	Best geometry has RMS(Delta(q)) = 1.71e-06
+
+Optimizer: Optimization complete!
+RadonPy info: Normal termination of psi4 optimization. Elapsed time = 0:00:07.707449
+RadonPy info: Psi4 RESP charge calculation is running...
+RadonPy debug info: First stage of RESP charge calculation
+RadonPy debug info: Second stage of RESP charge calculation
+RadonPy info: Normal termination of psi4 RESP charge calculation. Elapsed time = 0:00:00.883358

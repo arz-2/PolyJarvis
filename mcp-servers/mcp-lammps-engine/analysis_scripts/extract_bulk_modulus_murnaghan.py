@@ -21,8 +21,8 @@ Fallback:
     linear regression of P vs ln V with method="linear_fallback" and a warning.
 
 Output:
-    bulk_modulus_murnaghan.json  — B0_GPa, B0_prime, V0_A3, r_squared, …
-    murnaghan_eos.png            — scatter of (V, P) with Murnaghan fit curve
+    mechanical.json      — B0_GPa, B0_prime, V0_A3, r_squared, …
+    murnaghan_eos.png    — scatter of (V, P) with Murnaghan fit curve
 
 Aliases for generate_run_summary.py compatibility:
     bulk_modulus_GPa  = B0_GPa
@@ -43,6 +43,7 @@ References:
 
 import argparse
 import json
+import math
 import sys
 import numpy as np
 from pathlib import Path
@@ -53,7 +54,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from plot_style import apply_style, save_fig
-from analysis_utils import parse_lammps_log
+from analysis_utils import parse_lammps_log, compute_tau_eff, effective_sample_size
 
 
 # ---------------------------------------------------------------------------
@@ -70,8 +71,38 @@ ATM_TO_GPA = ATM_TO_PA * PA_TO_GPA
 # ---------------------------------------------------------------------------
 
 
+def mean_production_temperature(log_path, eq_fraction):
+    """The temperature this pressure point was actually held at, over the same production
+    window extract_mean_volume averages the volume on. None when the log carries no Temp
+    column or cannot be read -- never raises, exactly like compute_fluctuation_cross_check.
+
+    Recorded because the modulus had no temperature anywhere in its output: the series ran at
+    whatever temp_K the deck was handed, and mechanical.json never said what that was, so a
+    run_summary could not tell a 300 K modulus from a 400 K one. Deliberately separate from
+    extract_mean_volume so that function's tested return signature stays put.
+    """
+    try:
+        df = parse_lammps_log(log_path)
+        temp_col = next((c for c in ["Temp", "temp", "Temperature"] if c in df.columns), None)
+        if temp_col is None:
+            return None
+        prod = df.iloc[int(len(df) * (1.0 - eq_fraction)):]
+        return float(prod[temp_col].mean()) if len(prod) else None
+    except Exception:
+        return None
+
+
 def extract_mean_volume(log_path, eq_fraction):
-    """Parse log, discard first (1-eq_fraction) rows, return mean Volume (Å³)."""
+    """Parse log, discard first (1-eq_fraction) rows, return mean Volume (Å³) plus
+    autocorrelation-corrected sampling stats for that point.
+
+    The naive std/sqrt(n) SEM ignores that consecutive NPT dumps are correlated, so it
+    understates the true uncertainty on the mean volume -- compute_tau_eff/
+    effective_sample_size (already used elsewhere in this pipeline) give the honest SEM,
+    std/sqrt(n_eff), instead. This is a per-point precision estimate, distinct from and
+    additional to fit_murnaghan()'s covariance-based B0_sem_GPa (residual misfit of the
+    means around the Murnaghan form, not sampling noise on any one mean).
+    """
     df = parse_lammps_log(log_path)
     vol_col = None
     for candidate in ["Volume", "Vol", "vol"]:
@@ -90,7 +121,13 @@ def extract_mean_volume(log_path, eq_fraction):
             f"Only {len(prod)} production rows in {log_path} after "
             f"discarding {n_discard} burn-in rows (eq_fraction={eq_fraction})."
         )
-    return float(prod[vol_col].mean()), float(prod[vol_col].std()), len(prod)
+    values = prod[vol_col].to_numpy(dtype=float)
+    v_mean, v_std, n_prod = float(values.mean()), float(values.std()), len(values)
+    tau_frames, _ = compute_tau_eff(values)
+    tau_frames = tau_frames if tau_frames > 0 else 1.0
+    n_eff = effective_sample_size(n_prod, tau_frames)
+    vol_sem_A3 = v_std / math.sqrt(max(1, n_eff))
+    return v_mean, v_std, n_prod, tau_frames, n_eff, vol_sem_A3
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +207,49 @@ def leave_one_out_refit(volumes_sorted, pressures_sorted, pressures_atm_sorted,
     return rows
 
 
+def assess_ladder_convergence(plateau_confirmed, loo_max_dB0_pct, b0_prime,
+                               loo_threshold_pct=10.0, b0_prime_band=(4.0, 20.0)):
+    """Promotes the plateau/leave-one-out/B0'-band diagnostics above from
+    warning-only text into a real, additive signal -- bm_convergence_verdict is
+    independent of bm_gate_verdict and never folds into its three admissibility
+    values (BM_REPORTABLE/BM_FALLBACK_DEFORM/BM_INADMISSIBLE); it answers a
+    different question (is the ladder's pressure RANGE wide enough to identify
+    B0', not is the fit physically admissible).
+
+    confidence="high" only when plateau_not_confirmed fires: that check is a
+    self-consistency property of the fit under trimming (does the next-larger
+    window move B0 by >5%?), not an accuracy claim that needs archive
+    calibration. loo_unstable and b0_prime_out_of_band are each individually
+    LOW confidence, even combined -- decision_policy.json's own
+    rationale_bm_admissibility is explicit that leave-one-out dB0 is "emitted
+    without a threshold... not yet shown to be pathological, and no archived or
+    live run carries leave_one_out_refits to calibrate against", and that
+    r_squared/B0' band checks likewise "stay a warning". Auto-widening the
+    ladder (spending real wall time) on either of those alone would contradict
+    that documented caution; a caller that only auto-remedies high-confidence
+    findings will correctly leave them for a human/agent to review instead.
+    """
+    reasons = []
+    if plateau_confirmed is False:
+        reasons.append("plateau_not_confirmed")
+    if loo_max_dB0_pct is not None and loo_max_dB0_pct > loo_threshold_pct:
+        reasons.append("loo_unstable")
+    if b0_prime is not None and not (b0_prime_band[0] <= b0_prime <= b0_prime_band[1]):
+        reasons.append("b0_prime_out_of_band")
+    if not reasons:
+        return {
+            "bm_convergence_verdict": "BM_LADDER_CONVERGED",
+            "bm_convergence_reasons": [],
+            "bm_convergence_confidence": "high",
+        }
+    confidence = "high" if "plateau_not_confirmed" in reasons else "low"
+    return {
+        "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+        "bm_convergence_reasons": reasons,
+        "bm_convergence_confidence": confidence,
+    }
+
+
 def detect_anomalous_points(volumes_sorted, pressures_atm_sorted, vol_stds_sorted):
     """Flag pressure points showing cavitation/instability signatures, using only
     data already computed for the fit (no extra simulation cost):
@@ -224,7 +304,7 @@ def detect_anomalous_points(volumes_sorted, pressures_atm_sorted, vol_stds_sorte
 
 
 def select_stable_window(volumes_sorted, pressures_sorted_GPa, pressures_atm_sorted,
-                          anomalous_flags, min_points=5, b0_plateau_pct=5.0,
+                          anomalous_flags, min_points=4, b0_plateau_pct=5.0,
                           r2_acceptable=0.999, r2_improvement_eps=1e-4):
     """Search trimmed sub-windows of the full sorted ladder (dropping points from
     the tension/low-pressure end first, then the compression/high-pressure end --
@@ -258,6 +338,21 @@ def select_stable_window(volumes_sorted, pressures_sorted_GPa, pressures_atm_sor
     genuinely good points should barely move the answer).
     """
     n = len(volumes_sorted)
+    # min_points is the FLOOR on a fitted window, and Murnaghan has three free
+    # parameters (B0, B0_prime, V0), so 4 points is the smallest window carrying any
+    # residual degree of freedom -- the same floor detect_anomalous_points uses for its
+    # dV/dP heuristic (`if n >= 4` above).
+    #
+    # It was 5 until 2026-09-10, which silently disabled this entire function for the
+    # ladder size every run in the benchmark uses: with n=5, max_trim = n - min_points = 0,
+    # so the untrimmed window was the ONLY candidate ever fitted and both "no trim improved
+    # r_squared" and plateau_confirmed=True were vacuous. sPVC_1 is what that cost -- its
+    # -1000 atm point had cavitated (relaxation 169 frames vs 2.9-4.9, n_eff 29 vs 510-869,
+    # |dV/dP| 3.97 vs a 1.17 median) and the untrimmed r_squared of 0.998617 sits BELOW
+    # r2_acceptable, so the search below would have run and found the trim -- it just had
+    # nothing to search. Dropping that point moves B0 2.5446 -> 3.1975 GPa and brings the
+    # Murnaghan fit within 3% of the independent fluctuation K, against 22% untrimmed.
+    #
     # Never require more points than exist -- with only 3-4 points to begin with
     # (the script's own minimum), the full window is the only option and must
     # still be evaluated on its own already-known fit, not marked unconverged.
@@ -335,11 +430,22 @@ def select_stable_window(volumes_sorted, pressures_sorted_GPa, pressures_atm_sor
     if not improved:
         selected = dict(full_window) if full_window is not None else dict(
             sorted(good, key=lambda c: -(c["r_squared"] if c["r_squared"] is not None else -1))[0])
-        selected["plateau_confirmed"] = True
-        selected["selection_note"] = (
-            f"No trim improved r_squared over the untrimmed fit (r_squared={baseline_r2:.5f}) "
-            "-- keeping all points."
-        )
+        if max_trim == 0:
+            # No trimmed window EXISTS at this ladder size, so nothing was searched. Saying
+            # "no trim improved the fit" here would report a search that never ran, and
+            # plateau_confirmed would assert a stability nothing tested. Report unknown.
+            selected["plateau_confirmed"] = None
+            selected["selection_note"] = (
+                f"Ladder has {n} points and min_points={min_points}, so no trimmed window "
+                "exists -- the untrimmed fit is the only candidate. This is NOT evidence of "
+                "a stable window; plateau_confirmed is unknown, not True."
+            )
+        else:
+            selected["plateau_confirmed"] = True
+            selected["selection_note"] = (
+                f"No trim improved r_squared over the untrimmed fit "
+                f"(r_squared={baseline_r2:.5f}) -- keeping all points."
+            )
         return selected
 
     improved_excluding_flags = [c for c in improved if flagged_idx <= c["excluded_idx"]]
@@ -483,13 +589,22 @@ def main():
     volumes_A3 = []
     vol_stds = []
     n_prod_list = []
+    tau_frames_list = []
+    n_eff_list = []
+    vol_sem_list = []
+    temps_K = []
     errors = []
     for log_path, p_atm in zip(args.log_files, args.pressures_atm):
         try:
-            v_mean, v_std, n_prod = extract_mean_volume(log_path, args.eq_fraction)
+            v_mean, v_std, n_prod, tau_frames, n_eff, vol_sem = extract_mean_volume(
+                log_path, args.eq_fraction)
             volumes_A3.append(v_mean)
             vol_stds.append(v_std)
             n_prod_list.append(n_prod)
+            tau_frames_list.append(tau_frames)
+            n_eff_list.append(n_eff)
+            vol_sem_list.append(vol_sem)
+            temps_K.append(mean_production_temperature(log_path, args.eq_fraction))
         except Exception as e:
             errors.append(f"{log_path} @ {p_atm} atm: {e}")
 
@@ -510,6 +625,9 @@ def main():
     log_files_sorted = [args.log_files[i] for i in order]
     n_prod_sorted = [n_prod_list[i] for i in order]
     vol_stds_sorted = [vol_stds[i] for i in order]
+    tau_frames_sorted = [tau_frames_list[i] for i in order]
+    n_eff_sorted = [n_eff_list[i] for i in order]
+    vol_sem_sorted = [vol_sem_list[i] for i in order]
 
     volume_monotonic = all(
         pressures_sorted[i + 1] > pressures_sorted[i]
@@ -559,7 +677,7 @@ def main():
         B0_GPa, r2 = fit_linear_fallback(volumes_sorted, pressures_sorted)
         B0_prime = None
         V0_A3 = None
-        B0_sem_GPa = None
+        B0_sem_GPa = None  # noqa: F841 -- no SEM for the linear fallback; never reported
         method = "linear_fallback"
 
     # -------------------------------------------------------------------
@@ -567,6 +685,7 @@ def main():
     # -------------------------------------------------------------------
     loo_results = None
     loo_n_converged = None
+    loo_max_dB0_pct = None
     if converged:
         loo_results = leave_one_out_refit(
             volumes_sorted, pressures_sorted, pressures_atm_sorted, B0_GPa, B0_prime
@@ -575,11 +694,11 @@ def main():
         deltas = [abs(r["dB0_GPa_vs_baseline"]) for r in loo_results
                   if r["dB0_GPa_vs_baseline"] is not None]
         if deltas and B0_GPa:
-            max_dB0_pct = max(deltas) / abs(B0_GPa) * 100
-            if max_dB0_pct > 10.0:
+            loo_max_dB0_pct = max(deltas) / abs(B0_GPa) * 100
+            if loo_max_dB0_pct > 10.0:
                 warnings.append(
                     f"Leave-one-out refit: dropping one pressure point shifts B0 by up to "
-                    f"{max_dB0_pct:.1f}% (>10%) — the fit is not robust to a single point; "
+                    f"{loo_max_dB0_pct:.1f}% (>10%) — the fit is not robust to a single point; "
                     "consider widening the pressure range."
                 )
 
@@ -612,6 +731,34 @@ def main():
             "excluded_points and the murnaghan_eos.png plot."
         )
 
+    # Leave-one-out, re-scoped to the points the REPORTED fit actually uses.
+    #
+    # LOO above runs on the untrimmed ladder, and that is what lets it FIND a contaminated
+    # point at all -- keep it. But the convergence verdict below is a statement about the fit
+    # being reported, and that fit has already had the bad point removed. Counting the excluded
+    # point's own dB0 against it reports the screening's SUCCESS as the fit's instability.
+    #
+    # sPVC_1 (2026-09-10) is the worked example: its -1000 atm point had cavitated (relaxation
+    # 169 frames against 2.9-4.9, n_eff 29 against 510-869). Dropping it moved B0 by 25.7%,
+    # raised r_squared 0.998617 -> 0.999887, and brought the Murnaghan fit within 2.9% of the
+    # independent fluctuation modulus instead of 22% out. The screening correctly excluded it --
+    # and the ladder was still stamped BM_LADDER_NOT_CONVERGED / loo_unstable on the strength of
+    # that same 25.7%, i.e. on the evidence that justified the trim.
+    #
+    # Caveat kept explicit rather than papered over: each retained-point refit still CONTAINS the
+    # excluded point, and the baseline is the untrimmed B0, so this is not a clean LOO of the
+    # trimmed window (with 3 free parameters, a 4-point window's LOO has no residual degrees of
+    # freedom at all). It answers the weaker but well-posed question actually being asked: among
+    # the points the reported fit keeps, does any single one dominate the answer.
+    excluded_pressures = {pressures_atm_sorted[i] for i in excluded_idx}
+    loo_max_dB0_pct_retained = None
+    if loo_results and B0_GPa:
+        retained_deltas = [abs(r["dB0_GPa_vs_baseline"]) for r in loo_results
+                           if r.get("dB0_GPa_vs_baseline") is not None
+                           and r.get("dropped_pressure_atm") not in excluded_pressures]
+        if retained_deltas:
+            loo_max_dB0_pct_retained = max(retained_deltas) / abs(B0_GPa) * 100
+
     # Primary (screened) fit values -- these become the top-level result.
     primary_converged = window["converged"]
     primary_B0_GPa = window["B0_GPa"]
@@ -620,6 +767,16 @@ def main():
     primary_r2 = window["r_squared"]
     primary_B0_sem_GPa = window.get("B0_sem_GPa")
     primary_method = "murnaghan" if primary_converged else method
+
+    if primary_converged:
+        convergence = assess_ladder_convergence(
+            window.get("plateau_confirmed"),
+            loo_max_dB0_pct if loo_max_dB0_pct_retained is None else loo_max_dB0_pct_retained,
+            primary_B0_prime
+        )
+    else:
+        convergence = {"bm_convergence_verdict": None, "bm_convergence_reasons": [],
+                       "bm_convergence_confidence": None}
 
     # -------------------------------------------------------------------
     # 2d. Fluctuation cross-check (optional) -- compares against the SELECTED
@@ -691,9 +848,17 @@ def main():
     # (the screened, primary answer); all_points_fit preserves the original
     # unscreened fit for continuity/comparison/audit.
     # -------------------------------------------------------------------
+    # The temperature the series was actually held at. A spread means the points were not
+    # isothermal, so the EOS fit mixes temperatures -- surfaced rather than averaged away.
+    _measured_T = [t for t in temps_K if t is not None]
+    series_temp_K = round(sum(_measured_T) / len(_measured_T), 2) if _measured_T else None
+    series_temp_spread_K = round(max(_measured_T) - min(_measured_T), 2) if _measured_T else None
+
     result = {
         "status": "success",
         "method": primary_method,
+        "temperature_K": series_temp_K,
+        "temperature_spread_K": series_temp_spread_K,
         "fit_converged": primary_converged,
         "bm_gate_verdict": bm_gate_verdict,
         "bm_gate_reasons": gate_reasons,
@@ -713,11 +878,25 @@ def main():
         "vol_stds_A3": [round(vol_stds_sorted[i], 2) for i in range(len(volumes_sorted)) if i not in excluded_idx],
         "n_prod_rows": n_prod_sorted,
         "log_files": log_files_sorted,
+        # Autocorrelation-corrected per-point volume SEM (D-07) -- full sorted order, NOT
+        # filtered by excluded_idx: a resample/sampling-factor decision is exactly about the
+        # flagged/excluded points, so their SEM must not be dropped here. Distinct from
+        # B0_sem_GPa above (fit covariance, not sampling precision) -- see extract_mean_volume.
+        "tau_frames_per_point": [round(t, 3) for t in tau_frames_sorted],
+        "n_eff_per_point": n_eff_sorted,
+        "vol_sem_A3_per_point": [round(s, 4) for s in vol_sem_sorted],
         "eq_fraction": args.eq_fraction,
         "output_dir": str(output_dir),
         "volume_monotonic": window["volume_monotonic"],
         "loo_results": loo_results,
         "loo_n_converged": loo_n_converged,
+        "loo_max_dB0_pct": round(loo_max_dB0_pct, 2) if loo_max_dB0_pct is not None else None,
+        # What the convergence verdict is actually computed on when screening trimmed a point.
+        "loo_max_dB0_pct_retained": (round(loo_max_dB0_pct_retained, 2)
+                                     if loo_max_dB0_pct_retained is not None else None),
+        "bm_convergence_verdict": convergence["bm_convergence_verdict"],
+        "bm_convergence_reasons": convergence["bm_convergence_reasons"],
+        "bm_convergence_confidence": convergence["bm_convergence_confidence"],
         "fluctuation_bulk_modulus_GPa": round(fluctuation_bulk_modulus_GPa, 4)
             if fluctuation_bulk_modulus_GPa is not None else None,
         "fluctuation_divergence_pct": round(fluctuation_divergence_pct, 2)
@@ -762,7 +941,7 @@ def main():
     # -------------------------------------------------------------------
     # 5. Save JSON
     # -------------------------------------------------------------------
-    summary_path = str(output_dir / "bulk_modulus_murnaghan.json")
+    summary_path = str(output_dir / "mechanical.json")
     with open(summary_path, "w") as jf:
         json.dump(result, jf, indent=2)
     result["summary_json"] = summary_path

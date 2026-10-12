@@ -1,0 +1,64 @@
+{
+  "artifacts": [],
+  "attempt_id": "attempt-0001",
+  "findings": [
+    {
+      "code": "PROCESS_FAILED",
+      "confidence": "high",
+      "details": {
+        "error": "GPU claim failed for PLLA_3 (need=1): {'error': 'insufficient_free_gpus', 'need': 1, 'available': []}"
+      },
+      "remedy_id": null,
+      "severity": "blocking",
+      "stage": "equilibration"
+    }
+  ],
+  "finished_at": "2026-09-11T19:42:06.348353+00:00",
+  "input_hash": "5d4b59408cbf3301bbef0dc7343f37c912627c60d9c58aa9625f08ca570990ea",
+  "outputs": {},
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 620.0,
+    "T_melt_hold_K": 620.0,
+    "T_workflow_K": 620.0,
+    "annealing_T_high_K": 700.0,
+    "backbone_types": [
+      1,
+      2,
+      3,
+      6,
+      7
+    ],
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.15,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.63,
+    "dp_typical": 70,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 967838819,
+    "experimental_density_gcm3": 1.248,
+    "experimental_tg_K": 331.0,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_min_steps_per_T": 200000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 25364483
+  },
+  "stage": "equilibration",
+  "status": "failed"
+}

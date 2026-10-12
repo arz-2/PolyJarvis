@@ -1,0 +1,38 @@
+LAMMPS (22 Jul 2025 - Update 3)
+KOKKOS mode with Kokkos version 4.6.2 is enabled
+  will use up to 1 GPU(s) per node
+  using 1 OpenMP thread(s) per MPI task
+package kokkos
+package kokkos
+# ============================================================
+# PolyJarvis LAMMPS Engine - Tg Sweep Single Step Template
+# ============================================================
+# Stage: One NPT temperature step in a glass transition sweep
+# Purpose: Run short NPT at a single T, extract equilibrium density
+#          Caller chains many of these for the full T sweep.
+#
+# Design: No restart files (each step is short and independent).
+#         GPU-safe when restart is disabled.
+#         Reads from previous step's WRITE_DATA_FILE.
+#
+# Tunable parameters:
+#   DATA_FILE        - equilibrated cell from previous step
+#   READ_COMMAND     - "read_data" or "read_restart"
+#   LOG_FILE, LOG_APPEND
+#   DUMP_FILE, LAST_DUMP_FILE, WRITE_DATA_FILE
+#   PAIR_STYLE_BLOCK
+#   BOND_STYLE, ANGLE_STYLE, DIHEDRAL_STYLE, IMPROPER_STYLE
+#   GPU_PACKAGE
+#   T_TARGET         - target temperature for this step (K)
+#   T_DAMP           - thermostat damping (fs)
+#   P_TARGET         - target pressure (atm), typically 1
+#   P_DAMP           - barostat damping (fs)
+#   TIMESTEP, N_STEPS
+#   THERMO_FREQ, DUMP_FREQ
+#   SHAKE_BLOCK, UNSHAKE_BLOCK
+#   INIT_VELOCITY_BLOCK - rescale velocities to T_TARGET
+#   WRITE_PER_T_DUMP / PER_T_DUMP_FILE - optional one-frame snapshot appended to a shared
+#       multi-frame dump (one frame per temperature across the whole sweep's chained calls)
+# ============================================================
+
+log tg_sweep.log append

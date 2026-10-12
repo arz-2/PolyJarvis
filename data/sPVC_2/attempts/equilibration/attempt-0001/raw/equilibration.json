@@ -1,0 +1,358 @@
+{
+  "status": "success",
+  "overall_pass": true,
+  "thermo": {
+    "equilibrated": true,
+    "density_drift": {
+      "pass": true,
+      "drift_pct": 0.0603,
+      "p_value": 0.4599,
+      "p_value_eff": 0.7882,
+      "tau_frames": 7.54,
+      "n_eff": 265
+    },
+    "energy_drift": {
+      "pass": true,
+      "drift_pct": 0.1345,
+      "p_value": 0.3302,
+      "p_value_eff": 0.3302,
+      "tau_frames": 1.0,
+      "n_eff": 2001
+    },
+    "energy_component_drift": {
+      "components": {
+        "bond": {
+          "drift_pct": 0.2673,
+          "p_value": 0.0847,
+          "p_value_naive": 0.0844,
+          "tau_frames": 1.0,
+          "n_eff": 1997,
+          "criterion": "drift_pct",
+          "threshold": 1.0,
+          "pass": true
+        },
+        "angle": {
+          "drift_pct": 0.1664,
+          "p_value": 0.3845,
+          "p_value_naive": 0.1787,
+          "tau_frames": 2.39,
+          "n_eff": 837,
+          "criterion": "drift_pct",
+          "threshold": 1.0,
+          "pass": true
+        },
+        "dihedral": {
+          "drift_pct": 0.0834,
+          "p_value": 0.487,
+          "p_value_naive": 0.2867,
+          "tau_frames": 2.35,
+          "n_eff": 852,
+          "criterion": "drift_pct",
+          "threshold": 1.0,
+          "pass": true
+        },
+        "vdw": {
+          "drift_pct": 0.236,
+          "p_value": 0.9345,
+          "p_value_naive": 0.8389,
+          "tau_frames": 6.1,
+          "n_eff": 328,
+          "drift_sigma": 0.0157,
+          "sigma": 51.4566,
+          "criterion": "drift_sigma",
+          "threshold": 1.0,
+          "pass": true
+        },
+        "coul": {
+          "drift_pct": 0.0496,
+          "p_value": 0.6828,
+          "p_value_naive": 0.1737,
+          "tau_frames": 11.02,
+          "n_eff": 181,
+          "drift_sigma": 0.1054,
+          "sigma": 9.7799,
+          "criterion": "drift_sigma",
+          "threshold": 1.0,
+          "pass": true
+        },
+        "kspace": {
+          "drift_pct": 0.0301,
+          "p_value": 0.5407,
+          "p_value_naive": 0.0593,
+          "tau_frames": 9.48,
+          "n_eff": 211,
+          "criterion": "drift_pct",
+          "threshold": 1.0,
+          "pass": true
+        }
+      },
+      "pass": true
+    },
+    "density_sem": {
+      "pass": true,
+      "sem_pct": 0.0744
+    },
+    "energy_sem": {
+      "pass": true,
+      "sem_pct": 0.0654
+    },
+    "tau_eff_density_fraction": 0.0037680598734880933,
+    "n_eff_density": {
+      "pass": true,
+      "n_eff": 265,
+      "n_eff_min": 20
+    },
+    "residual_stress": {
+      "available": true,
+      "dev_atm": {
+        "Pxx": 11.3,
+        "Pyy": -5.4,
+        "Pzz": -5.9
+      },
+      "von_mises_atm": 16.9,
+      "max_abs_dev_atm": 11.3,
+      "z_max": 0.56,
+      "resolved": false,
+      "mean_pressure_atm": 22.3
+    },
+    "meta": {
+      "n_total_rows": 4001,
+      "n_production_rows": 2001,
+      "T_mean": 571.05
+    }
+  },
+  "chain": {
+    "rg": {
+      "pass": true,
+      "cv": 0.1798,
+      "mean_Rg_A": 20.293,
+      "mean_Rg2_A2": 429.38,
+      "rg_spread_flag": false,
+      "C_inf": null,
+      "n_chains": 10,
+      "frames_analysed": 3951
+    },
+    "ree": {
+      "available": true,
+      "mean_R_ee_A": 49.38,
+      "std_R_ee_A": 20.37,
+      "n_chains": 10,
+      "end_to_end_distribution_png": "failed: [Errno 2] No such file or directory: '/home/arz2/PolyJarvis_v2/data/sPVC_2/graphs/end_to_end_distribution.png'"
+    },
+    "msid": {
+      "available": true,
+      "slope": 1.277,
+      "r2": 0.9828,
+      "gaussian_pass": false,
+      "n_separations": 81,
+      "s_split": 28,
+      "small_intermediate": {
+        "available": true,
+        "slope": 1.539,
+        "r2": 0.9959,
+        "gaussian_pass": false,
+        "n_separations": 27,
+        "s_range": [
+          2,
+          28
+        ]
+      },
+      "large_s": {
+        "available": true,
+        "slope": 0.962,
+        "r2": 0.9993,
+        "gaussian_pass": true,
+        "n_separations": 54,
+        "s_range": [
+          29,
+          82
+        ]
+      }
+    },
+    "ct": {
+      "available": true,
+      "tau_relax_ps": 9174.3,
+      "tau_ps": 6254.7,
+      "beta": 0.612,
+      "decay_fraction_at_end": 0.423,
+      "trajectory_ps": 4951.0,
+      "pass": true
+    },
+    "msd": {
+      "alpha": 0.294,
+      "alpha_r2": 0.9628,
+      "diffusion_regime": "strongly sub-diffusive (see kinetic_trap_flag for trap verdict)",
+      "msd_max_A2": 1017.18,
+      "kinetic_trap_flag": false,
+      "msd_over_rg2": 3.257,
+      "msd_over_ree2": 0.7849
+    },
+    "torsion": {
+      "available": true,
+      "n_blocks": 6,
+      "js_divergence_series": [
+        3e-05,
+        6e-05,
+        3e-05,
+        8e-05,
+        6e-05
+      ],
+      "js_divergence_last": 6e-05,
+      "js_threshold": 0.05,
+      "stable": true
+    },
+    "backbone_type_coverage": 1.0
+  },
+  "spatial": {
+    "p2": {
+      "pass": true,
+      "p2_mean": 0.022,
+      "p2_std": 0.0081,
+      "p2_max": 0.0523,
+      "ordered_flag": false
+    },
+    "density_homogeneity": {
+      "pass": true,
+      "verdict": "HOMOG_PASS",
+      "cv_mean": 0.22,
+      "cv_max": 0.2579,
+      "cv_signal": 0.0,
+      "cv_signal_max": 0.11,
+      "grid_n": 6,
+      "atoms_per_voxel": 22.9,
+      "poisson_cv": 0.323,
+      "mass_dispersion": 1.545,
+      "heterogeneous_flag": false
+    },
+    "finite_size": {
+      "available": true,
+      "pass": true,
+      "self_image_advisory": false,
+      "verdict": "SIZE_PASS",
+      "L_min_A": 41.8,
+      "cutoff_A": 9.5,
+      "L_over_2cutoff": 2.2,
+      "L_over_2Rg": 1.03,
+      "L_over_Ree": 0.846,
+      "ree_self_image_flag": true,
+      "min_image_evaluated": true,
+      "box_A": [
+        41.8,
+        41.8,
+        41.8
+      ],
+      "graded_box": "actual_equilibrated"
+    }
+  },
+  "warnings": [
+    "MSID slope = 1.277 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension",
+    "C(t) partially decayed: 42% decayed at end of trajectory (\u03c4_relax=9174.3 ps vs T_traj=4951.0 ps)"
+  ],
+  "d05_markdown": "## D-05 CONVERGENCE DETAIL\n`check_equilibration_comprehensive` \u00b7 T=571.05 K \u00b7 3951 frames analysed (skip=50) \u00b7 2026-09-10 22:41\n\n**Overall: PASS**\n\n### A. Thermo convergence\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Density drift | 0.0603% (p=0.4599) | <1%, p<0.01 | PASS |\n| Energy drift | 0.1345% (p=0.3302) | <1%, p<0.01 | PASS |\n| Energy component drift | bond=0.2673%, angle=0.1664%, dihedral=0.0834%, vdw=0.236%, coul=0.0496%, kspace=0.0301% | <1%, p<0.01 each | PASS |\n| Density block-SEM | 0.0744% | <1% | PASS |\n| Energy block-SEM | 0.0654% | <1% | PASS |\n| \u03c4_eff density | 0.4% of trajectory | \u2014 | OK |\n| Independent density samples | 265 | \u226520 | PASS |\n| Residual deviatoric stress | 16.9 atm von Mises (max |dev| 11.3 atm, z=0.56, not resolved (z<2)) | \u2014 | INFO |\n\n### B. Chain conformation\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| Rg CV (chain\u2013chain) | 18.0% | <30% | PASS |\n| MSID slope (combined) | 1.277 (R\u00b2=0.9828) | 1.0 \u00b120% | \u26a0 non-Gaussian |\n| MSID slope (large-s, n=[29, 82]) | 0.962 (R\u00b2=0.9993) | 1.0 \u00b120% | OK |\n| Torsion JS-divergence (last block-pair) | 6e-05 | \u22640.05 | OK (stable) |\n| C(t) \u03c4_relax | 9174.3 ps (42% decayed) | \u2014 | \u26a0 partial |\n| MSD kinetic trap | no (\u03b1=0.294, MSD=1017.18 \u00c5\u00b2>>Rg\u00b2=429.38) | \u2014 | OK |\n| R_ee mean \u00b1 std | 49.38 \u00b1 20.37 \u00c5 (N=10 chains) | \u2014 | INFO |\n\n### C. Spatial / packing\n| Check | Value | Threshold | Result |\n|-------|-------|-----------|--------|\n| P2 nematic order | 0.022 \u00b1 0.0081 | <0.10 | PASS |\n| Finite size | L=41.8 \u00c5 \u00b7 L/2r_cut=2.2 \u00b7 L/2Rg=1.03 \u00b7 L/R_ee=0.846 | \u22651.0 | PASS |\n| Density homogeneity CV (signal) | 0.0% (raw 22.0% \u2212 Poisson 32.3%; 6\u00b3 grid, 22.9 atoms/voxel) | <11% | PASS |\n\n**Warnings:** MSID slope = 1.277 (expected 1.0 \u00b120% for Gaussian chain) \u2014 possible chain collapse or extension; C(t) partially decayed: 42% decayed at end of trajectory (\u03c4_relax=9174.3 ps vs T_traj=4951.0 ps)",
+  "log_file": "/home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.log",
+  "dump_file": "/home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_melt_hold.dump",
+  "data_file": "/home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data",
+  "struct_dump_file": "/home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.dump",
+  "struct_data_file": "/home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data",
+  "backbone_types": [
+    1,
+    2,
+    3
+  ],
+  "timestamp": "2026-09-10 22:41",
+  "density": {
+    "status": "success",
+    "plateau_density_mean": 1.171309,
+    "plateau_density_std": 0.012329,
+    "plateau_density_sem": 0.000276,
+    "plateau_n_points": 2001,
+    "plateau_fraction": 1.0,
+    "production_n_points": 2001,
+    "total_n_points": 4001,
+    "eq_fraction_used": 0.5,
+    "naive_mean": 1.171309,
+    "naive_std": 0.012329,
+    "rolling_mean_abs_deriv": 2.693e-05,
+    "tau_eff_frames": 7.54,
+    "tau_eff_fraction": 0.003768,
+    "n_effective_samples": 265,
+    "block_sem_density": 0.00087165,
+    "drift_slope": -3.527e-07,
+    "drift_pct": 0.0603,
+    "drift_p_value": 0.4599393820158109,
+    "plateau_equilibrated": true,
+    "target_temp_K": 571.0,
+    "temp_tolerance_K": 50.0,
+    "actual_T_mean": 571.05,
+    "plateau_step_range": [
+      2000000,
+      4000000
+    ]
+  },
+  "gate": {
+    "regime": "melt",
+    "applicable_clause": "require_melt",
+    "binding_gates": {
+      "density_drift": true,
+      "energy_drift": true,
+      "density_sem": true,
+      "energy_sem": true,
+      "energy_component_drift": true,
+      "n_eff_density": true,
+      "rg": true,
+      "p2": true,
+      "density_homogeneity": true,
+      "finite_size": true,
+      "torsion": true,
+      "chain_displacement": true
+    },
+    "unmeasured_binding_gates": [],
+    "advisory_gates": {
+      "residual_stress": true,
+      "msd_not_trapped": true,
+      "msid_gaussian": false
+    },
+    "density_value_binding": "n/a",
+    "cooling_verdict": null,
+    "cooling_extrapolation_reliable": null,
+    "homogeneity_verdict": "HOMOG_PASS",
+    "finite_size_verdict": "SIZE_PASS",
+    "finite_size": {
+      "available": true,
+      "pass": true,
+      "self_image_advisory": false,
+      "verdict": "SIZE_PASS",
+      "L_min_A": 41.8,
+      "cutoff_A": 9.5,
+      "L_over_2cutoff": 2.2,
+      "L_over_2Rg": 1.03,
+      "L_over_Ree": 0.846,
+      "ree_self_image_flag": true,
+      "min_image_evaluated": true,
+      "box_A": [
+        41.8,
+        41.8,
+        41.8
+      ],
+      "graded_box": "actual_equilibrated"
+    },
+    "finite_size_min_image_unarmed": false,
+    "residual_stress": {
+      "available": true,
+      "dev_atm": {
+        "Pxx": 11.3,
+        "Pyy": -5.4,
+        "Pzz": -5.9
+      },
+      "von_mises_atm": 16.9,
+      "max_abs_dev_atm": 11.3,
+      "z_max": 0.56,
+      "resolved": false,
+      "mean_pressure_atm": 22.3
+    },
+    "failing_binding_gates": [],
+    "verdict": "PASS",
+    "remedy": null,
+    "remedy_confidence": "high"
+  }
+}

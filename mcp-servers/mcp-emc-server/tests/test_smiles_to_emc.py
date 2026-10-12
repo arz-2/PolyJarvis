@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from smiles_to_emc import make_esh
+from smiles_to_emc import make_esh, strip_bond_stereo
 
 # ---------------------------------------------------------------------------
 # Representative SMILES for the five PCFF target classes
@@ -126,15 +126,43 @@ class TestMakeEshStructure:
         s = sections(esh)
         assert "pcff" in s["OPTIONS"]
 
+    def test_pcff_uses_explicit_h_cap(self):
+        # non-UA (all-atom) fields have an explicit H atom type -- *[H] is valid
+        esh = make_esh("*CC*", field="pcff")
+        assert "cap      *[H]" in esh
+
+    def test_trappe_ua_uses_methyl_cap_not_explicit_h(self):
+        # UA hydrogen is implicit -- *[H] has no UA atom type and EMC aborts with
+        # "Missing rules." on it (see is_ua in make_esh)
+        esh = make_esh("*CC*", field="trappe/2014/trappe-ua")
+        s = sections(esh)
+        assert "*[H]" not in s["GROUPS"]
+        assert "cap      *C" in esh
+
+    def test_opls_ua_uses_methyl_cap_not_explicit_h(self):
+        # OPLS-UA field id has no "trappe" substring but still ends in "-ua" -- must
+        # get the same UA-correct cap as TraPPE-UA, or every build fails with
+        # "Missing rules" (regression: this previously fell through to the *[H]
+        # all-atom cap because the old detection only matched "trappe" in field.lower())
+        esh = make_esh("*CC*", field="opls/2024/opls-ua")
+        s = sections(esh)
+        assert "*[H]" not in s["GROUPS"]
+        assert "cap      *C" in esh
+
     def test_density_in_options(self):
         esh = make_esh("*CC*", density=1.2)
         s = sections(esh)
         assert "1.200000" in s["OPTIONS"]
 
-    def test_ntotal_in_options(self):
-        esh = make_esh("*CC*", ntotal=5000)
-        s = sections(esh)
-        assert "5000" in s["OPTIONS"]
+    def test_ntotal_is_emitted_but_inert(self):
+        """ntotal stopped being a parameter 2026-09-02 -- "number true" is now always on, so
+        EMC reads the ITEM CLUSTERS fraction as a literal chain count and ignores ntotal. The
+        key is still emitted so the OPTIONS block stays well-formed, at a fixed value that
+        cannot vary per call."""
+        from smiles_to_emc import _ESH_NTOTAL_INERT
+        assert str(_ESH_NTOTAL_INERT) in sections(make_esh("*CC*"))["OPTIONS"]
+        assert sections(make_esh("*CC*", nchains=7))["OPTIONS"] == \
+            sections(make_esh("*CC*", nchains=7))["OPTIONS"]
 
     def test_output_name_as_esh_filename(self):
         # output name is derived from the .esh filename passed to emc_setup.pl,
@@ -158,20 +186,20 @@ class TestMakeEshStructure:
 
 
 class TestMakeEshChainCount:
-    """nchains>0 selects EMC 'number' mode (exact chain count); otherwise the
-    ntotal-driven default sizing is used."""
+    """The chain count is always exact: EMC 'number' mode is unconditional. The
+    ntotal-driven sizing path was removed 2026-09-02 so that D-04_system_size is the only
+    thing that decides how big a cell is -- a second, implicit sizing route is exactly the
+    kind of thing that silently decides a run."""
 
-    def test_default_no_number_mode(self):
-        # nchains defaults to 0 → no 'number' option, cluster fraction stays 1
-        esh = make_esh("*CC*")
-        s = sections(esh)
-        assert "number" not in s["OPTIONS"].lower().split()
-        assert "poly    alternate    1" in s["CLUSTERS"]
+    def test_number_mode_is_unconditional(self):
+        s = sections(make_esh("*CC*"))
+        opts = s["OPTIONS"].split()
+        assert "number" in opts and opts[opts.index("number") + 1] == "true"
 
-    def test_nchains_zero_no_number_mode(self):
-        esh = make_esh("*CC*", nchains=0)
-        s = sections(esh)
-        assert "number" not in s["OPTIONS"].lower().split()
+    def test_nchains_below_one_is_refused(self):
+        for bad in (0, -1):
+            with pytest.raises(ValueError, match="nchains must be >= 1"):
+                make_esh("*CC*", nchains=bad)
 
     def test_nchains_enables_number_mode(self):
         esh = make_esh("*CC*", nchains=20)
@@ -237,3 +265,36 @@ class TestPerClass:
         assert f"{case['density']:.6f}" in s["OPTIONS"], (
             f"{case['polymer']}: density={case['density']} not in OPTIONS"
         )
+
+
+# ---------------------------------------------------------------------------
+# cis/trans bond stereo: "/" terminates a comment in the .esh grammar
+# ---------------------------------------------------------------------------
+
+class TestBondStereo:
+    """24 of the 982 PI1070 polymers died here, across 4 classes -- not on chemistry EMC
+    could not represent, but on a "/" the .esh parser read as a comment delimiter."""
+
+    @pytest.mark.parametrize("raw,clean", [
+        ("*CC/C=C/*",     "*CCC=C*"),
+        ("*/C=C\\CC*",    "*C=CCC*"),
+        ("*CC(*)c1ccccc1", "*CC(*)c1ccccc1"),
+    ])
+    def test_only_bond_stereo_is_removed(self, raw, clean):
+        assert strip_bond_stereo(raw) == (clean, raw != clean)
+
+    def test_stereocentres_are_left_alone(self):
+        """EMC DOES honour @/@@ -- that is how tacticity reaches a built cell."""
+        iso = "*C[C@@H](*)C"
+        assert strip_bond_stereo(iso) == (iso, False)
+
+    def test_the_esh_carries_no_comment_delimiter(self):
+        esh = make_esh("*CC/C=C/*", field="trappe-ua")
+        assert "/" not in esh.split("ITEM GROUPS")[1].split("ITEM END")[0]
+        assert "*CCC=C*" in esh
+
+    def test_star_count_is_checked_after_stripping(self):
+        """The check must see the stripped string: "/" never carries a * but a future
+        normalisation might, and a mismatch here would report the wrong SMILES."""
+        with pytest.raises(ValueError, match="exactly 2"):
+            make_esh("*CC/C=C/CC")

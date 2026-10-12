@@ -1,5 +1,5 @@
 """
-import_tg.py — load Polymer Handbook 4th ed. Tg data into polymer_db.sqlite.
+import_tg.py — load Polymer Handbook 4th ed. Tg data into experimental_db.sqlite.
 
 Source: literature/Polymer_Handbook/tg_all.csv
 Format: semicolon-delimited, columns:
@@ -12,7 +12,6 @@ Run from the project root:
 import csv
 import os
 import re
-import sqlite3
 import sys
 
 _HERE = os.path.dirname(__file__)

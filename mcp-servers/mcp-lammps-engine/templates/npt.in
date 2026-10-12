@@ -20,6 +20,12 @@
 #   DUMP_FILE        - trajectory filename
 #   LAST_DUMP_FILE   - final snapshot filename
 #   WRITE_DATA_FILE  - output .data filename
+#   WRITE_RESTART_FILE - unconditional final-state restart file, written every run
+#                        (independent of periodic RESTART_BLOCK checkpointing) so a
+#                        continuation call always has a definitive state to read from
+#   DUMP_APPEND_BLOCK - "dump_modify dump_npt append yes" or empty -- set when this
+#                        run continues (via READ_COMMAND=read_restart) a trajectory
+#                        started by an earlier run into the SAME DUMP_FILE/LOG_FILE
 #   RESTART_FILE_1/2 - restart checkpoint filenames
 #   RESTART_FREQ     - steps between restart writes
 #   RESTART_BLOCK    - full restart command or empty
@@ -70,6 +76,7 @@ thermo {THERMO_FREQ}
 
 # --- Trajectory ---
 dump dump_npt all custom {DUMP_FREQ} {DUMP_FILE} id type mol x y z ix iy iz vx vy vz
+{DUMP_APPEND_BLOCK}
 
 # --- Restart Checkpointing ---
 {RESTART_BLOCK}
@@ -97,6 +104,7 @@ undump dump_npt
 # --- Write Output ---
 write_dump all custom {LAST_DUMP_FILE} id type mol x y z xu yu zu vx vy vz modify sort id
 write_data {WRITE_DATA_FILE}
+write_restart {WRITE_RESTART_FILE}
 
 print "STAGE COMPLETE: NPT T={T_START}->{T_FINAL}K P={P_START}->{P_FINAL}atm steps={N_STEPS}"
 quit

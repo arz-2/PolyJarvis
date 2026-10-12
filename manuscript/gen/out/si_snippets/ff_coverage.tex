@@ -1,0 +1,20 @@
+\begin{table}[H]
+\centering
+\caption{Trial EMC builds of each benchmark repeat unit and of PTFE under four force fields. The class prior is in bold. ``No typing rule'': EMC has no atom-typing rule for a group; ``missing parameters'': typing succeeds but a bonded or increment row is absent; ``element not typed'': the field defines no type for an element. A build shows only that the field can type the repeat unit, not that it is accurate for it.}
+\label{tab:si_ff_coverage}
+\small
+\begin{tabular}{l l l l l}
+\toprule
+\textbf{System} & \textbf{PCFF} & \textbf{OPLS-AA} & \textbf{TraPPE-UA} & \textbf{COMPASS} \\
+\midrule
+PE & builds & builds & \textbf{builds} & builds \\
+PEG & \textbf{builds} & missing parameters & builds & builds \\
+PLLA & \textbf{builds} & missing parameters & no typing rule & missing parameters \\
+aPS & \textbf{builds} & builds & builds & builds \\
+sPVC & \textbf{builds} & missing parameters & no typing rule & element not typed \\
+PEEK & \textbf{builds} & no typing rule & missing parameters & no typing rule \\
+PSU & \textbf{builds} & no typing rule & no typing rule & no typing rule \\
+PTFE & builds & \textbf{builds} & no typing rule & element not typed \\
+\bottomrule
+\end{tabular}
+\end{table}

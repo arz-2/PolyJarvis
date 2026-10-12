@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 validate_run_plan.py — mechanical structural checks for a run_plan.json against
-decision_policy.json, extracted from critic.md step 3.
+decision_policy.json.
 
 Covers only what's actually mechanical: criteria-coverage (criteria_evaluated ⊇ the matching
 policy's evaluate list), evidence_required presence, stage schema (required fields / valid
@@ -9,15 +9,9 @@ track / stage->track mapping), loose stage-vs-properties coverage, dominant-unce
 naming, reduction_probe validity, and the arithmetic/require-clause parts of D-08 hardware
 safety (delegated to select_hardware.py so the numbers live in exactly one place).
 
-Deliberately NOT covered (stays critic.md prose, per its own step 3): whether cited evidence
-substantively supports its claim, directional-probe "evidence inconsistency" judgment calls,
-the "no boilerplate bounce" carve-out (a finding here tagged severity=advisory may still be a
-legitimate approve — critic.md decides), and verdict/escalation sequencing.
-
-planner.md also calls this as a self-check before finalizing a reasoned plan, to catch schema
-mistakes before they cost a critic round-trip. Checks schema only, not runtime consumption --
-also smoke-render `gen_prompt.py --stage <X> --plan <path>` for touched stages and grep the
-cited field before finalizing.
+Substantive scientific support remains the planning agent's responsibility. The deterministic
+control plane blocks on structural findings and preserves advisory findings in control-state
+provenance.
 
 Usage:
   python3 orchestration/validate_run_plan.py --run_plan data/<RUN>/raw/run_plan.json
@@ -32,7 +26,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from select_hardware import select_hardware
-from hw_common import load_rules, get_class_entry
+from select_system_size import select_system_size
+from rules_common import load_rules, get_class_entry, hardware_policy
+from make_deterministic_plan import PLAN_SCHEMA_VERSION  # single source of truth
+import track_registry  # the property -> stage authority
+from hardware_runtime import host_matches
 
 _ENGINE_SCRIPTS = (Path(__file__).resolve().parents[2]
                    / "mcp-servers" / "mcp-lammps-engine" / "analysis_scripts")
@@ -41,28 +39,15 @@ if str(_ENGINE_SCRIPTS) not in sys.path:
 from finite_size import predict_equilibrated_L  # noqa: E402
 
 
-def _target_density(cls: dict, run_name: str):
-    """Class experimental density. Multi-member classes key it by member name (PACR
-    {PMMA, PMA}, PHYC {PE, PP, PIB}), so resolve via the run name's alpha prefix; a bare
-    float applies to the whole class. Returns None when it cannot be resolved -- the
-    caller then skips rather than guessing a density."""
-    ed = cls.get("experimental_density_gcm3")
-    if isinstance(ed, (int, float)):
-        return float(ed)
-    if isinstance(ed, dict):
-        key = run_name.rstrip("0123456789")
-        v = ed.get(key)
-        if isinstance(v, (int, float)):
-            return float(v)
-        numeric = [x for x in ed.values() if isinstance(x, (int, float))]
-        # Single-member dict is unambiguous; a real multi-member class without a run-name
-        # match is NOT -- refuse rather than pick one.
-        if len(numeric) == 1:
-            return float(numeric[0])
-    return None
-
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 POLICY_PATH = REPO_ROOT / "orchestration" / "decision_policy.json"
+
+# Finite-size forecast target density: density_initial_gcm3 is a build parameter chosen for
+# every run (how loosely to pack the initial cell before EMC/LAMMPS compress it), never
+# experimental data -- always resolvable, unlike a curated per-SMILES experimental_density_gcm3.
+# See orchestration/scripts/run_campaign.py's COMPRESSION_RATIO for the same constant/rationale
+# (duplicated, not shared -- no existing shared-constants module for this kind of value).
+COMPRESSION_RATIO = 2.0
 
 
 def _prefix(decision_id: str) -> str:
@@ -103,13 +88,17 @@ def _criteria_and_evidence_findings(plan: dict, policy: dict) -> list:
                                  "severity": "structural",
                                  "detail": "evidence_required policy but no evidence entry "
                                            "has source_doi/citation"})
-            if not d.get("alternatives"):
+            # alternatives_note is the explicit "none, and here is why" answer. It has to be
+            # accepted, because the prose used to be stored as alternatives[0] -- which
+            # satisfied this check while making the list unreadable as field names. An
+            # unexplained empty list is still worth saying out loud.
+            if not d.get("alternatives") and not d.get("alternatives_note"):
                 findings.append({"check": "alternatives_empty", "decision_id": d["id"],
                                  "severity": "advisory",
                                  "detail": "evidence_required decision has empty alternatives "
-                                           "-- critic.md's no-boilerplate-bounce carve-out may "
-                                           "apply for a carried-over validated default; judge "
-                                           "in context, do not auto-revise on this alone"})
+                                           "and no alternatives_note -- record the alternatives "
+                                           "when scientifically meaningful, or say why there "
+                                           "are none"})
     return findings
 
 
@@ -134,51 +123,89 @@ def _stage_schema_findings(plan: dict, policy: dict) -> list:
 
 
 def _stage_properties_findings(plan: dict) -> list:
+    """The plan's stage list must be exactly what its properties route to.
+
+    This was seven hand-written clauses covering `tg` and `bulk_modulus` only -- the same
+    if-chain shape, in the same file, that track_registry was created to delete. It had already
+    drifted: a plan requesting `shear_modulus` with no `deform` stage passed (only the cooling
+    clause fired), and `melt_density` had no clause at all.
+
+    Asking the registry instead makes the check total, and catches the inverse defect the
+    clauses could not express -- a plan naming a stage its properties do not route, which is
+    how a plan artifact comes to disagree with the run it describes.
+    """
     findings = []
-    stages_present = {s.get("stage") for s in plan.get("planned_stages", [])}
+    present = [s.get("stage") for s in plan.get("planned_stages", [])]
     props = set(plan.get("properties", []))
-    for base in ("build", "equil", "equil-check", "run-summary"):
-        if base not in stages_present:
-            findings.append({"check": "stage_properties", "severity": "structural",
-                             "detail": f"missing always-required stage {base!r}"})
-    if "tg" in props and not (stages_present & {"tg", "analyze-tg", "analyze-tg-multirate"}):
+    expected = track_registry.planned_stage_names(props)
+
+    missing = [stage for stage in expected if stage not in present]
+    if missing:
         findings.append({"check": "stage_properties", "severity": "structural",
-                         "detail": "tg requested but no tg/analyze-tg stage present"})
-    if "bulk_modulus" in props and not (stages_present & {"murnaghan", "deform", "analyze-bm"}):
+                         "detail": f"{sorted(props)} route stages {missing} but the plan does "
+                                   f"not contain them"})
+    unexpected = [stage for stage in present if stage not in expected]
+    if unexpected:
         findings.append({"check": "stage_properties", "severity": "structural",
-                         "detail": "bulk_modulus requested but no murnaghan/deform/analyze-bm "
-                                   "stage present"})
+                         "detail": f"plan contains stages {unexpected} that {sorted(props)} do "
+                                   f"not route"})
+    # Set semantics, deliberately: the plan's stage ORDER is cosmetic -- workflow_engine
+    # executes from track_registry.macro_stages_for(), never from this list's sequence.
     return findings
 
 
 def _uncertainty_findings(plan: dict, policy: dict) -> list:
-    findings = []
-    uncs = plan.get("uncertainties", [])
-    if uncs and not any(u.get("dominant") and u.get("name") for u in uncs):
-        findings.append({"check": "dominant_uncertainty", "severity": "structural",
-                         "detail": "no uncertainties[] entry has dominant=true with a name"})
-    valid_probes = set(policy.get("uncertainty_reduction_probes", {}).keys()) - {"description"}
-    for u in uncs:
-        rp = u.get("reduction_probe")
-        if rp and rp != "none" and rp not in valid_probes:
-            findings.append({"check": "reduction_probe", "severity": "structural",
-                             "detail": f"unknown reduction_probe {rp!r} on uncertainty "
-                                       f"{u.get('name')!r}"})
-    return findings
+    """The plan must name its dominant uncertainty.
+
+    It was an uncertainties[] list carrying exactly one entry flagged dominant=true, mixed in
+    with the solver's advisories; this check policed that exactly one carried the flag. The
+    headline is a scalar of its own since 2026-09-04 and the advisories moved onto the records
+    they qualify, so there is nothing left to police -- only to require.
+    """
+    if not plan.get("dominant_uncertainty"):
+        return [{"check": "dominant_uncertainty", "severity": "structural",
+                 "detail": "plan names no dominant_uncertainty"}]
+    return []
+
+
+def _schema_version_findings(plan: dict) -> list:
+    """Reject a plan file written against an older schema.
+
+    Pairs with workflow_engine.ENGINE_VERSION and covers the other half of the break:
+    ENGINE_VERSION invalidates RESUMABLE RUN STATE (it is folded into every stage's
+    _input_hash), while this rejects a stale PLAN FILE before it is ever executed. Neither
+    substitutes for the other -- a v1.0 plan carries retired keys (tg_rates_K_per_ns,
+    tg_steps_per_t) and a five-row decisions[] that today's readers would silently misread.
+    """
+    got = plan.get("schema_version")
+    if got == PLAN_SCHEMA_VERSION:
+        return []
+    return [{"check": "schema_version", "severity": "structural",
+             "detail": (f"run_plan schema_version is {got!r}, expected "
+                        f"{PLAN_SCHEMA_VERSION!r}. Regenerate it with "
+                        "`make_deterministic_plan.py run-plan`; a plan written against an "
+                        "older schema carries retired parameters and decision rows.")}]
 
 
 def _exp_tg_companion_findings(plan: dict) -> list:
-    """Check C: multi-member tg stage (t_range_brackets_exp_tg=true) should carry a
-    companion success_criteria.exp_tg_K -- flag if missing."""
+    """Check C: a tg stage's t_range_brackets_exp_tg is the pinned experimental Tg target
+    (a number) once build_planned_stages resolves it via run_name -- None means it genuinely
+    never resolved (run_name didn't match any member of a multi-member experimental_tg_K dict,
+    or no run_name was available, e.g. the scaffold path). Flag that unresolved case: without a
+    pinned target, the tg stage's accuracy gate has nothing to check the sweep range against.
+
+    (Previously this tested `is True`, a value build_planned_stages could never produce --
+    the field has only ever held a number or None -- so this check could never fire for any
+    plan, single- or multi-member.)"""
     findings = []
     for s in plan.get("planned_stages", []):
         if s.get("stage") != "tg":
             continue
         sc = s.get("success_criteria", {})
-        if sc.get("t_range_brackets_exp_tg") is True and "exp_tg_K" not in sc:
+        if "t_range_brackets_exp_tg" in sc and sc.get("t_range_brackets_exp_tg") is None:
             findings.append({"check": "exp_tg_companion", "stage": "tg", "severity": "advisory",
-                             "detail": "t_range_brackets_exp_tg=true with no companion "
-                                       "success_criteria.exp_tg_K"})
+                             "detail": "t_range_brackets_exp_tg is unresolved (None) -- no "
+                                       "pinned experimental Tg target for this run's member"})
     return findings
 
 
@@ -186,9 +213,10 @@ def _finite_size_findings(plan: dict) -> list:
     """Cheapest possible finite-size check: plan time, before the build, before any GPU.
 
     Only the MINIMUM-IMAGE criterion is decidable here -- it needs no Rg. The predicted
-    equilibrated box edge follows from the planned cell mass and the class experimental
-    density: L = (m / (N_A * rho))^(1/3), accurate to within ~3% of the archive's actual
-    post-compression boxes.
+    equilibrated box edge follows from the planned cell mass and an estimated target density:
+    L = (m / (N_A * rho))^(1/3), where rho = COMPRESSION_RATIO * density_initial_gcm3 -- never
+    a curated experimental value (a novel system may have none), always resolvable since
+    density_initial_gcm3 is a build parameter chosen for every run, not measured data.
 
     The chain-self-imaging criterion (L >= 2*Rg) needs a real Rg, so it is enforced one
     step later by inspect_data_file's finite_size_forecast on the built cell -- still
@@ -203,12 +231,13 @@ def _finite_size_findings(plan: dict) -> list:
 
     cls = get_class_entry(load_rules(), polymer_class) or {}
     cutoff_A = dp.get("cutoff_A") or cls.get("cutoff_A")
-    rho = _target_density(cls, plan.get("run_name") or "")
+    rho = COMPRESSION_RATIO * (dp.get("density_initial_gcm3") or cls.get("density_initial_gcm3", 0.6))
     if not cutoff_A or not rho:
         return findings
 
     try:
-        rec = select_hardware(polymer_class, smiles, dp.get("dp_typical"), dp.get("nchain"))
+        rec = select_hardware(polymer_class, smiles, dp.get("dp_typical"), dp.get("nchain"),
+                              dp.get("preferred_ff"))
         cell_mass = rec.get("cell_mass_g_per_mol_estimate")
     except Exception:
         return findings
@@ -242,12 +271,37 @@ def _finite_size_findings(plan: dict) -> list:
     return findings
 
 
+def _family_has_multi_gpu_benchmark(fam: str) -> bool:
+    """True iff some real measured point for this FF family (recommended_by_ff or
+    size_points) actually used gpu_per_run>=2 ON A HOST MATCHING THIS ONE
+    (hardware_runtime.host_matches -- hardware_policy.host, the same host-match check
+    select_hardware.estimate_ns_per_day itself uses). Every point calibrated so far (both fields)
+    is gpu=1 -- select_hardware.py's cost_model-driven "high" confidence describes how well
+    the ns_per_day NUMBER at a given atom count is supported, not whether a >=2-GPU pin is
+    benchmarked, which is what this specific check claims to verify -- those are different
+    claims and must not be conflated just because one confidence field happens to cover both
+    today."""
+    rules = load_rules()
+    if not host_matches(rules):
+        return False
+    dp_probe = hardware_policy(rules).get("directional_probe", {})
+    rec = dp_probe.get("recommended_by_ff", {}).get(fam)
+    if rec and (rec.get("gpu") or 1) >= 2:
+        return True
+    return any((p.get("gpu") or 1) >= 2 for p in dp_probe.get("size_points", {}).get(fam, []))
+
+
 def _hardware_findings(plan: dict) -> list:
     """Delegates the recommended choice to select_hardware.py -- decision_policy.json's
     hardware require/prefer thresholds live there once, not duplicated here."""
     findings = []
     dp = plan.get("decided_params", {})
-    pin = {k: dp.get(k) for k in ("engine", "gpu_per_run", "mpi_ranks")}
+    # decided_params first (an override lands there and is what stage_params actually reads),
+    # then the plan's own derived hardware block. Reading only decided_params silently disarmed
+    # every check below on 2026-09-04, when the derived triple moved to plan["hardware"].
+    hw = plan.get("hardware") or {}
+    pin = {k: (dp.get(k) if dp.get(k) is not None else hw.get(k))
+           for k in ("engine", "gpu_per_run", "mpi_ranks")}
     if not any(pin.values()):
         return findings  # unpinned -> runtime by_forcefield fallback, always safe
 
@@ -260,7 +314,8 @@ def _hardware_findings(plan: dict) -> list:
         return findings
 
     try:
-        rec = select_hardware(polymer_class, smiles, dp.get("dp_typical"), dp.get("nchain"))
+        rec = select_hardware(polymer_class, smiles, dp.get("dp_typical"), dp.get("nchain"),
+                              dp.get("preferred_ff"))
     except Exception as e:
         findings.append({"check": "hardware_safety", "severity": "structural",
                          "detail": f"select_hardware.py raised: {e}"})
@@ -271,7 +326,6 @@ def _hardware_findings(plan: dict) -> list:
         return findings
 
     rec_choice = rec["decision"]["choice"]
-    d08 = next((d for d in plan.get("decisions", []) if d.get("id") == "D-08_hardware"), None)
 
     if pin.get("mpi_ranks") == 1 and pin.get("engine") == "gpu" and rec["ff_family"] != "trappe":
         findings.append({"check": "hardware_anti_pattern", "severity": "structural",
@@ -285,46 +339,49 @@ def _hardware_findings(plan: dict) -> list:
             findings.append({"check": "hardware_size_mismatch", "severity": "structural",
                              "detail": f"gpu_per_run={gpu_pin} pinned but estimated cell "
                                        f"{rec['cell_atoms_estimate']} atoms < 10k"})
-        elif rec["decision"]["confidence"] != "high":
+        elif not _family_has_multi_gpu_benchmark(rec["ff_family"]):
             findings.append({"check": "hardware_size_mismatch", "severity": "structural",
-                             "detail": "gpu_per_run>=2 pinned without clean benchmark support "
-                                       "(select_hardware.py would not recommend it at high "
-                                       "confidence for this cell/host)"})
+                             "detail": f"gpu_per_run={gpu_pin} pinned for ff_family="
+                                       f"{rec['ff_family']!r} but no real measured point "
+                                       "(recommended_by_ff or size_points) for this family "
+                                       "used gpu_per_run>=2 -- a well-supported ns_per_day "
+                                       "number at gpu=1 is not evidence for a multi-GPU pin"})
 
     deviates = any(pin.get(k) not in (None, rec_choice.get(k)) for k in rec_choice)
-    if deviates:
-        if d08 is None:
-            findings.append({"check": "hardware_missing_decision", "severity": "structural",
-                             "detail": "decided_params pins non-default hardware but no "
-                                       "D-08_hardware entry in decisions[]"})
-        elif d08.get("confidence") != "low" and rec["decision"]["confidence"] != "high":
-            findings.append({"check": "hardware_staleness", "severity": "structural",
-                             "detail": f"pin {pin} deviates from the policy-recommended "
-                                       f"{rec_choice} without confidence:low on D-08_hardware "
-                                       "(not cleanly benchmarked on this host/cell size)"})
+    if deviates and rec["decision"]["confidence"] != "high":
+        # Info, not structural. Until 2026-09-04 a deviating pin demanded a D-08_hardware row
+        # to acknowledge it; D-08 was retired that day, so the structural finding had become
+        # unsatisfiable -- no legal edit could clear it. Writing the pin into `overrides` IS the
+        # acknowledgement now, and the anti-pattern/multi-GPU checks above stay structural
+        # because those are unsafe rather than merely unbenchmarked.
+        findings.append({"check": "hardware_staleness", "severity": "info",
+                         "detail": f"pin {pin} deviates from the policy-recommended "
+                                   f"{rec_choice} and this host/cell size is not cleanly "
+                                   "benchmarked (select_hardware confidence="
+                                   f"{rec['decision']['confidence']!r})"})
     return findings
 
 
-# decided_params that no executor consumes, so setting them changes nothing that runs.
-# Entries require a traced call path, not a name grep: eq_annealing_cycles is listed
-# because generate_equilibration_workflow's signature has no such parameter at all --
-# the workflow performs exactly one heat/compress/cool pass regardless of the value.
-UNIMPLEMENTED_PARAMS = {
-    "eq_annealing_cycles": ("generate_equilibration_workflow takes no annealing-cycles "
-                            "argument; the workflow runs one heat/compress/cool pass "
-                            "regardless of this value"),
-}
+# Parameters may be listed here only after a complete plan→resolver→executor trace proves
+# that the declared value cannot affect a generated deck. Keep the map empty while every
+# currently advertised planning parameter has an executable consumer.
+UNIMPLEMENTED_PARAMS = {}
 
 
 # decided_params that ARE wired, but that another decided_param silently overrides. The plan
 # then records a protocol the deck did not run. Keyed by the overridden param; the value is
 # (overriding param, why).
-OVERRIDDEN_PARAMS = {
-    "tg_steps_per_t": ("tg_rate_index",
-                       "gen_prompt._resolve_tg_params computes n_steps_per_t from the selected "
-                       "cooling rate (T_step / (rate*dt)) whenever a rate index is given, and "
-                       "ignores tg_steps_per_t entirely"),
-}
+# Empty since 2026-09-04. Its only entry keyed tg_steps_per_t on tg_rate_index, and
+# tg_rate_index stopped being a decided_params key on every planner path with the single-rate
+# collapse -- so the guard could never fire on a real plan, while its unit test kept passing by
+# hand-building a plan carrying a key no producer writes. Both retired keys are now rejected at
+# the override allowlist instead, which is the earlier and louder place to catch them.
+# Add an entry here only after a plan->resolver->executor trace shows a RECORDED value that a
+# LIVE decided_param silently replaces; _overridden_param_findings stays wired for that case.
+# The remove_noop REMEDY that used to answer it was deleted from workflow_engine.py's registry
+# 2026-09-07 -- with this dict empty and UNIMPLEMENTED_PARAMS empty, neither of its codes had a
+# producer, so no finding could reach it. Re-adding an entry here means re-adding that row.
+OVERRIDDEN_PARAMS = {}
 
 
 def _overridden_param_findings(plan: dict) -> list:
@@ -366,7 +423,7 @@ def _unimplemented_param_findings(plan: dict) -> list:
     return findings
 
 
-# NO_SOURCE_ROW is deliberately absent: it reports a gap in ff_provenance.py's own
+# NO_SOURCE_ROW is deliberately absent: it reports a gap in forcefield.py's provenance
 # lookup, not a defect in the field, and must never block a plan or change a field choice
 _PROVENANCE_BLOCKING = ("LOCAL_PATCH", "ZERO_SUBSTITUTED")
 
@@ -376,7 +433,7 @@ def _forcefield_findings(plan: dict) -> list:
 
     Admissibility is the one clause in policies.forcefield.require that a plan can
     silently violate: the class default applies whether or not the field can represent
-    the molecule, and the only previous symptom was the build crashing. select_forcefield.py
+    the molecule, and the only previous symptom was the build crashing. forcefield.py
     records what it measured; this checks the plan agrees with it.
     """
     findings = []
@@ -393,7 +450,7 @@ def _forcefield_findings(plan: dict) -> list:
             "detail": (f"D-01_ff.choice={choice!r} is not in the measured admissible set "
                        f"{admissible} — the field cannot integrate or cannot type this "
                        "SMILES, so the build will fail or the parameters are not this "
-                       "molecule's. Re-run orchestration/scripts/select_forcefield.py.")})
+                       "molecule's. Re-run orchestration/scripts/forcefield.py select.")})
     if isinstance(admissible, list) and not admissible:
         findings.append({
             "check": "ff_no_admissible_field", "severity": "structural",
@@ -408,28 +465,175 @@ def _forcefield_findings(plan: dict) -> list:
 
     flags = d.get("provenance_flags") or {}
     blocking = sorted(f for f in flags if f in _PROVENANCE_BLOCKING and flags[f])
-    acknowledged = any(u.get("name") == "ff_parameter_provenance"
-                       for u in plan.get("uncertainties", []))
+    # Acknowledgements live on the decision they qualify. They were a plan-wide uncertainties[]
+    # list matched by NAME until 2026-09-04 -- a bag of strings acting as per-decision flags.
+    acknowledged = "ff_parameter_provenance" in (d.get("acknowledgements") or {})
     if blocking and not acknowledged:
         findings.append({
             "check": "ff_provenance_unacknowledged", "severity": "structural",
             "detail": (f"D-01_ff.provenance_flags {blocking} record parameters that were "
                        "locally patched, silently zeroed, or unexplained, and no "
-                       "uncertainties entry named 'ff_parameter_provenance' acknowledges "
+                       "acknowledgements entry named 'ff_parameter_provenance' on the "
+                       "D-01_ff row acknowledges "
                        "them. The flag does not veto the field — it must be carried as a "
                        "stated uncertainty, not inherited silently.")})
+
+    # D-01's only DOI-backed evidence is the class ff_justification_doi, which describes the
+    # class prior. Once the field changes, that citation no longer covers the run.
+    prior = _class_prior(plan)
+    if prior and dp_ff and dp_ff != prior and (
+            "ff_accuracy_prior_not_met" not in (d.get("acknowledgements") or {})):
+        findings.append({
+            "check": "ff_prior_departure_unacknowledged", "severity": "structural",
+            "detail": (f"decided_params.preferred_ff={dp_ff!r} is not the class prior "
+                       f"{prior!r}, and no acknowledgements entry named "
+                       "'ff_accuracy_prior_not_met' acknowledges the departure. The class "
+                       "ff_justification_doi is D-01's only DOI-backed evidence and it "
+                       f"describes {prior!r}, not {dp_ff!r}.")})
+    return findings
+
+
+def _class_prior(plan: dict) -> str | None:
+    """classes.<CLASS>.ff_accuracy_prior for this plan's class, or None if unresolvable."""
+    polymer_class = plan.get("polymer_class")
+    if not polymer_class:
+        return None
+    try:
+        return get_class_entry(load_rules(), polymer_class,
+                               warn_on_miss=False).get("ff_accuracy_prior")
+    except Exception:  # noqa: BLE001 -- a broken lookup must not block a plan
+        return None
+
+
+def _system_size_findings(plan: dict) -> list:
+    """D-04_system_size must not silently under-provision DP for a floor the class's own
+    cited literature already documents (Fox-Flory for tg -- the only mechanized DP floor;
+    entanglement DP@Me for bulk_modulus is advisory only, see select_system_size.py).
+
+    Mirrors _hardware_findings: select_system_size.py is re-run live against the plan's
+    own smiles/properties, same as _hardware_findings does with select_hardware.py. A
+    floor violation does not block the plan outright, it must be raised or carried as a
+    stated uncertainty -- same acknowledgeable-flag pattern as _forcefield_findings'
+    provenance check.
+    """
+    findings = []
+    dp_dict = plan.get("decided_params", {})
+    smiles, polymer_class = plan.get("smiles"), plan.get("polymer_class")
+    if not smiles or not polymer_class:
+        return findings
+
+    try:
+        rec = select_system_size(polymer_class, smiles,
+                                 properties=plan.get("properties"),
+                                 dp_typical=dp_dict.get("dp_typical"),
+                                 nchain=dp_dict.get("nchain"),
+                                 field=dp_dict.get("preferred_ff"))
+    except Exception as e:  # noqa: BLE001 -- a broken check must not block a plan
+        findings.append({"check": "system_size_safety", "severity": "structural",
+                         "detail": f"select_system_size.py raised: {e}"})
+        return findings
+    if "error" in rec:
+        return findings
+
+    required_floor = rec["decision"].get("required_dp_floor")
+    if required_floor is None:
+        return findings
+    dp = dp_dict.get("dp_typical")
+    if dp is None or dp >= required_floor:
+        return findings
+    acknowledged = "system_size_dp_floor" in (plan.get("system_size", {}).get(
+        "acknowledgements") or {})
+    if not acknowledged:
+        findings.append({
+            "check": "system_size_dp_floor_unacknowledged", "severity": "structural",
+            "detail": (f"decided_params.dp_typical={dp} is below the measured "
+                      f"required_dp_floor={required_floor} ({rec['decision'].get('floor_sources')}) "
+                      "and no system_size.acknowledgements entry named 'system_size_dp_floor' "
+                      "acknowledges "
+                      "it. Raise dp_typical to the floor or record the gap as a stated "
+                      "uncertainty -- re-run orchestration/scripts/select_system_size.py.")})
+    return findings
+
+
+def _system_size_over_provisioned_findings(plan: dict) -> list:
+    """Symmetric to _system_size_findings above, but for the OTHER direction: a
+    reasoned/novel plan whose dp_typical clears select_system_size.py's own
+    size_over_provisioned threshold (>1.5x the mechanized floor) without any
+    acknowledgment in the plan.
+
+    Gated on plan_mode=="reasoned" -- a protocol_validated replay must never be touched
+    by this check (shrinking/flagging a frozen protocol is exactly what materialize_plan()
+    is structurally prevented from doing; this check must not second-guess a replay either).
+
+    Expected to basically never fire for a plan actually produced by
+    scientific_control.py:materialize_plan(), which self-acknowledges this exact condition
+    (an uncertainties[] entry named "system_size_over_provisioned") whenever it applies --
+    auto-filled, literature-grounded, or from the agent's own override. This is defense in
+    depth for a hand-edited plan or one produced by a path that skipped that step, matching
+    this file's existing practice of re-deriving live rather than trusting the plan's own
+    claims.
+
+    Still live after the 2026-09-02 sizing change, though its reachable inputs narrowed: with
+    class defaults gone, the auto-fill can never over-provision (the derived DP is the floor),
+    so what remains is an explicit Planner dp_typical override or a hand-edited plan. Verified
+    by execution before this note was written, not inferred -- an over-provisioned override
+    does still reach both this check and materialize_plan()'s acknowledgment.
+    """
+    findings = []
+    if plan.get("plan_mode") != "reasoned":
+        return findings
+    dp_dict = plan.get("decided_params", {})
+    smiles, polymer_class = plan.get("smiles"), plan.get("polymer_class")
+    dp = dp_dict.get("dp_typical")
+    if not smiles or not polymer_class or dp is None:
+        return findings
+
+    try:
+        rec = select_system_size(polymer_class, smiles, properties=plan.get("properties"),
+                                 dp_typical=dp, nchain=dp_dict.get("nchain"),
+                                 field=dp_dict.get("preferred_ff"))
+    except Exception as e:  # noqa: BLE001 -- a broken check must not block a plan
+        findings.append({"check": "system_size_safety", "severity": "structural",
+                         "detail": f"select_system_size.py raised: {e}"})
+        return findings
+    if "error" in rec:
+        return findings
+
+    if not any(u.get("name") == "size_over_provisioned" for u in rec.get("uncertainties", [])):
+        return findings
+    acknowledged = "system_size_over_provisioned" in (plan.get("system_size", {}).get(
+        "acknowledgements") or {})
+    if not acknowledged:
+        findings.append({
+            "check": "system_size_over_provisioned_unacknowledged", "severity": "structural",
+            "detail": (f"decided_params.dp_typical={dp} clears select_system_size.py's "
+                      "size_over_provisioned threshold and no system_size.acknowledgements entry named "
+                      "'system_size_over_provisioned' acknowledges it. A plan built through "
+                      "materialize_plan() self-acknowledges this automatically -- re-run it, "
+                      "or add the uncertainty by hand if this plan was edited directly.")})
     return findings
 
 
 def validate_plan(plan: dict, policy: dict) -> list:
+    """Every check a run_plan.json must pass before execution, as a flat list of findings.
+
+    Each finding has a `check` name and a `severity`: "structural" findings block execution
+    (DeterministicScriptChain refuses the plan), "advisory" ones are recorded and passed on.
+    Covers policy criteria and evidence, stage schema, hardware, force-field admissibility,
+    system size (re-solved live, not trusted from the plan), finite-size limits, and
+    parameters that are unimplemented or overridden.
+    """
     findings = []
     findings += _criteria_and_evidence_findings(plan, policy)
     findings += _stage_schema_findings(plan, policy)
     findings += _stage_properties_findings(plan)
+    findings += _schema_version_findings(plan)
     findings += _uncertainty_findings(plan, policy)
     findings += _exp_tg_companion_findings(plan)
     findings += _hardware_findings(plan)
     findings += _forcefield_findings(plan)
+    findings += _system_size_findings(plan)
+    findings += _system_size_over_provisioned_findings(plan)
     findings += _finite_size_findings(plan)
     findings += _unimplemented_param_findings(plan)
     findings += _overridden_param_findings(plan)

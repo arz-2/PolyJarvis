@@ -1,0 +1,180 @@
+{
+  "status": "success",
+  "method": "murnaghan",
+  "temperature_K": 299.91,
+  "temperature_spread_K": 0.18,
+  "fit_converged": true,
+  "bm_gate_verdict": "BM_REPORTABLE",
+  "bm_gate_reasons": [],
+  "bm_reportable": true,
+  "B0_GPa": 2.8865,
+  "bulk_modulus_GPa": 2.8865,
+  "B0_sem_GPa": 0.0372,
+  "bulk_modulus_sem_GPa": 0.0372,
+  "B0_prime": 13.0029,
+  "V0_A3": 63124.55,
+  "r_squared": 0.999952,
+  "n_points": 4,
+  "pressures_atm": [
+    -1000.0,
+    0.0,
+    1500.0,
+    3000.0
+  ],
+  "pressures_GPa": [
+    -0.101325,
+    0.0,
+    0.151988,
+    0.303975
+  ],
+  "volumes_A3": [
+    66130.18,
+    63156.15,
+    60625.6,
+    59077.2
+  ],
+  "vol_stds_A3": [
+    423.29,
+    274.33,
+    238.79,
+    184.58
+  ],
+  "n_prod_rows": [
+    2501,
+    2501,
+    2501,
+    2501,
+    2501
+  ],
+  "log_files": [
+    "/home/arz2/PolyJarvis_v2/data/bm_diagnostics_r2/points/P-1000_damp4000_steps500000/bm_P-1000/bm_P-1000.log",
+    "/home/arz2/PolyJarvis_v2/data/bm_diagnostics_r2/points/P0_damp4000_steps500000/bm_P0/bm_P0.log",
+    "/home/arz2/PolyJarvis_v2/data/bm_diagnostics_r2/points/P1500_damp4000_steps500000/bm_P1500/bm_P1500.log",
+    "/home/arz2/PolyJarvis_v2/data/bm_diagnostics_r2/points/P3000_damp4000_steps500000/bm_P3000/bm_P3000.log",
+    "/home/arz2/PolyJarvis_v2/data/bm_diagnostics_r2/points/P5000_damp4000_steps500000/bm_P5000/bm_P5000.log"
+  ],
+  "tau_frames_per_point": [
+    189.839,
+    16.26,
+    12.325,
+    11.4,
+    10.232
+  ],
+  "n_eff_per_point": [
+    13,
+    153,
+    202,
+    219,
+    244
+  ],
+  "vol_sem_A3_per_point": [
+    117.3992,
+    22.1787,
+    16.8015,
+    12.4731,
+    12.2586
+  ],
+  "eq_fraction": 0.5,
+  "output_dir": "/home/arz2/PolyJarvis_v2/benchmarks/bm_diagnostics_r2/results/pdamp_4000",
+  "volume_monotonic": true,
+  "loo_results": [
+    {
+      "dropped_pressure_atm": -1000.0,
+      "is_tension_point": true,
+      "converged": true,
+      "B0_GPa": 3.345,
+      "B0_prime": 8.461,
+      "r_squared": 0.999017,
+      "dB0_GPa_vs_baseline": 0.3878,
+      "dB0_prime_vs_baseline": -1.5144
+    },
+    {
+      "dropped_pressure_atm": 0.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 2.9284,
+      "B0_prime": 9.8224,
+      "r_squared": 0.999006,
+      "dB0_GPa_vs_baseline": -0.0288,
+      "dB0_prime_vs_baseline": -0.153
+    },
+    {
+      "dropped_pressure_atm": 1500.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 3.0032,
+      "B0_prime": 9.4038,
+      "r_squared": 0.999235,
+      "dB0_GPa_vs_baseline": 0.046,
+      "dB0_prime_vs_baseline": -0.5716
+    },
+    {
+      "dropped_pressure_atm": 3000.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 2.8583,
+      "B0_prime": 10.7486,
+      "r_squared": 0.999958,
+      "dB0_GPa_vs_baseline": -0.0989,
+      "dB0_prime_vs_baseline": 0.7732
+    },
+    {
+      "dropped_pressure_atm": 5000.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 2.8865,
+      "B0_prime": 13.0029,
+      "r_squared": 0.999952,
+      "dB0_GPa_vs_baseline": -0.0707,
+      "dB0_prime_vs_baseline": 3.0275
+    }
+  ],
+  "loo_n_converged": 5,
+  "loo_max_dB0_pct": 13.11,
+  "loo_max_dB0_pct_retained": 13.11,
+  "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+  "bm_convergence_reasons": [
+    "loo_unstable"
+  ],
+  "bm_convergence_confidence": "low",
+  "fluctuation_bulk_modulus_GPa": null,
+  "fluctuation_divergence_pct": null,
+  "anomalous_points": {},
+  "excluded_points": [
+    {
+      "pressure_atm": 5000.0,
+      "reasons": [
+        "excluded to reach a converged, volume-monotonic window"
+      ]
+    }
+  ],
+  "selected_window": {
+    "trim_total": 1,
+    "n_points": 4,
+    "plateau_confirmed": true,
+    "selection_note": "Trim=1: r_squared improved from 0.99894 (untrimmed) to 0.99995 and excludes every flagged point."
+  },
+  "all_points_fit": {
+    "method": "murnaghan",
+    "fit_converged": true,
+    "B0_GPa": 2.9572,
+    "B0_prime": 9.9754,
+    "V0_A3": 63280.43,
+    "r_squared": 0.998938,
+    "volume_monotonic": true,
+    "n_points": 5,
+    "pressures_atm": [
+      -1000.0,
+      0.0,
+      1500.0,
+      3000.0,
+      5000.0
+    ]
+  },
+  "warnings": [
+    "Murnaghan fit R\u00b2=0.99894 < 0.999. Check that NPT runs are fully equilibrated (increase --eq_fraction or NPT steps) and that the pressure range is appropriate for this polymer.",
+    "Leave-one-out refit: dropping one pressure point shifts B0 by up to 13.1% (>10%) \u2014 the fit is not robust to a single point; consider widening the pressure range.",
+    "Automated screening excluded 1 of 5 pressure point(s) from the primary fit (see excluded_points/selected_window) -- see all_points_fit for the unscreened comparison."
+  ],
+  "murnaghan_eos_fig": "/home/arz2/PolyJarvis_v2/benchmarks/bm_diagnostics_r2/results/pdamp_4000/figures/murnaghan_eos.png"
+}

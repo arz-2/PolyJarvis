@@ -1,0 +1,113 @@
+{
+  "log": "/home/arz2/PolyJarvis_v2/benchmarks/polyjarvis_vs_radonpy/preserved_artifacts/PEG1_retry9/radonpy/PEG1_retry9/eq12.log",
+  "units": "real",
+  "rows_in_log": 5001,
+  "rows_graded": 2001,
+  "tail_rows": 2001,
+  "width": 800,
+  "window_fully_defined": true,
+  "criteria": {
+    "totene": {
+      "status": "PASS",
+      "value": 55.05585161311007,
+      "threshold": 74.01749388793,
+      "column": "TotEng",
+      "mean": 148034.98777586,
+      "crit": 0.0005,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "kinene": {
+      "status": "PASS",
+      "value": 5.688229345827076,
+      "threshold": 15.150519039119501,
+      "column": "KinEng",
+      "mean": 30301.038078239002,
+      "crit": 0.0005,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "ebond": {
+      "status": "PASS",
+      "value": 3.663512735184671,
+      "threshold": 6.765906033291,
+      "column": "E_bond",
+      "mean": 6765.906033291,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "eangle": {
+      "status": "PASS",
+      "value": 21.182878954550834,
+      "threshold": 24.236282558458996,
+      "column": "E_angle",
+      "mean": 24236.282558458995,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "edihed": {
+      "status": "FAIL",
+      "value": 69.43445953200674,
+      "threshold": 50.370329255678,
+      "column": "E_dihed",
+      "mean": 25185.164627839,
+      "crit": 0.002,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "evdw": {
+      "status": "PASS",
+      "value": 7.89622305922321,
+      "threshold": 30.0,
+      "column": "E_vdwl",
+      "mean": -17619.314408732,
+      "crit": 30.0,
+      "rule": "sma_sd > crit"
+    },
+    "ecoul": {
+      "status": "NOT_GATED",
+      "value": 11.97899874288854,
+      "threshold": null,
+      "column": "E_coul",
+      "mean": 195297.35120296,
+      "crit": null,
+      "rule": "sma_sd > crit"
+    },
+    "elong": {
+      "status": "PASS",
+      "value": 1.6945062552690486,
+      "threshold": 116.13144041452,
+      "column": "E_long",
+      "mean": -116131.44041452,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "dens": {
+      "status": "PASS",
+      "value": 0.0006944891370289884,
+      "threshold": 0.001104097373,
+      "column": "Density",
+      "mean": 1.104097373,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "rg": {
+      "status": "UNMEASURED",
+      "reason": "no rg.profile, and RadonPy's stored Rg statistic was computed at width 2000 on the full log -- it cannot be re-windowed",
+      "crit": 0.01,
+      "rule": "sd_max > mean_mean*crit"
+    }
+  },
+  "verdict": "FAIL",
+  "failing": [
+    "edihed"
+  ],
+  "not_evaluated": [
+    "rg"
+  ],
+  "radonpy_check_eq_returned": false,
+  "radonpy_check_eq_passes_an_unevaluable_window": false,
+  "radonpy_check_eq_agrees": true,
+  "radonpy_check_eq_skipped_rg": false,
+  "radonpy_warnings": [
+    "RadonPy warning: Potential energy of dihedrals does not converge. mean = 25185.164628, sma_sd = 69.434460",
+    "RadonPy warning: Can not obtain the data of radius of gyration. Skip to check the Rg convergence."
+  ]
+}

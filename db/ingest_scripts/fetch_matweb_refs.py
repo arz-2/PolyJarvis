@@ -8,7 +8,7 @@ Tg (K), shear modulus (GPa), bulk modulus (GPa) where available.
 
 Output: data/matweb_refs.json
 Next step: db/ingest_scripts/import_matweb.py reads this JSON and loads
-the data into polymer_db.sqlite.
+the data into experimental_db.sqlite.
 
 Usage:
   python3 db/ingest_scripts/fetch_matweb_refs.py [options]
@@ -22,7 +22,6 @@ Options:
 
 import argparse
 import json
-import os
 import re
 import sys
 import time
@@ -317,7 +316,7 @@ def fetch_polymer(polymer_id: str, poly_class: str, search_term: str,
 
     candidates = _search_results(html, keywords)
     if not candidates:
-        print(f"  WARN: no DataSheet links found in search results", file=sys.stderr)
+        print("  WARN: no DataSheet links found in search results", file=sys.stderr)
         record["status"] = "no_results"
         return record
 
@@ -331,7 +330,7 @@ def fetch_polymer(polymer_id: str, poly_class: str, search_term: str,
             continue
         props = _extract_properties(sheet_html)
         if "density_gcm3" not in props and "E_GPa" not in props:
-            print(f"       (no usable properties, skipping)")
+            print("       (no usable properties, skipping)")
             continue
         mat_name = _material_name(sheet_html) or name
         record.update({

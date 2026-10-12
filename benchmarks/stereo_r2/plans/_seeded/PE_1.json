@@ -1,0 +1,281 @@
+{
+  "schema_version": "2.0",
+  "run_name": "PE_1",
+  "polymer_class": "PHYC",
+  "smiles": "*CC*",
+  "goal": "density, Tg and bulk modulus for polyethylene (achiral), stereo_r2",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "plan_mode": "reasoned",
+  "confidence": "low",
+  "dominant_uncertainty": "scientific_review_pending",
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "trappe-ua",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "criterion": "literature_support",
+          "claim": "polymer_rules.json:classes.PHYC.ff_note: TraPPE-UA via EMC: purely apolar C/H backbone (charge <0.1 e), which qualifies for the lj/cut-only routing tier -- PCFF/OPLS-AA's PPPM machinery is unnecessary and TraPPE-UA is far cheaper per atom. Ramos2015: PE Tg=187K vs exp 185-195K, density within +/-7% -- directly validated. Branched types (PP, PIB) have UA parameters but no published polymer-Tg validation; treat with medium confidence until confirmed. TraPPE-UA's own founding paper (Martin & Siepmann 1998) validates only C1-C12 n-alkane VLE/critical-point data via Monte Carlo -- PE's confidence rests on the downstream Ramos2015 MD validation, not the 1998 origin paper.",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PHYC.ff_justification_doi",
+          "source_doi": "10.1021/acs.macromol.5b00823"
+        },
+        {
+          "claim": "PE: 2 chains \u00d7 300 repeat units; COMPASS; NVT 300 K + NPT 300 K; cooling 300\u2192100 K in 10 K/200 ps steps; Tg ~200 K vs literature 195 K.",
+          "origin": "autofill",
+          "criterion": "validation_data",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[PE_RSC2016]",
+          "source_doi": "10.1039/C5RA21115H",
+          "citation": "The glass transition temperature measurements of polyethylene: determined by using molecular dynamic method. RSC Advances, 2016."
+        },
+        {
+          "claim": "High-throughput GAFF2 polymer MD; 1 ns NVT anneal 300\u2192700 K; 10 chains ~10,000 atoms; LAMMPS; systematic Tg and density for 1070+ polymers. Primary reference for nchain, dp, and forcefield defaults.",
+          "origin": "autofill",
+          "criterion": "validation_data",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Hayashi2022]",
+          "source_doi": "10.1038/s41524-022-00906-4",
+          "citation": "Hayashi, Y. et al. RadonPy: Automated Physical Property Calculation using All-atom Classical Molecular Dynamics Simulations for Polymer Informatics. npj Comput. Mater. 2022, 8, 222."
+        },
+        {
+          "claim": "Tg values for 12 polymers; PE Tg=281\u00b152 K; PDMS Tg ~228 K. Validation data for PHYC and PSIL classes.",
+          "origin": "autofill",
+          "criterion": "validation_data",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Srivastava2026]",
+          "citation": "Srivastava, A. et al. On-the-Fly Machine-Learned Force Fields for High-Fidelity Polymer Glass Transition Simulations. arXiv:2601.17137."
+        },
+        {
+          "claim": "OPLS3e GPU-based Tg for 315 polymers; validates electrostatics impact on polar vs apolar polymers. lj/cut acceptable only when backbone charge < 0.1 e.",
+          "origin": "autofill",
+          "criterion": "validation_data",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Afzal2021]",
+          "source_doi": "10.1021/acsapm.0c00524",
+          "citation": "Afzal, M. A. F. et al. High-Throughput Molecular Dynamics Simulations and Validation of Thermophysical Properties of Polymers for Various Applications. ACS Appl. Polym. Mater. 2021, 3, 2, 620\u2013630."
+        },
+        {
+          "claim": "Original TraPPE-UA force field for n-alkanes (CH3/CH2 united atoms): LJ parameters fitted to vapor\u2013liquid coexistence of C1\u2013C12 alkanes. Foundation for all TraPPE-UA-routed classes (PHYC, PDIE) via EMC.",
+          "origin": "autofill",
+          "criterion": "validation_data",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Martin1998]",
+          "citation": "Martin, M. G.; Siepmann, J. I. Transferable Potentials for Phase Equilibria. 1. United-Atom Description of n-Alkanes. J. Phys. Chem. B 1998, 102, 2569\u20132577."
+        },
+        {
+          "claim": "PE TraPPE-UA MD: Tg=187 K, excellent agreement with extrapolated experimental Tg(U)~195 K (Boyer 1973). Characteristic ratio C_n=8.2 at 500 K. Justifies ff_accuracy_prior=trappe-ua for PHYC/PDIE and sets ff_justification_doi for those classes.",
+          "origin": "autofill",
+          "criterion": "validation_data",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Ramos2015]",
+          "source_doi": "10.1021/acs.macromol.5b00823",
+          "citation": "Ramos, J.; Vega, J. F.; Mart\u00ednez-Salazar, J. Molecular Dynamics Simulations for the Description of Experimental Molecular Conformation, Melt Dynamics, and Phase Transitions in Polyethylene. Macromolecules 2015, 48, 5016\u20135027."
+        },
+        {
+          "claim": "Experimental review establishing two PE glass transitions: Tg(L)~145 K (dangling cilia/tight folds in crystalline PE) and Tg(U)~195 K (loose loops/tie molecules, amorphous regions). Amorphous-cell simulations target Tg(U)~195 K. Primary experimental reference for PHYC class PE Tg.",
+          "origin": "autofill",
+          "criterion": "validation_data",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Boyer1973]",
+          "citation": "Boyer, R. F. Glass Temperatures of Polyethylene. Macromolecules 1973, 6, 288."
+        },
+        {
+          "criterion": "parameter_coverage",
+          "claim": "NOT MEASURED for this SMILES. No EMC trial build was run, so coverage is asserted from polymer_rules.json:classes.PHYC.ff_accuracy_prior='trappe-ua' only; whether 'trappe-ua' can type THIS repeat unit is unverified until the build stage runs. The moiety screen ran and matched no rule, so no trial build was triggered. That narrows the risk and measures nothing: the rules cover 77% of the measured failures (guides/ff_moiety_rules.json), so this SMILES is UNSCREENED for the rest, not cleared.",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PHYC.ff_accuracy_prior"
+        },
+        {
+          "criterion": "computational_cost",
+          "claim": "trappe-family cell of 3580 atoms (50216.7 g/mol): estimate_ns_per_day at this run's 3580-atom estimate: 311.6406697847464 ns/day (high confidence). electrostatics=lj_cut, cutoff_A=14.0.",
+          "origin": "autofill",
+          "resolver": "select_hardware.select_hardware"
+        }
+      ],
+      "alternatives": [],
+      "resolved_by": "polymer_rules.json:classes.PHYC.ff_accuracy_prior",
+      "alternatives_note": "NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.PHYC has no forcefield_alternatives, and this layer will not invent one. The moiety probe names what actually types this SMILES; the literature critic may name a candidate on the evidence.",
+      "acknowledgements": {},
+      "critique": {
+        "status": "scientific_agent_decision",
+        "rounds": 1,
+        "findings": []
+      },
+      "confidence": "low"
+    }
+  ],
+  "system_size": {
+    "dp_typical": 179,
+    "nchain": 10,
+    "resolved_by": "select_system_size.solve_system_size",
+    "reasons": [
+      "system size auto-filled {'dp_typical': 179, 'nchain': 10} via solve_system_size()",
+      "rigidity DP recommendation (backbone_rotatable_fraction=1.00, backbone_ring_fraction=0.00, longest_rigid_backbone_run=1 atoms -> flexible; DP_MW=179) does not exceed the existing recommendation 179"
+    ],
+    "acknowledgements": {
+      "MW_FLOOR_UNKNOWN": {
+        "class": "PHYC",
+        "detail": "no documented entanglement Me for this class in polymer_rules.json:_metadata.global_notes -- bulk_modulus chain-length adequacy is UNASSESSED, not assumed adequate"
+      }
+    }
+  },
+  "hardware": {
+    "engine": "gpu",
+    "mpi_ranks": 1,
+    "gpu_per_run": 1,
+    "ff_family": "trappe"
+  },
+  "overrides": {
+    "emc_seed": 642001918,
+    "velocity_seed": 214582469
+  },
+  "decided_params": {
+    "preferred_builder": "emc",
+    "cutoff_A": 14.0,
+    "dt_fs": 2.0,
+    "density_initial_gcm3": 0.65,
+    "T_equil_K": 550.0,
+    "annealing_T_high_K": 620.0,
+    "stage8_min_steps": 2500000,
+    "md_tg_ceiling_K": 450,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "tg_rate_K_per_ns": 40,
+    "tg_min_steps_per_T": 250000,
+    "K_deform_rate_inv_s": 100000000.0,
+    "bm_pressures_atm": [
+      1,
+      1000,
+      2500,
+      5000,
+      10000,
+      15000
+    ],
+    "ct_min_decay_melt": 0.25,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "final_T_K": 300.0,
+    "bm_temperature_K": 300.0,
+    "preferred_ff": "trappe-ua",
+    "charge_method": "embedded",
+    "electrostatics": "lj_cut",
+    "dp_typical": 179,
+    "nchain": 10,
+    "T_workflow_K": 300.0,
+    "T_melt_hold_K": 550.0,
+    "emc_seed": 642001918,
+    "velocity_seed": 214582469
+  },
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "cool",
+      "track": "cooling",
+      "success_criteria": {
+        "chain_submitted": true
+      }
+    },
+    {
+      "stage": "cool-check",
+      "track": "cooling",
+      "success_criteria": {
+        "cool_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": 195
+      }
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "murnaghan",
+      "track": "mechanical",
+      "success_criteria": {
+        "chain_submitted": true
+      }
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ],
+  "cost_estimate": {
+    "cell_atoms_estimate": 3580,
+    "ff_family": "trappe",
+    "stages": {
+      "cool": {
+        "gpu_hours": 0.8664,
+        "confidence": "high",
+        "basis": "log-log interpolated between real measured points [(1640, 639.19), (5040, 227.491), (15040, 76.857)] -- 3580 atoms is within the measured [1640,15040] range",
+        "ns_per_day_used": 311.6407,
+        "simulated_ns": 11.25,
+        "steps": 5625000,
+        "note": "10 cool blocks x 312500 steps (550->300 K at dT=25 K) + npt_final 2500000; first blocks only -- adaptive extensions are not priced"
+      },
+      "tg": {
+        "gpu_hours": 0.9241,
+        "confidence": "high",
+        "basis": "log-log interpolated between real measured points [(1640, 639.19), (5040, 227.491), (15040, 76.857)] -- 3580 atoms is within the measured [1640,15040] range",
+        "ns_per_day_used": 311.6407,
+        "simulated_ns": 12.0,
+        "steps": 6000000,
+        "note": "1 rate (40 K/ns) x 24 T-bin(s) x 250000 steps, floor-checked against tg_min_steps_per_T=250000"
+      },
+      "murnaghan": {
+        "gpu_hours": 0.4621,
+        "confidence": "high",
+        "basis": "log-log interpolated between real measured points [(1640, 639.19), (5040, 227.491), (15040, 76.857)] -- 3580 atoms is within the measured [1640,15040] range",
+        "ns_per_day_used": 311.6407,
+        "simulated_ns": 6.0,
+        "steps": 3000000,
+        "note": "6 pressure point(s) x 500000 npt_steps each"
+      }
+    },
+    "unpriced_stages": [
+      {
+        "stage": "equil",
+        "reason": "stage-length knobs default to None, deferred to generate_equilibration_workflow's own atom-count-tiered default inside the MCP LAMMPS engine -- not resolvable from decided_params alone; not priced here to avoid guessing"
+      }
+    ],
+    "total_gpu_hours": 2.2526,
+    "confidence": "high",
+    "note": "Partial/lower-bound total -- see unpriced_stages for what is not included (notably: equil-stage length, and any deform stage beyond a single primary-direction leg)."
+  }
+}

@@ -1,0 +1,35 @@
+LAMMPS (22 Jul 2025 - Update 3)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread.
+  using 1 OpenMP thread(s) per MPI task
+package gpu 1
+# ============================================================
+# PolyJarvis LAMMPS Engine - Minimization Template
+# ============================================================
+# Stage: Energy minimization (step 0 of equilibration)
+# Purpose: Relax bad contacts in newly generated amorphous cells
+#
+# Tunable parameters (injected by script_generator.py):
+#   DATA_FILE       - path to .data file
+#   LOG_FILE        - log output filename
+#   DUMP_FILE       - trajectory dump filename
+#   WRITE_DATA_FILE - output .data file after minimization
+#   WRITE_RESTART_FILE - restart checkpoint file written on completion (mirrors
+#                        the unconditional final restart every other stage template
+#                        writes, so minimize's output is resumable the same way)
+#   LAST_DUMP_FILE  - final snapshot dump filename
+#   PAIR_STYLE_BLOCK- pair + kspace style lines (soft-core for dense systems)
+#   BOND_STYLE      - e.g. harmonic
+#   ANGLE_STYLE     - e.g. harmonic
+#   DIHEDRAL_STYLE  - e.g. fourier
+#   IMPROPER_STYLE  - e.g. cvff
+#   GPU_PACKAGE     - "package gpu 1 neigh no" or empty string
+#   MIN_STYLE       - cg (conjugate gradient) or hftn
+#   ETOL            - energy convergence tolerance (e.g. 1e-6)
+#   FTOL            - force convergence tolerance (e.g. 1e-6)
+#   MAXITER         - max iterations (e.g. 50000)
+#   MAXEVAL         - max force evaluations (e.g. 100000)
+#   THERMO_FREQ     - thermo output frequency
+#   DUMP_FREQ       - dump output frequency
+# ============================================================
+
+log minimize.log

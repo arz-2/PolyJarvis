@@ -1,0 +1,819 @@
+{
+  "active_finding": null,
+  "agent_escalations": [],
+  "agent_escalations_archived": [
+    {
+      "at": "2026-09-13T17:15:36.123534+00:00",
+      "decision": {
+        "action": "stop",
+        "modifications": {},
+        "rationale": "[recovery-agent diagnosis via claude-opus-5[1m]] No rung should be spent here; this needs a human acceptance decision, the same one already made for PE_1.\n\n**What stopped the run.** BM_LADDER_NOT_CONVERGED at confidence=low, with loo_unstable as the only reason. The measurement itself passes its own gate: BM_REPORTABLE, B0 = 1.9296 \u00b1 0.1454 GPa, B0' = 8.18, r\u00b2 = 0.99980, six points, volume monotonic, plateau_confirmed = true. That B0 is inside PHYC/PE's experimental band [1.5, 2.0] GPa, and the fluctuation cross-check gives 1.67 GPa (13.3% apart). Per recover.md \u00a72, a low-confidence LOO finding never auto-widens the ladder, which is why it reached the agent. remedy_history holds only the two EXTEND continue_npt rungs (equilibration and cooling); no mechanical remedy has been tried.\n\n**Diagnosis: model bias, not noise.**\n- Only dropping the P = 1 atm point breaks the 10% LOO threshold (+11.18%). Dropping 15000 atm gives -9.67%, and the other four points stay within 5.3%. The two ends pull B0 in opposite directions, which means the fit is misshapen, not noisy.\n- Secant moduli from the reported volumes are 2.14, 3.31, 5.31, 8.42 and 12.0 GPa at mid-pressures 0.05, 0.18, 0.38, 0.76 and 1.27 GPa. The local K' falls from about 9.2 to 9.9 at low pressure to about 7.0 at the top of the ladder. K' decreasing with pressure is a rubbery PE cell at 300 K (exp Tg 195 K) stiffening under compression, so a single-K' Murnaghan fit can't hold across the whole range.\n- The 1 atm point is noisy (n_eff = 29, SEM 95 \u00c5\u00b3), but that only moves the first secant by about 2%. It can't produce an 11% LOO shift.\n\n**Why each lever fails.**\n- Raising the compression ceiling (bm_pressures_atm) adds a point further from the constant-K' regime and makes the bias worse.\n- mechanical_sampling_factor or resampling reduces variance, which isn't what's failing.\n- Pricing via remedy_economics was skipped because no rung is recommended.\n\n**Precedent.** This is the same pattern as PE_1: same SMILES, same frozen trappe-ua protocol, same ladder, B0 1.8897 with LOO +13.65% on the P\u22480 drop only. The operator accepted it in commit fe985a2 (benchmarks/rev2_replicates/MANIFEST.json, operator_decisions D-01), declined resampling, and ruled out widening. PE_2 reproduces it (B0 1.93 vs 1.89), which supports the value as reproducible.\n\n**Recommendation to the human.** Accept mechanical with the PE_1 annotation: \"LOO shift driven by the P\u22480 anchor; K' decreases with P over the 1\u201315000 atm ladder (rubbery-to-stiffened crossover); Murnaghan B0 is likely slightly high against the low-P secant (~2.1 GPa) and fluctuation (1.67 GPa) estimates; do not widen the ladder.\"\n\n**Longer term.** Because this repeats on every rubbery PE replicate, the LOO convergence check should probably be advisory, not blocking, for rubbery Murnaghan fits that are BM_REPORTABLE and inside the experimental band. That's a policy change for a human, not something a recovery action can do."
+      },
+      "finding": {
+        "code": "BM_LADDER_NOT_CONVERGED",
+        "confidence": "low",
+        "details": {
+          "gate_output": {
+            "B0_prime": 8.1848,
+            "bm_convergence_confidence": "low",
+            "bm_convergence_reasons": [
+              "loo_unstable"
+            ],
+            "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+            "bm_gate_reasons": [],
+            "bm_gate_verdict": "BM_REPORTABLE",
+            "bulk_modulus_GPa": 1.9296,
+            "mechanical_json_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/raw/mechanical.json",
+            "method": "murnaghan",
+            "murnaghan_result": {
+              "B0_GPa": 1.9296,
+              "B0_prime": 8.1848,
+              "B0_sem_GPa": 0.1454,
+              "V0_A3": 96892.14,
+              "all_points_fit": {
+                "B0_GPa": 1.9296,
+                "B0_prime": 8.1848,
+                "V0_A3": 96892.14,
+                "fit_converged": true,
+                "method": "murnaghan",
+                "n_points": 6,
+                "pressures_atm": [
+                  1.0,
+                  1000.0,
+                  2500.0,
+                  5000.0,
+                  10000.0,
+                  15000.0
+                ],
+                "r_squared": 0.999804,
+                "volume_monotonic": true
+              },
+              "anomalous_points": {
+                "0": [
+                  "|dV/dP| between points 0 and 1 is 4.614, >3x the other intervals' median (1.35) -- possible cavitation/discontinuity in this interval."
+                ],
+                "1": [
+                  "|dV/dP| between points 0 and 1 is 4.614, >3x the other intervals' median (1.35) -- possible cavitation/discontinuity in this interval."
+                ]
+              },
+              "bm_convergence_confidence": "low",
+              "bm_convergence_reasons": [
+                "loo_unstable"
+              ],
+              "bm_convergence_verdict": "BM_LADDER_NOT_CONVERGED",
+              "bm_gate_reasons": [],
+              "bm_gate_verdict": "BM_REPORTABLE",
+              "bm_reportable": true,
+              "bulk_modulus_GPa": 1.9296,
+              "bulk_modulus_sem_GPa": 0.1454,
+              "eq_fraction": 0.5,
+              "excluded_points": [],
+              "fit_converged": true,
+              "fluctuation_bulk_modulus_GPa": 1.6722,
+              "fluctuation_divergence_pct": 13.34,
+              "log_files": [
+                "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1/attempt_1/bm_P1/bm_P1.log",
+                "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_1000/attempt_1/bm_P1000/bm_P1000.log",
+                "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_2500/attempt_1/bm_P2500/bm_P2500.log",
+                "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_5000/attempt_1/bm_P5000/bm_P5000.log",
+                "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_10000/attempt_1/bm_P10000/bm_P10000.log",
+                "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/work/bm_series/p_15000/attempt_1/bm_P15000/bm_P15000.log"
+              ],
+              "loo_max_dB0_pct": 11.18,
+              "loo_n_converged": 6,
+              "loo_results": [
+                {
+                  "B0_GPa": 2.1454,
+                  "B0_prime": 7.8909,
+                  "converged": true,
+                  "dB0_GPa_vs_baseline": 0.2158,
+                  "dB0_prime_vs_baseline": -0.2939,
+                  "dropped_pressure_atm": 1.0,
+                  "is_tension_point": true,
+                  "r_squared": 0.999869
+                },
+                {
+                  "B0_GPa": 1.912,
+                  "B0_prime": 8.1978,
+                  "converged": true,
+                  "dB0_GPa_vs_baseline": -0.0176,
+                  "dB0_prime_vs_baseline": 0.013,
+                  "dropped_pressure_atm": 1000.0,
+                  "is_tension_point": false,
+                  "r_squared": 0.999776
+                },
+                {
+                  "B0_GPa": 1.9352,
+                  "B0_prime": 8.102,
+                  "converged": true,
+                  "dB0_GPa_vs_baseline": 0.0056,
+                  "dB0_prime_vs_baseline": -0.0827,
+                  "dropped_pressure_atm": 2500.0,
+                  "is_tension_point": false,
+                  "r_squared": 0.999873
+                },
+                {
+                  "B0_GPa": 1.9449,
+                  "B0_prime": 8.142,
+                  "converged": true,
+                  "dB0_GPa_vs_baseline": 0.0153,
+                  "dB0_prime_vs_baseline": -0.0428,
+                  "dropped_pressure_atm": 5000.0,
+                  "is_tension_point": false,
+                  "r_squared": 0.999807
+                },
+                {
+                  "B0_GPa": 1.8273,
+                  "B0_prime": 8.3891,
+                  "converged": true,
+                  "dB0_GPa_vs_baseline": -0.1023,
+                  "dB0_prime_vs_baseline": 0.2043,
+                  "dropped_pressure_atm": 10000.0,
+                  "is_tension_point": false,
+                  "r_squared": 0.999941
+                },
+                {
+                  "B0_GPa": 1.743,
+                  "B0_prime": 8.8415,
+                  "converged": true,
+                  "dB0_GPa_vs_baseline": -0.1866,
+                  "dB0_prime_vs_baseline": 0.6567,
+                  "dropped_pressure_atm": 15000.0,
+                  "is_tension_point": false,
+                  "r_squared": 0.999941
+                }
+              ],
+              "method": "murnaghan",
+              "murnaghan_eos_fig": "/home/alexzhao/PolyJarvis/data/PE_2/graphs/murnaghan_eos.png",
+              "n_eff_per_point": [
+                29,
+                1392,
+                39,
+                53,
+                2501,
+                2501
+              ],
+              "n_points": 6,
+              "n_prod_rows": [
+                2501,
+                2501,
+                2501,
+                2501,
+                2501,
+                2501
+              ],
+              "output_dir": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/raw",
+              "pressures_GPa": [
+                0.000101,
+                0.101325,
+                0.253313,
+                0.506625,
+                1.01325,
+                1.519875
+              ],
+              "pressures_atm": [
+                1.0,
+                1000.0,
+                2500.0,
+                5000.0,
+                10000.0,
+                15000.0
+              ],
+              "r_squared": 0.999804,
+              "selected_window": {
+                "n_points": 6,
+                "plateau_confirmed": true,
+                "selection_note": "Untrimmed fit already has r_squared=0.99980 >= 0.999 -- no trimming applied even though point(s) [0, 1] were flagged (a genuinely curved EOS can trip the interval heuristic without a real problem).",
+                "trim_total": 0
+              },
+              "status": "success",
+              "summary_json": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/raw/mechanical.json",
+              "tau_frames_per_point": [
+                85.718,
+                1.796,
+                63.771,
+                47.106,
+                1.0,
+                1.0
+              ],
+              "temperature_K": 299.93,
+              "temperature_spread_K": 0.19,
+              "vol_sem_A3_per_point": [
+                95.325,
+                9.7248,
+                49.0155,
+                32.5043,
+                3.5181,
+                2.955
+              ],
+              "vol_stds_A3": [
+                513.34,
+                362.83,
+                306.1,
+                236.63,
+                175.94,
+                147.78
+              ],
+              "volume_monotonic": true,
+              "volumes_A3": [
+                97275.29,
+                92665.83,
+                88410.56,
+                84196.13,
+                79129.1,
+                75785.99
+              ],
+              "warnings": [
+                "Leave-one-out refit: dropping one pressure point shifts B0 by up to 11.2% (>10%) \u2014 the fit is not robust to a single point; consider widening the pressure range."
+              ]
+            },
+            "pressure_selection": {
+              "ced_mpa": null,
+              "compression_limit_atm": 15000,
+              "fluctuation_K_GPa": 1.6722076302915672,
+              "ladder_adjustment": null,
+              "pressures_atm": [
+                1,
+                1000,
+                2500,
+                5000,
+                10000,
+                15000
+              ],
+              "reason": "class_protocol",
+              "tension_limit_atm": 1
+            },
+            "velocity_seed": 904370
+          }
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "mechanical"
+      },
+      "manifest": "attempt-0001"
+    }
+  ],
+  "created_at": "2026-09-13T13:28:09.489160+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 550.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 620.0,
+    "bm_pressures_atm": [
+      1,
+      1000,
+      2500,
+      5000,
+      10000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "embedded",
+    "cooling_continuation_attempt": 1,
+    "cooling_continuation_ns": 0.5,
+    "cooling_extend_base_stage": "npt_final",
+    "cooling_extend_ensemble": "npt",
+    "ct_min_decay_melt": 0.25,
+    "cutoff_A": 14.0,
+    "density_initial_gcm3": 0.65,
+    "dp_typical": 179,
+    "dt_fs": 2.0,
+    "electrostatics": "lj_cut",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 450,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "trappe-ua",
+    "stage8_min_steps": 2500000,
+    "tg_min_steps_per_T": 250000,
+    "tg_rate_K_per_ns": 40,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20
+  },
+  "engine_version": "workflow-engine-v3",
+  "plan_decided_params": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 550.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 620.0,
+    "bm_pressures_atm": [
+      1,
+      1000,
+      2500,
+      5000,
+      10000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "embedded",
+    "ct_min_decay_melt": 0.25,
+    "cutoff_A": 14.0,
+    "density_initial_gcm3": 0.65,
+    "dp_typical": 179,
+    "dt_fs": 2.0,
+    "electrostatics": "lj_cut",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 450,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "trappe-ua",
+    "stage8_min_steps": 2500000,
+    "tg_min_steps_per_T": 250000,
+    "tg_rate_K_per_ns": 40,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20
+  },
+  "plan_hash": "bf166979a8590bb2619ead3e7d3da81eccd59056c9933396f3adff00cb84c3d6",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {
+      "agent_only:build": 0,
+      "agent_only:cooling": 0,
+      "agent_only:equilibration": 0,
+      "agent_only:mechanical": 0,
+      "agent_only:summary": 0,
+      "agent_only:thermal": 0,
+      "conditional_deformation:build": 1,
+      "conditional_deformation:cooling": 1,
+      "conditional_deformation:equilibration": 1,
+      "conditional_deformation:mechanical": 1,
+      "conditional_deformation:summary": 1,
+      "conditional_deformation:thermal": 1,
+      "continue_npt:build": 2,
+      "continue_npt:cooling": 2,
+      "continue_npt:equilibration": 2,
+      "continue_npt:mechanical": 2,
+      "continue_npt:summary": 2,
+      "continue_npt:thermal": 2,
+      "deformation_fallback:build": 1,
+      "deformation_fallback:cooling": 1,
+      "deformation_fallback:equilibration": 1,
+      "deformation_fallback:mechanical": 1,
+      "deformation_fallback:summary": 1,
+      "deformation_fallback:thermal": 1,
+      "finite_size_rebuild:build": 2,
+      "finite_size_rebuild:cooling": 2,
+      "finite_size_rebuild:equilibration": 2,
+      "finite_size_rebuild:mechanical": 2,
+      "finite_size_rebuild:summary": 2,
+      "finite_size_rebuild:thermal": 2,
+      "melt_homogeneity:build": 2,
+      "melt_homogeneity:cooling": 2,
+      "melt_homogeneity:equilibration": 2,
+      "melt_homogeneity:mechanical": 2,
+      "melt_homogeneity:summary": 2,
+      "melt_homogeneity:thermal": 2,
+      "murnaghan_ladder_extend:build": 1,
+      "murnaghan_ladder_extend:cooling": 1,
+      "murnaghan_ladder_extend:equilibration": 1,
+      "murnaghan_ladder_extend:mechanical": 1,
+      "murnaghan_ladder_extend:summary": 1,
+      "murnaghan_ladder_extend:thermal": 1,
+      "murnaghan_resample:build": 1,
+      "murnaghan_resample:cooling": 1,
+      "murnaghan_resample:equilibration": 1,
+      "murnaghan_resample:mechanical": 1,
+      "murnaghan_resample:summary": 1,
+      "murnaghan_resample:thermal": 1,
+      "negative_deformation:build": 1,
+      "negative_deformation:cooling": 1,
+      "negative_deformation:equilibration": 1,
+      "negative_deformation:mechanical": 1,
+      "negative_deformation:summary": 1,
+      "negative_deformation:thermal": 1,
+      "raise_minimize_tolerance:build": 2,
+      "raise_minimize_tolerance:cooling": 2,
+      "raise_minimize_tolerance:equilibration": 2,
+      "raise_minimize_tolerance:mechanical": 2,
+      "raise_minimize_tolerance:summary": 2,
+      "raise_minimize_tolerance:thermal": 2,
+      "rate_sensitivity:build": 1,
+      "rate_sensitivity:cooling": 1,
+      "rate_sensitivity:equilibration": 1,
+      "rate_sensitivity:mechanical": 1,
+      "rate_sensitivity:summary": 1,
+      "rate_sensitivity:thermal": 1,
+      "tg_breakpoint:build": 1,
+      "tg_breakpoint:cooling": 1,
+      "tg_breakpoint:equilibration": 1,
+      "tg_breakpoint:mechanical": 1,
+      "tg_breakpoint:summary": 1,
+      "tg_breakpoint:thermal": 1,
+      "transient_retry:build": 0,
+      "transient_retry:cooling": 0,
+      "transient_retry:equilibration": 0,
+      "transient_retry:mechanical": 0,
+      "transient_retry:summary": 0,
+      "transient_retry:thermal": 0
+    },
+    "note": "operator strict-replay pin, 2026-09-13: every parameter-changing route at cap; transient_retry (identical params) left available. Real history in remedy_counters_archived.",
+    "total": 0
+  },
+  "remedy_counters_archived": [
+    {
+      "at": "2026-09-13T20:55:01.545425+00:00",
+      "counters": {
+        "by_id": {
+          "continue_npt": 2
+        },
+        "by_route": {
+          "continue_npt:cooling": 1,
+          "continue_npt:equilibration": 1
+        },
+        "total": 2
+      }
+    }
+  ],
+  "remedy_history": [],
+  "remedy_history_archived": [
+    {
+      "application": 1,
+      "at": "2026-09-13T14:22:35.860753+00:00",
+      "finding": {
+        "code": "EXTEND",
+        "confidence": "high",
+        "details": {
+          "advisory_gates": {
+            "msd_not_trapped": true,
+            "msid_gaussian": true,
+            "residual_stress": true
+          },
+          "applicable_clause": "require_melt",
+          "binding_gates": {
+            "chain_displacement": true,
+            "density_drift": true,
+            "density_homogeneity": true,
+            "density_sem": true,
+            "energy_component_drift": false,
+            "energy_drift": true,
+            "energy_sem": true,
+            "finite_size": true,
+            "n_eff_density": true,
+            "p2": true,
+            "rg": true,
+            "torsion": true
+          },
+          "cooling_extrapolation_reliable": null,
+          "cooling_verdict": null,
+          "density_value_binding": "n/a",
+          "extension_ns": 2.0,
+          "failing_binding_gates": [
+            "energy_component_drift"
+          ],
+          "finite_size": {
+            "L_min_A": 49.14,
+            "L_over_2Rg": 0.801,
+            "L_over_2cutoff": 1.755,
+            "L_over_Ree": 0.676,
+            "available": true,
+            "box_A": [
+              49.14,
+              49.14,
+              49.14
+            ],
+            "cutoff_A": 14.0,
+            "graded_box": "actual_equilibrated",
+            "min_image_evaluated": true,
+            "pass": true,
+            "ree_self_image_flag": true,
+            "self_image_advisory": true,
+            "verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY"
+          },
+          "finite_size_min_image_unarmed": false,
+          "finite_size_verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
+          "homogeneity_verdict": "HOMOG_PASS",
+          "regime": "melt",
+          "relaxation_time_ns": 207.46710000000002,
+          "remedy": "extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': extend_ns = max(1.5, 1.5*ct_tau_relax_ps/1000), else 1.5 ns, via restart-continuation at npt_prod_temp_K (npt_final always runs at final_T_K, default 300 K \u2014 never a re-melt). Cap 2 per gate.",
+          "remedy_confidence": "high",
+          "residual_stress": {
+            "available": true,
+            "dev_atm": {
+              "Pxx": 4.0,
+              "Pyy": -27.4,
+              "Pzz": 23.4
+            },
+            "max_abs_dev_atm": 27.4,
+            "mean_pressure_atm": 11.2,
+            "resolved": false,
+            "von_mises_atm": 44.4,
+            "z_max": 1.36
+          },
+          "saved_to": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0001/raw/equilibration.json",
+          "unmeasured_binding_gates": [],
+          "verdict": "EXTEND"
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "equilibration"
+      },
+      "remedy_id": "continue_npt"
+    },
+    {
+      "application": 1,
+      "at": "2026-09-13T15:43:04.084457+00:00",
+      "finding": {
+        "code": "EXTEND",
+        "confidence": "high",
+        "details": {
+          "advisory_gates": {
+            "ct": true,
+            "density_drift": true,
+            "energy_component_drift": false,
+            "msd_not_trapped": false,
+            "msid_gaussian": true,
+            "residual_stress": false,
+            "rg": true,
+            "torsion": true
+          },
+          "applicable_clause": "require_rubbery",
+          "binding_gates": {
+            "density_homogeneity": true,
+            "density_sem": true,
+            "energy_drift": false,
+            "energy_sem": true,
+            "finite_size": true,
+            "n_eff_density": true
+          },
+          "cooling_extrapolation_reliable": null,
+          "cooling_verdict": null,
+          "density_value_binding": "n/a",
+          "extension_ns": 0.5,
+          "failing_binding_gates": [
+            "energy_drift"
+          ],
+          "finite_size": {
+            "L_min_A": 46.08,
+            "L_over_2Rg": 0.76,
+            "L_over_2cutoff": 1.646,
+            "L_over_Ree": 0.673,
+            "available": true,
+            "box_A": [
+              46.08,
+              46.08,
+              46.08
+            ],
+            "cutoff_A": 14.0,
+            "graded_box": "actual_equilibrated",
+            "min_image_evaluated": true,
+            "pass": true,
+            "ree_self_image_flag": true,
+            "self_image_advisory": true,
+            "verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY"
+          },
+          "finite_size_min_image_unarmed": false,
+          "finite_size_verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
+          "homogeneity_verdict": "HOMOG_PASS",
+          "regime": "rubbery",
+          "relaxation_time_ns": 109.4192,
+          "remedy": "extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': extend_ns = max(1.5, 1.5*ct_tau_relax_ps/1000), else 1.5 ns, via restart-continuation at npt_prod_temp_K (npt_final always runs at final_T_K, default 300 K \u2014 never a re-melt). Cap 2 per gate.",
+          "remedy_confidence": "high",
+          "residual_stress": {
+            "available": true,
+            "dev_atm": {
+              "Pxx": 31.8,
+              "Pyy": -18.0,
+              "Pzz": -13.9
+            },
+            "max_abs_dev_atm": 31.8,
+            "mean_pressure_atm": 10.4,
+            "resolved": true,
+            "von_mises_atm": 47.9,
+            "z_max": 2.86
+          },
+          "saved_to": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0001/raw/cooling.json",
+          "unmeasured_binding_gates": [],
+          "verdict": "EXTEND"
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "cooling"
+      },
+      "remedy_id": "continue_npt"
+    }
+  ],
+  "run_name": "PE_2",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T13:28:39.609278+00:00",
+          "input_hash": "1a028f41581b5e05bf0746555d82732d947e40fc7ef23b76e2e188a2d2df0d15",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T13:28:09.489692+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "1a028f41581b5e05bf0746555d82732d947e40fc7ef23b76e2e188a2d2df0d15",
+      "status": "accepted"
+    },
+    "cooling": {
+      "accepted_attempt": "attempt-0004",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T15:43:04.083139+00:00",
+          "input_hash": "56756d71f4233a48f2e77ae0b73bd9168e0d3c541010a4b5aa4afd2040be2c7f",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T14:40:31.513319+00:00",
+          "status": "failed",
+          "status_before_supersede": "remedy_required",
+          "superseded": true,
+          "superseded_reason": "branch-rerun 2026-09-13: PE_1 ran no equilibration extension; attempt-0002's 2.0 ns npt_melt_hold continuation is discarded and cooling, thermal, mechanical and summary re-run from equilibration attempt-0001's melt cell"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-13T15:46:39.733047+00:00",
+          "input_hash": "a29602d83e6cd468c73a78eaa15f0b03e0f9a219bbcddf22efcb668b55038da2",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0002/executor_state.json",
+          "started_at": "2026-09-13T15:43:04.240126+00:00",
+          "status": "failed",
+          "status_before_supersede": "accepted",
+          "superseded": true,
+          "superseded_reason": "branch-rerun 2026-09-13: PE_1 ran no equilibration extension; attempt-0002's 2.0 ns npt_melt_hold continuation is discarded and cooling, thermal, mechanical and summary re-run from equilibration attempt-0001's melt cell"
+        },
+        {
+          "attempt_id": "attempt-0003",
+          "finished_at": "2026-09-13T23:28:14.709938+00:00",
+          "input_hash": "47064a44d3837f2486fd46ffc437b6449c5277077368a60ce766b45b70109db1",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0003/executor_state.json",
+          "started_at": "2026-09-13T22:26:10.991973+00:00",
+          "status": "remedy_required"
+        },
+        {
+          "attempt_id": "attempt-0004",
+          "finished_at": "2026-09-14T01:11:29.488960+00:00",
+          "input_hash": "d4ea7757026c0483811864f824ac33d42d08634372aaef5a68df393fa25b51e3",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/executor_state.json",
+          "started_at": "2026-09-14T01:07:52.861949+00:00",
+          "status": "accepted",
+          "status_before_promotion": "remedy_required"
+        }
+      ],
+      "input_hash": "d4ea7757026c0483811864f824ac33d42d08634372aaef5a68df393fa25b51e3",
+      "operator_branch_acceptance": {
+        "decision": "operator standing authorization 2026-09-13 (same as PE_3)",
+        "failing_binding_gates": [
+          "energy_drift",
+          "n_eff_density"
+        ],
+        "measured": {
+          "density_drift": {
+            "drift_pct": 0.582,
+            "p_value": 0.0003,
+            "pass": true
+          },
+          "energy_drift": {
+            "drift_pct": 1.7315,
+            "p_value": 0.0059,
+            "pass": false
+          },
+          "n_eff_density": {
+            "n_eff": 19,
+            "n_eff_min": 20,
+            "pass": false
+          }
+        },
+        "pe_1_same_schedule": {
+          "energy_drift_pct": 2.0218,
+          "n_eff_density": 25,
+          "p": 0.0116,
+          "verdict": "PASS"
+        },
+        "schedule": "npt_final 5 ns + exactly one 0.5 ns continuation, identical to PE_1"
+      },
+      "status": "accepted"
+    },
+    "equilibration": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T14:22:35.859596+00:00",
+          "input_hash": "5d9c46069877d3bd18b9f8b56139214c641f063fcbe86c65e9343c998c0bfdb1",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T13:28:39.611655+00:00",
+          "status": "accepted",
+          "status_before_promotion": "remedy_required"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-13T14:40:31.359100+00:00",
+          "input_hash": "ba1d14d3194557f5de73ab468e733372eab25e97222ad1534032fa393b950d86",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/equilibration/attempt-0002/executor_state.json",
+          "started_at": "2026-09-13T14:22:35.862588+00:00",
+          "status": "failed",
+          "status_before_supersede": "accepted",
+          "superseded": true,
+          "superseded_reason": "branch-rerun 2026-09-13: PE_1 ran no equilibration extension; attempt-0002's 2.0 ns npt_melt_hold continuation is discarded and cooling, thermal, mechanical and summary re-run from equilibration attempt-0001's melt cell"
+        }
+      ],
+      "input_hash": "5d9c46069877d3bd18b9f8b56139214c641f063fcbe86c65e9343c998c0bfdb1",
+      "operator_branch_acceptance": {
+        "failing_binding_gates": [
+          "energy_component_drift"
+        ],
+        "gate_verdict_recorded_honestly": "EXTEND",
+        "melt_density_from_own_equilibration_json": 0.716843,
+        "why": "branch-rerun 2026-09-13: PE_1 ran no equilibration extension; attempt-0002's 2.0 ns npt_melt_hold continuation is discarded and cooling, thermal, mechanical and summary re-run from equilibration attempt-0001's melt cell"
+      },
+      "status": "accepted"
+    },
+    "mechanical": {
+      "accepted_attempt": "attempt-0002",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T17:14:28.134064+00:00",
+          "input_hash": "9701945834db40cd0d3d401a4bb0fb211ad2af81f983e5bacac26fdb6085d244",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T16:47:16.668448+00:00",
+          "status": "failed",
+          "status_before_supersede": "accepted",
+          "superseded": true,
+          "superseded_reason": "branch-rerun 2026-09-13: PE_1 ran no equilibration extension; attempt-0002's 2.0 ns npt_melt_hold continuation is discarded and cooling, thermal, mechanical and summary re-run from equilibration attempt-0001's melt cell"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-14T02:39:39.561159+00:00",
+          "input_hash": "aeb86796cb608f07c937ce587a9abc1fc6fa534dfb26d6ba537143e31de62d04",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/mechanical/attempt-0002/executor_state.json",
+          "started_at": "2026-09-14T02:12:28.102645+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "aeb86796cb608f07c937ce587a9abc1fc6fa534dfb26d6ba537143e31de62d04",
+      "operator_acceptance": {
+        "B0_GPa": 1.83,
+        "B0_prime": 8.2691,
+        "annotation": "LOO shift driven by the P~0 anchor; K' decreases with P over the 1-15000 atm ladder (rubbery-to-stiffened crossover); Murnaghan B0 likely slightly high against the low-P secant and fluctuation estimates; do not widen the ladder.",
+        "bm_gate_verdict": "BM_REPORTABLE",
+        "decision": "operator pre-authorization 2026-09-13"
+      },
+      "status": "accepted"
+    },
+    "summary": {
+      "accepted_attempt": "attempt-0002",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T20:22:04.708362+00:00",
+          "input_hash": "8d00056a1beb78c75f3ece973f7df7a327ca58e87902c82a8ab542ad42a08f87",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/summary/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T20:22:01.967493+00:00",
+          "status": "failed",
+          "status_before_supersede": "accepted",
+          "superseded": true,
+          "superseded_reason": "phase-1 summary measured the 5 ns cell; superseded for the 5.5 ns schedule"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-14T02:40:00.906164+00:00",
+          "input_hash": "b8cd3632dc04747c4300c0fab1a25df7c45c4f4f9e763b37e338822962f2434c",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/summary/attempt-0002/executor_state.json",
+          "started_at": "2026-09-14T02:39:57.430270+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "b8cd3632dc04747c4300c0fab1a25df7c45c4f4f9e763b37e338822962f2434c",
+      "stale_reason": "D-03 phase 2: apply PE_1's exact 0.5 ns continuation on top of the fresh 5 ns npt_final",
+      "status": "accepted"
+    },
+    "thermal": {
+      "accepted_attempt": "attempt-0002",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T16:47:16.606914+00:00",
+          "input_hash": "315d82bb1a39ed9902b4cd04b7e904c968c2c86e6027fef5e1190be2f7a274a6",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/thermal/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T15:46:39.886324+00:00",
+          "status": "failed",
+          "status_before_supersede": "accepted",
+          "superseded": true,
+          "superseded_reason": "branch-rerun 2026-09-13: PE_1 ran no equilibration extension; attempt-0002's 2.0 ns npt_melt_hold continuation is discarded and cooling, thermal, mechanical and summary re-run from equilibration attempt-0001's melt cell"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-14T02:12:28.041327+00:00",
+          "input_hash": "659a8f973e864a6f2264c6fddb84b21de6ceefaaf4138523c0b9cf47a3151b0c",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/thermal/attempt-0002/executor_state.json",
+          "started_at": "2026-09-14T01:11:50.389326+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "659a8f973e864a6f2264c6fddb84b21de6ceefaaf4138523c0b9cf47a3151b0c",
+      "stale_reason": "branch-rerun 2026-09-13: PE_1 ran no equilibration extension; attempt-0002's 2.0 ns npt_melt_hold continuation is discarded and cooling, thermal, mechanical and summary re-run from equilibration attempt-0001's melt cell",
+      "status": "accepted"
+    }
+  },
+  "status": "accepted",
+  "updated_at": "2026-09-14T02:40:00.908257+00:00"
+}

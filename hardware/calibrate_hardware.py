@@ -44,9 +44,9 @@ HERE = Path(__file__).resolve().parent
 ORCH = REPO / "orchestration" / "scripts"
 RULES = REPO / "guides" / "polymer_rules.json"
 sys.path.insert(0, str(HERE))
-sys.path.insert(0, str(ORCH))            # hw_common lives in orchestration/scripts/
+sys.path.insert(0, str(ORCH))            # hardware_runtime lives in orchestration/scripts/
 import benchmark_hardware as bh          # reuse politeness probes + detection + matrix
-import hw_common                         # live_host() for the host fingerprint
+import hardware_runtime                  # live_host() for the host fingerprint
 
 HEADROOM_FRAC = 0.25                     # leave >=25% of physical cores for other users
 
@@ -61,9 +61,25 @@ CALIB_CELLS = {
 }
 PPPM_FOR = {"pcff": True, "opls": True, "gaff": True, "trappe": False}  # UA has no kspace
 
-LMP        = os.environ.get("LAMBDA_LAMMPS", bh.LMP_DEFAULT)
-LMP_KOKKOS = os.environ.get("LAMBDA_LAMMPS_KOKKOS", bh.LMP_KOKKOS_DEFAULT)
-CALIB_TMP  = Path("/tmp/polyjarvis/calib")
+# Extra atom counts beyond the base CALIB_<FAM> cell, for --size-points. ns/day-vs-atoms is a
+# power law with a family-dependent exponent (trappe near -1; pcff/opls flatter because PPPM
+# and the class2 bonded terms amortise), so a single point cannot be scaled to another size
+# without inventing an exponent -- select_hardware interpolates log-log between real points
+# instead. These cells are what produce those points.
+SIZE_SUFFIXES = ("_5K", "_15K")
+
+
+def extra_size_cells(fam: str) -> list[Path]:
+    """Existing in-repo CALIB_<FAM>_<SIZE> cells for `fam` (the base cell is measured by the
+    ordinary revalidation run, so it is not repeated here)."""
+    return [c for c in (HERE / f"CALIB_{fam.upper()}{sfx}" / "emc_build.data"
+                        for sfx in SIZE_SUFFIXES) if c.exists()]
+
+# bh.LMP_DEFAULT / bh.LMP_KOKKOS_DEFAULT already consult LAMBDA_LAMMPS / LAMBDA_LAMMPS_KOKKOS
+# and fall back to the per-user $HOME install prefix, so no second env lookup is needed here.
+LMP        = bh.LMP_DEFAULT
+LMP_KOKKOS = bh.LMP_KOKKOS_DEFAULT
+CALIB_TMP  = bh.BENCH_ROOT / "calib"          # single scratch root, shared with benchmark_hardware
 REVALIDATE_TIMEOUT_S = 1800             # generous per-run cap (timed run + two run-0 evals)
 
 
@@ -72,13 +88,21 @@ REVALIDATE_TIMEOUT_S = 1800             # generous per-run cap (timed run + two 
 # --------------------------------------------------------------------------
 def detect_host() -> dict:
     # Single fingerprint definition (GPU count+model + a DIRECT core probe) shared with
-    # hw_common.host_matches, so what we write here is exactly what the nudge compares against.
-    return hw_common.live_host()
+    # hardware_runtime.host_matches, so what we write here is exactly what the nudge compares against.
+    return hardware_runtime.live_host()
 
 
-def polite_state(phys: int, allow_busy: bool) -> dict:
-    """Snapshot of what we may use right now without contending."""
-    free = bh.idle_gpu_ids()
+def polite_state(phys: int, allow_busy: bool, pin_gpus: list[int] | None = None) -> dict:
+    """Snapshot of what we may use right now without contending.
+
+    `pin_gpus` (--gpu-id) replaces the probe's answer with the operator's. bh.idle_gpu_ids()
+    excludes any GPU hosting a compute process from any user, which is the right default but
+    reports EVERY GPU busy when a neighbour's framework job holds an idle ~750 MB CUDA context
+    on all of them -- and --allow-busy alone would then fall through to GPU 0, typically the
+    one actually under load. Naming the GPUs that are genuinely free is an assertion the probe
+    cannot make; it narrows nothing else, and CPU gating is untouched.
+    """
+    free = list(pin_gpus) if pin_gpus else bh.idle_gpu_ids()
     busy = 0 if allow_busy else bh.busy_cores(phys)
     headroom = 0 if allow_busy else max(1, round(HEADROOM_FRAC * phys))
     cap = phys if allow_busy else max(1, phys - busy - headroom)
@@ -106,7 +130,7 @@ def plan_configs(phys: int, st: dict, allow_busy: bool):
 def benchmark_cell(cell: str, ff: str, pppm: bool, steps: int, st: dict,
                    only_names: list[str], dry: bool, allow_busy: bool) -> dict | None:
     label = f"calib_{ff}_{Path(cell).parent.name}"
-    out_json = Path("/tmp/polyjarvis/bench") / label / "benchmark.json"
+    out_json = bh.BENCH_ROOT / "bench" / label / "benchmark.json"
     cmd = ["nice", "-n", "19", sys.executable, str(HERE / "benchmark_hardware.py"),
            "--data", cell, "--ff", ff, "--label", label,
            "--steps", str(steps), "--out", str(out_json),
@@ -163,26 +187,99 @@ def splice_hardware_policy(new_hp: dict) -> None:
     RULES.write_text(text[:start] + body + text[end:])
 
 
-def _carry_provenance(prior_probe: dict, probe: dict) -> None:
-    """Carry hand-authored provenance sub-blocks (e.g. kokkos_offload_study) across a fresh
-    directional_probe rebuild. Those record cross-host engine rationale that isn't re-derived
-    by a throughput sweep, so wiping them on every calibration would lose real history."""
+def _repo_rel(path) -> str | None:
+    """Record calibration-cell paths REPO-RELATIVE so directional_probe.cells stays valid in
+    any clone (the shipped CALIB_* cells are in-repo). A cell passed via --cell from outside
+    the repo has no relative form, so it is kept absolute."""
+    if not path:
+        return None
+    try:
+        return str(Path(path).resolve().relative_to(REPO))
+    except ValueError:
+        return str(path)
+
+
+def _same_host(prior: dict | None, live: dict) -> bool:
+    """Whether a PREVIOUSLY RECORDED hardware_policy.host is the box we are on now. Same
+    GPU-model/count/core comparison hardware_runtime.host_matches uses (loose model match,
+    because nvidia-smi and the saved name format the same card differently). A missing or
+    empty prior host means the policy was never calibrated anywhere -> not this host."""
+    if not prior:
+        return False
+    return (hardware_runtime._gpu_model_matches(live.get("gpu_model", ""),
+                                                prior.get("gpu_model", ""))
+            and live.get("gpus") == prior.get("gpus")
+            and live.get("phys_cores") == prior.get("phys_cores"))
+
+
+def _carry_provenance(prior_probe: dict, probe: dict, same_host: bool) -> str | None:
+    """Carry hand-authored provenance sub-blocks across a fresh directional_probe rebuild,
+    and return a note about anything deliberately DROPPED (None when nothing was).
+
+    Two different kinds of block live here and they do NOT travel the same way:
+
+      kokkos_offload_study — hand-authored engine RATIONALE (why class2+PPPM wants full
+        offload while small UA cells do not). That reasoning is about interaction styles,
+        not about one box, and is not re-derived by a throughput sweep, so it always
+        survives; wiping it on every calibration would lose real history.
+
+      size_points — MEASURED ns/day at several atom counts, i.e. this box's throughput
+        curve. It must NOT survive a move to different hardware. select_hardware's
+        _size_points() prefers these points over the freshly measured single point AND
+        reports "high" confidence once hardware_policy.host matches -- and `host` is
+        overwritten by this same calibration. Carrying them across a host change would
+        therefore make the cost model quote the OLD machine's curve, at high confidence,
+        on hardware it never ran on. Dropped on a host change; estimate_ns_per_day then
+        falls back to the single measured point and honestly reports lower confidence.
+    """
     for key in ("kokkos_offload_study",):
         if key in prior_probe:
             probe[key] = prior_probe[key]
 
+    if "size_points" not in prior_probe:
+        return None
+    if same_host:
+        probe["size_points"] = prior_probe["size_points"]
+        return None
+    prior_measured_on = prior_probe.get("measured_on", "an unrecorded host")
+    return (f"size_points DROPPED: those ns/day-vs-atoms points were measured on "
+            f"{prior_measured_on}, not this box, and the cost model would otherwise have "
+            f"quoted that machine's throughput curve here at high confidence. Cost estimates "
+            f"now fall back to the single measured point per family (lower confidence). "
+            f"Re-measure with: hardware/calibrate_hardware.py --revalidate --size-points")
+
+
+def _fresh_size_curves(ran: list[dict]) -> dict[str, list]:
+    """Per-family ns/day-vs-atoms curves from this run's successful timed records, sorted by
+    atom count. Only families with >=2 distinct sizes get a curve: select_hardware._size_points
+    needs two points to interpolate, and writing a lone point would put something in
+    polymer_rules.json that looks like a curve and is not. Duplicate atom counts collapse to
+    the last measurement rather than faking a second point."""
+    by_fam: dict[str, dict[int, dict]] = {}
+    for r in ran:
+        if not (r.get("atoms") and r.get("ns_per_day")):
+            continue
+        by_fam.setdefault(r["ff"], {})[r["atoms"]] = {
+            "atoms": r["atoms"], "ns_per_day": round(r["ns_per_day"], 3),
+            "engine": r["engine"], "mpi": r["mpi"], "gpu": r["gpu_per_run"]}
+    return {fam: [pts[a] for a in sorted(pts)]
+            for fam, pts in by_fam.items() if len(pts) >= 2}
+
 
 def ingest(host: dict, per_ff: dict, date: str, clean: bool) -> None:
     hp = json.loads(RULES.read_text())["hardware_policy"]
-    hp["host"] = host
+    prior_host = hp.get("host")                   # read BEFORE overwriting — _carry_provenance
+    hp["host"] = host                             # needs to know if the box actually changed
     prior_probe = hp.get("directional_probe", {})
     probe = {}                                    # rebuild fresh — drop any stale prior-box keys
     hp["directional_probe"] = probe
-    _carry_provenance(prior_probe, probe)
+    dropped = _carry_provenance(prior_probe, probe, _same_host(prior_host, host))
+    if dropped:
+        probe["carry_over_note"] = dropped
     probe["measured_on"] = (f"{host['gpus']}x {host['gpu_model']} / "
                             f"{host['phys_cores']} phys cores (calibrate_hardware.py)")
     probe["date"] = date
-    probe["cells"] = {ff: d["data_file"] for ff, d in per_ff.items()}
+    probe["cells"] = {ff: _repo_rel(d["data_file"]) for ff, d in per_ff.items()}
     probe["ff_coverage_note"] = (
         "Benchmarked per FORCE-FIELD FAMILY, not per polymer template: the mpi/gpu optimum is "
         "set by the interaction-style mix (pair + k-space), which the FF family fixes, while the "
@@ -280,8 +377,14 @@ def run_parity(cpu_log: Path, eng_log: Path, work: Path) -> dict:
 
 
 def revalidate_ff(fam: str, cell: str, default: dict, st: dict, steps: int,
-                  dry: bool, kokkos_ok: bool) -> dict:
-    """Re-validate one FF's shipped default on this host: run it (timed) + run-0 parity vs CPU."""
+                  dry: bool, kokkos_ok: bool, timing_only: bool = False,
+                  work_tag: str | None = None) -> dict:
+    """Re-validate one FF's shipped default on this host: run it (timed) + run-0 parity vs CPU.
+
+    timing_only skips the parity pair and returns throughput alone. That is the right shape for
+    the extra --size-points cells: parity asks whether this ENGINE reproduces CPU physics, which
+    is a property of the interaction styles, not of how many atoms are in the box -- so it is
+    gated once per family on the base cell rather than re-run at every size."""
     engine = default.get("engine", "gpu")
     mpi = int(default.get("mpi", 1) or 1)
     gpu_per_run = 0 if engine == "cpu" else int(default.get("gpu_per_run", 1) or 1)
@@ -310,21 +413,25 @@ def revalidate_ff(fam: str, cell: str, default: dict, st: dict, steps: int,
     if dry:
         return {"ff": fam, "status": "planned", "engine": engine, "arm": arm, "mpi": mpi,
                 "gpu_per_run": need_gpu, "gpu_ids": gpu_ids, "config_name": config_name,
-                "cell": cell, "fell_back": fell_back, "notes": notes}
+                "cell": cell, "fell_back": fell_back, "notes": notes,
+                "size_point": timing_only}
 
-    work = CALIB_TMP / fam
+    work = CALIB_TMP / (work_tag or fam)
     work.mkdir(parents=True, exist_ok=True)
     # 1) timed shipped config -> host-matched ns/day
     timed, _ = _run_once(cell, fam, arm, mpi, gpu_ids, steps, work, "timed")
-    # 2) run-0 parity: shipped engine vs CPU, mpi=1 both, identical microstate
-    _, eng_log = _run_once(cell, fam, arm, 1, gpu_ids, 0, work, "p0_engine")
-    _, cpu_log = _run_once(cell, fam, "A0", 1, [], 0, work, "p0_cpu")
-    parity = run_parity(cpu_log, eng_log, work)
+    parity = None
+    if not timing_only:
+        # 2) run-0 parity: shipped engine vs CPU, mpi=1 both, identical microstate
+        _, eng_log = _run_once(cell, fam, arm, 1, gpu_ids, 0, work, "p0_engine")
+        _, cpu_log = _run_once(cell, fam, "A0", 1, [], 0, work, "p0_cpu")
+        parity = run_parity(cpu_log, eng_log, work)
 
     return {"ff": fam, "status": timed.get("status", "failed"), "engine": engine, "arm": arm,
             "mpi": mpi, "gpu_per_run": need_gpu, "config_name": config_name, "cell": cell,
             "ns_per_day": timed.get("ns_per_day"), "atoms": timed.get("atoms"),
             "parity": parity, "fell_back": fell_back, "notes": notes,
+            "size_point": timing_only,
             "sections_pct": timed.get("sections_pct", {})}
 
 
@@ -334,11 +441,14 @@ def ingest_revalidate(host: dict, records: list[dict], st: dict, date: str) -> b
     fallback, and the CPU was uncontended. Engine CHOICES are unchanged (revalidate confirms,
     it does not re-decide). Returns the clean flag."""
     hp = json.loads(RULES.read_text())["hardware_policy"]
+    prior_host = hp.get("host")                   # read BEFORE overwriting (see _carry_provenance)
     hp["host"] = host
     prior_probe = hp.get("directional_probe", {})
     probe: dict = {}
     hp["directional_probe"] = probe
-    _carry_provenance(prior_probe, probe)
+    dropped = _carry_provenance(prior_probe, probe, _same_host(prior_host, host))
+    if dropped:
+        probe["carry_over_note"] = dropped
     probe["measured_on"] = (f"{host['gpus']}x {host['gpu_model']} / "
                             f"{host['phys_cores']} phys cores (calibrate_hardware.py --revalidate)")
     probe["date"] = date
@@ -352,11 +462,31 @@ def ingest_revalidate(host: dict, records: list[dict], st: dict, date: str) -> b
     ran = [r for r in records if r.get("status") == "ok"]
     skipped = [r for r in records if r.get("status") not in ("ok", "planned")]
     any_fallback = any(r.get("fell_back") for r in records)
-    all_pass = bool(ran) and all((r.get("parity") or {}).get("verdict") == "PASS" for r in ran)
+    # --size-points runs are throughput-only (parity is gated once per family on the base
+    # cell, see revalidate_ff), so only the base records carry a verdict to check.
+    base_ran = [r for r in ran if not r.get("size_point")]
+    all_pass = bool(base_ran) and all(
+        (r.get("parity") or {}).get("verdict") == "PASS" for r in base_ran)
 
-    for r in ran:
+    # size_points: every throughput measurement for a family, base cell included, sorted by
+    # atom count. Written only where >=2 real points exist -- select_hardware._size_points
+    # needs two to interpolate, and a lone point in the JSON reads as data it is not. A
+    # fresh measurement here REPLACES anything _carry_provenance kept.
+    fresh_curves = _fresh_size_curves(ran)
+    if fresh_curves:
+        curves = probe.setdefault("size_points", {})
+        if not isinstance(curves, dict):          # carried value was a list/other -> replace
+            curves = probe["size_points"] = {}
+        curves.pop("_note", None)                 # stale note from the prior host's block
+        curves.update(fresh_curves)
+        sizes = sorted({p["atoms"] for pts in fresh_curves.values() for p in pts})
+        probe["size_points_note"] = (
+            f"measured on this host {date} at {sizes} atoms via --size-points; parity is "
+            "gated once per family on the base cell, not re-run per size.")
+
+    for r in base_ran:
         fam = r["ff"]
-        cells[fam] = r.get("cell")
+        cells[fam] = _repo_rel(r.get("cell"))
         if r.get("atoms"):
             cells_atoms[fam] = r["atoms"]
         probe[f"{fam}_ns_per_day"] = {r["config_name"]: r["ns_per_day"]}
@@ -394,7 +524,7 @@ def run_revalidate(args, host: dict) -> int:
         os.nice(19)                       # be polite even on direct (non-subprocess) runs
     except OSError:
         pass
-    st = polite_state(host["phys_cores"], args.allow_busy)
+    st = polite_state(host["phys_cores"], args.allow_busy, args.gpu_id)
     hp = json.loads(RULES.read_text())["hardware_policy"]
     by_ff = hp.get("by_forcefield", {})
 
@@ -420,29 +550,44 @@ def run_revalidate(args, host: dict) -> int:
               file=sys.stderr)
         return 1
 
+    def report(r: dict, label: str) -> None:
+        tail = "  [timing only — parity gated on the base cell]" if r.get("size_point") else ""
+        if args.dry_run:
+            if r["status"] == "planned":
+                print(f"   PLAN {label:<13} engine={r['engine']} arm={r['arm']} "
+                      f"{r['config_name']} gpu_ids={r['gpu_ids']}"
+                      + ("  [kokkos fallback]" if r["fell_back"] else "") + tail)
+            else:
+                print(f"   SKIP {label:<13} — {r.get('reason')}")
+        elif r["status"] == "ok":
+            parity = "timing-only" if r.get("size_point") else r["parity"]["verdict"]
+            print(f"   {label:<13} {r['config_name']:<11} {r['ns_per_day']:>8.2f} ns/day  "
+                  f"parity={parity}" + ("  [kokkos fallback]" if r["fell_back"] else ""))
+        else:
+            print(f"   {label:<13} {r['status']}: {r.get('reason','')}")
+        for n in r.get("notes", []):
+            print(f"        {n}")
+
     records = []
     for fam, cell in pairs:
         default = by_ff.get(fam, {})
         r = revalidate_ff(fam, cell, default, st, args.steps, args.dry_run, kokkos_ok)
         records.append(r)
-        if args.dry_run:
-            if r["status"] == "planned":
-                print(f"   PLAN {fam:<7} engine={r['engine']} arm={r['arm']} "
-                      f"{r['config_name']} gpu_ids={r['gpu_ids']}"
-                      + ("  [kokkos fallback]" if r["fell_back"] else ""))
-            else:
-                print(f"   SKIP {fam:<7} — {r.get('reason')}")
-            for n in r.get("notes", []):
-                print(f"        {n}")
+        report(r, fam)
+        if not args.size_points:
             continue
-        if r["status"] == "ok":
-            print(f"   {fam:<7} {r['config_name']:<11} {r['ns_per_day']:>8.2f} ns/day  "
-                  f"parity={r['parity']['verdict']}"
-                  + ("  [kokkos fallback]" if r["fell_back"] else ""))
-        else:
-            print(f"   {fam:<7} {r['status']}: {r.get('reason','')}")
-        for n in r.get("notes", []):
-            print(f"        {n}")
+        # Extra atom counts for the log-log cost curve. Same shipped engine/mpi/gpu as the base
+        # run -- this measures how throughput scales with size, not which engine to use.
+        extras = extra_size_cells(fam)
+        if not extras:
+            print(f"        no CALIB_{fam.upper()}_<SIZE> cells in-repo — "
+                  f"{fam} keeps a single point (no interpolation)")
+            continue
+        for cell_path in extras:
+            sr = revalidate_ff(fam, str(cell_path), default, st, args.steps, args.dry_run,
+                               kokkos_ok, timing_only=True, work_tag=cell_path.parent.name)
+            records.append(sr)
+            report(sr, cell_path.parent.name)
 
     if args.dry_run:
         print("\n[dry-run] nothing written.")
@@ -459,7 +604,7 @@ def run_revalidate(args, host: dict) -> int:
 # Full sweep — fresh engine×config search per FF (drained-box authoritative mode, --full)
 # --------------------------------------------------------------------------
 def run_full(args, host: dict) -> int:
-    st = polite_state(host["phys_cores"], args.allow_busy)
+    st = polite_state(host["phys_cores"], args.allow_busy, args.gpu_id)
     runnable, skipped = plan_configs(host["phys_cores"], st, args.allow_busy)
     only_names = [c["name"] for c in runnable]
 
@@ -518,16 +663,39 @@ def main() -> int:
                     help="fresh engine×config sweep per FF (drained-box authoritative mode). "
                          "Default is --revalidate: confirm the shipped per-FF defaults on this host.")
     ap.add_argument("--steps", type=int, default=4000, help="MD steps per timed config")
+    ap.add_argument("--size-points", action="store_true",
+                    help="--revalidate only: also time the in-repo CALIB_<FAM>_5K/_15K cells "
+                         "so directional_probe.size_points is a real ns/day-vs-atoms curve for "
+                         "THIS host, which select_hardware interpolates log-log for cost "
+                         "estimates. Without it a new box keeps one point per family and the "
+                         "cost model honestly reports lower confidence. Timing only — parity "
+                         "is gated once per family on the base cell, since it tests the engine "
+                         "against CPU physics, not the cell size. A family needs >=2 measured "
+                         "sizes to get a curve; otherwise none is written.")
     ap.add_argument("--date", default=datetime.date.today().isoformat(),
                     help="measurement date stamp (default: today)")
     ap.add_argument("--allow-busy", action="store_true",
                     help="DEDICATED/DRAINED BOX ONLY: disable politeness gating")
+    ap.add_argument("--gpu-id", action="append", type=int, default=[],
+                    help="pin GPU configs to these GPU indices instead of the ones the "
+                         "politeness probe found free (repeatable). For a box shared with a "
+                         "neighbour whose job holds an idle CUDA context on every GPU: that "
+                         "makes gpus_with_compute_procs() report every GPU busy, so "
+                         "free_gpus is empty and --allow-busy alone would fall through to "
+                         "GPU 0 -- typically the one actually under load. Naming the GPUs "
+                         "that are genuinely yours is the operator assertion politeness "
+                         "cannot make on its own. Implies nothing about CPU gating.")
     ap.add_argument("--dry-run", action="store_true",
                     help="show the planned polite work; write nothing")
     args = ap.parse_args()
 
     if len(args.cell) != len(args.ff):
         print("ERROR: each --cell needs a matching --ff (same order/count)", file=sys.stderr)
+        return 2
+    if args.full and args.size_points:
+        print("ERROR: --size-points belongs to --revalidate. The --full sweep searches "
+              "engine x config on the cells you pass explicitly; give it the _5K/_15K cells "
+              "as ordinary --cell/--ff pairs if you want them swept.", file=sys.stderr)
         return 2
     if args.full and not args.cell:
         print("ERROR: --full needs explicit --cell/--ff pairs (the full sweep is not "

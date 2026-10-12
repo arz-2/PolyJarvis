@@ -1,0 +1,136 @@
+LAMMPS (22 Jul 2025 - Update 3)
+KOKKOS mode with Kokkos version 4.6.2 is enabled
+  will use up to 1 GPU(s) per node
+  using 1 OpenMP thread(s) per MPI task
+Reading data file ...
+  orthogonal box = (0 0 0) to (51.522057 51.522057 51.522057)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  8000 atoms
+  scanning bonds ...
+  4 = max bonds/atom
+  scanning angles ...
+  10 = max angles/atom
+  scanning dihedrals ...
+  16 = max dihedrals/atom
+  scanning impropers ...
+  7 = max impropers/atom
+  orthogonal box = (0 0 0) to (51.522057 51.522057 51.522057)
+  1 by 1 by 1 MPI processor grid
+  reading bonds ...
+  7990 bonds
+  reading angles ...
+  14820 angles
+  reading dihedrals ...
+  17070 dihedrals
+  reading impropers ...
+  9120 impropers
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        1       
+  special bond factors coul:  0        0        1       
+     4 = max # of 1-2 neighbors
+     6 = max # of 1-3 neighbors
+     8 = max # of special neighbors
+  special bonds CPU = 0.003 seconds
+  read_data CPU = 0.131 seconds
+PPPM Kokkos initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.29929834
+  grid = 36 36 36
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00028253263
+  estimated relative force accuracy = 8.5083861e-07
+  using double precision cuFFT
+  3d grid and FFT values/proc = 79507 46656
+Generated 10 of 10 mixed pair_coeff terms from sixthpower/sixthpower mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 4000, page size: 100000
+  master list distance cutoff = 11.5
+  ghost atom cutoff = 11.5
+  binsize = 11.5, bins = 5 5 5
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/class2/coul/long/kk, perpetual
+      attributes: full, newton off, kokkos_device
+      pair build: full/bin/kk/device
+      stencil: full/bin/3d
+      bin: kk/device
+Setting up cg/kk style minimization ...
+  Unit style    : real
+  Current step  : 0
+WARNING: Fix MINIMIZE/kk not compatible with sending data in Kokkos communication (src/KOKKOS/comm_kokkos.cpp:767)
+WARNING: Fix with atom-based arrays not compatible with sending data in Kokkos communication, switching to classic exchange/border communication (src/KOKKOS/comm_kokkos.cpp:780)
+WARNING: Fix MINIMIZE/kk not compatible with Kokkos sorting on device (src/KOKKOS/atom_kokkos.cpp:212)
+WARNING: Fix with atom-based arrays not compatible with Kokkos sorting on device, switching to classic host sorting (src/KOKKOS/atom_kokkos.cpp:218)
+Per MPI rank memory allocation (min/avg/max) = 33.53 | 33.53 | 33.53 Mbytes
+   Step          Time           Temp          Press          TotEng         PotEng         E_bond        E_angle        E_dihed        E_impro         E_vdwl         E_coul         E_long         Volume           Lx             Ly             Lz          Density    
+         0   0              0              7576.8431      7929.3127      7929.3127      2852.6725      8411.9148     -7386.1719     -73.167009      1054.7302      8336.7703     -5267.4361      136766.45      51.522057      51.522057      51.522057      0.60999999   
+       500   500            0             -1058.1186     -5765.1893     -5765.1893      120.59047      2941.24       -9526.4404     -18.073325     -2133.5127      8167.9088     -5316.9022      136766.45      51.522057      51.522057      51.522057      0.60999999   
+      1000   1000           0             -904.79868     -6157.6828     -6157.6828      112.27996      2923.1033     -9600.5894     -18.119114     -2399.5194      8149.8509     -5324.689       136766.45      51.522057      51.522057      51.522057      0.60999999   
+      1500   1500           0             -819.58445     -6377.6833     -6377.6833      106.14894      2874.0464     -9647.5324     -17.720026     -2495.1412      8141.3079     -5338.7929      136766.45      51.522057      51.522057      51.522057      0.60999999   
+      2000   2000           0             -859.21332     -6538.3696     -6538.3696      103.45999      2870.5919     -9699.073      -17.900027     -2586.5675      8133.1137     -5341.9947      136766.45      51.522057      51.522057      51.522057      0.60999999   
+      2500   2500           0             -869.32416     -6625.8847     -6625.8847      102.15645      2850.6619     -9705.2639     -17.92202      -2640.6648      8131.2327     -5346.0852      136766.45      51.522057      51.522057      51.522057      0.60999999   
+      3000   3000           0             -810.8894      -6662.2923     -6662.2923      100.77583      2842.0882     -9718.5049     -17.754511     -2651.3168      8127.2867     -5344.8667      136766.45      51.522057      51.522057      51.522057      0.60999999   
+      3050   3050           0             -806.42705     -6663.554      -6663.554       100.69241      2844.4084     -9719.7592     -17.731183     -2653.8572      8127.6505     -5344.9576      136766.45      51.522057      51.522057      51.522057      0.60999999   
+Loop time of 10.3215 on 1 procs for 3050 steps with 8000 atoms
+
+100.0% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      7929.31268875064  -6663.55127864287  -6663.55400648575
+  Force two-norm initial, final = 3049.992 5.0275921
+  Force max component initial, final = 315.51698 1.7520761
+  Final line search alpha, max atom move = 0.022870189 0.040070313
+  Iterations, force evaluations = 3050 6063
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 1.6276     | 1.6276     | 1.6276     |   0.0 | 15.77
+Bond    | 1.3372     | 1.3372     | 1.3372     |   0.0 | 12.96
+Kspace  | 6.0491     | 6.0491     | 6.0491     |   0.0 | 58.61
+Neigh   | 0.36039    | 0.36039    | 0.36039    |   0.0 |  3.49
+Comm    | 0.08335    | 0.08335    | 0.08335    |   0.0 |  0.81
+Output  | 0.019435   | 0.019435   | 0.019435   |   0.0 |  0.19
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.8444     |            |       |  8.18
+
+Nlocal:           8000 ave        8000 max        8000 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:          15240 ave       15240 max       15240 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:  3.61708e+06 ave 3.61708e+06 max 3.61708e+06 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 3617078
+Ave neighs/atom = 452.13475
+Ave special neighs/atom = 5.7025
+Neighbor list builds = 76
+Dangerous builds = 0
+System init for write_data ...
+PPPM Kokkos initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.29929834
+  grid = 36 36 36
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00028253263
+  estimated relative force accuracy = 8.5083861e-07
+  using double precision cuFFT
+  3d grid and FFT values/proc = 79507 46656
+Generated 10 of 10 mixed pair_coeff terms from sixthpower/sixthpower mixing rule
+System init for write_restart ...
+PPPM Kokkos initialization ...
+  using 12-bit tables for long-range coulomb
+  G vector (1/distance) = 0.29929834
+  grid = 36 36 36
+  stencil order = 5
+  estimated absolute RMS force accuracy = 0.00028253263
+  estimated relative force accuracy = 8.5083861e-07
+  using double precision cuFFT
+  3d grid and FFT values/proc = 79507 46656
+Generated 10 of 10 mixed pair_coeff terms from sixthpower/sixthpower mixing rule
+STAGE COMPLETE: minimization

@@ -135,7 +135,6 @@ def main():
     # -------------------------------------------------------------------
     df = parse_lammps_log(args.log_file)
 
-    required_cols = {"Step", "Pxx", "Pyy", "Pzz"}
     # LAMMPS thermo columns are case-sensitive: pxx → Pxx in output? Check:
     # Standard LAMMPS thermo column names: "Pxx" "Pyy" "Pzz" with capital P
     col_map = {}
@@ -384,7 +383,6 @@ def main():
             else:
                 steps2   = df2[col_map2["Step"]].values
                 pxx2     = df2[col_map2["Pxx"]].values
-                pyy2     = df2[col_map2["Pyy"]].values
                 step_0_idx2 = np.searchsorted(steps2, args.eq_steps)
                 steps_def2  = steps2[step_0_idx2:]
                 pxx_def2    = pxx2[step_0_idx2:]

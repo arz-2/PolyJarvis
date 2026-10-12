@@ -121,6 +121,40 @@ TRAPPE_UA_STYLES = {
 TRAPPE_SPECIAL_BONDS = "special_bonds lj 0 0 0"
 TRAPPE_PAIR_MODIFY   = "mix arithmetic tail yes"
 
+# ─── DREIDING force field style constants (RadonPy-generated cells) ─────────
+# Confirmed 2026-08-26 against a real RadonPy-built BPA-PC cell (radonpy.ff.dreiding.Dreiding,
+# ff_class='1'): 2-column epsilon/sigma pair coeffs, 2-column k/r0 bonds, 2-column k/theta0
+# angles (all harmonic, matching GAFF2's bond/angle styles) -- but dihedral_style is
+# harmonic (K,d,n -- 3-column, NOT GAFF2's 4-term fourier) and improper_style is umbrella
+# (K,X0 -- NOT GAFF2's cvff). Distinct branch from GAFF2's "else" default, not a subset of it.
+DREIDING_STYLES = {
+    "BOND_STYLE":      "harmonic",
+    "ANGLE_STYLE":     "harmonic",
+    "DIHEDRAL_STYLE":  "harmonic",
+    "IMPROPER_STYLE":  "umbrella",
+}
+
+# Same lj/charmm/coul/long cutoff-scheme convention as GAFF2 (RadonPy doesn't emit its own
+# LAMMPS input script, only the .data file -- pair_style choice is entirely ours). The
+# per-type epsilon/sigma coefficients are format-identical to GAFF2's; only the combining
+# rule for cross (i!=j) terms differs (see PAIR_MODIFY below).
+PAIR_STYLE_DREIDING_PPPM = (
+    "pair_style lj/charmm/coul/long 8.0 12.0\n"
+    "kspace_style pppm 1e-6"
+)
+PAIR_STYLE_DREIDING_CUTOFF = "pair_style lj/charmm/coul/charmm 8.0 12.0"
+
+# Dreiding.__init__'s own hardcoded constants: c_c12=c_c13=lj_c12=lj_c13=0, c_c14=5/6
+# (0.833333), lj_c14=0.5 -- exactly LAMMPS's "special_bonds amber" shortcut, written out
+# explicitly here so a DREIDING deck doesn't carry a confusing "amber" keyword.
+# Mixing rule: the original DREIDING force field (Mayo, Olafson, Goddard 1990) specifies
+# GEOMETRIC combining for both epsilon and sigma -- distinct from GAFF2's arithmetic mixing;
+# RadonPy's dreiding.py does not itself emit a LAMMPS script/pair_modify directive (data-file
+# writer only), so this choice is PolyJarvis's own and not independently re-verifiable from
+# an emitted file the way the bonded styles above were.
+DREIDING_SPECIAL_BONDS = "special_bonds lj 0.0 0.0 0.5 coul 0.0 0.0 0.833333"
+DREIDING_PAIR_MODIFY   = "mix geometric tail yes"
+
 
 # Lumped CHn pseudo-atom masses (CH, CH2, CH3, CH4). None coincides with an element
 # mass: the closest pair is CH2 14.0268 vs N 14.007, so the 0.005 tolerance separates
@@ -166,6 +200,20 @@ def _detect_ff_from_data_file(data_file: str) -> dict:
     Returns a dict with one of use_pcff/use_trappe/use_opls = True and the others False,
     or {} when detection is inconclusive so callers fall back to explicit flags or GAFF2 default.
     """
+    # A LAMMPS .restart is BINARY. read_text(errors="replace") happily turns it into mojibake,
+    # and the substring probes below then match by chance: on 2026-09-09 a PCFF restart
+    # (npt_melt_hold_out.restart) was classified {'use_opls': True}, the exact opposite of its
+    # own sibling .data. That surfaced only because the caller had passed an explicit use_pcff
+    # and the flag-mismatch guard raised -- with no explicit flag it would have SILENTLY emitted
+    # an OPLS deck for a class2 system. A restart-continuation legitimately passes its restart
+    # here, so refuse to classify anything that is not text and let the caller's explicit flags
+    # stand.
+    try:
+        head = Path(data_file).read_bytes()[:8192]
+    except OSError:
+        return {}
+    if b"\x00" in head:
+        return {}
     try:
         content = Path(data_file).read_text(errors="replace")
     except OSError:
@@ -498,6 +546,14 @@ class ScriptGenerator:
     Parses a RadonPy LAMMPS data file and generates filled-in .in scripts.
     """
 
+    # LAMMPS dump-command ID per template, needed to target dump_modify ... append yes
+    # at the right dump on a restart-based continuation run.
+    _DUMP_ID_BY_TEMPLATE = {
+        "nvt": "dump_nvt",
+        "npt": "dump_npt",
+        "npt_compress": "dump_comp",
+    }
+
     def __init__(self, data_file: str, templates_dir: Optional[str] = None):
         """
         Args:
@@ -691,7 +747,7 @@ class ScriptGenerator:
 
         box_min = min(info.get("box_x", 0), info.get("box_y", 0), info.get("box_z", 0))
         if box_min <= 0:
-            errors.append(f"Box dimension <= 0 — file may be truncated")
+            errors.append("Box dimension <= 0 — file may be truncated")
         elif box_min < 2 * lj_cutoff:
             errors.append(
                 f"Minimum box side {box_min:.1f} Å < 2×cutoff ({2*lj_cutoff:.1f} Å). "
@@ -771,6 +827,8 @@ class ScriptGenerator:
         charge_parse_ok = False
         type_counts: dict = {}
         masses_by_type: dict = {}
+        atom_ids: set = set()
+        n_atom_rows = 0
 
         # Build mass lookup from Masses section
         in_masses_sec = False
@@ -809,6 +867,8 @@ class ScriptGenerator:
                         charge = float(parts[3])
                         net_charge += charge
                         type_counts[atype] = type_counts.get(atype, 0) + 1
+                        atom_ids.add(int(parts[0]))
+                        n_atom_rows += 1
                         atoms_seen_data = True
                         charge_parse_ok = True
                     except (ValueError, IndexError):
@@ -826,6 +886,65 @@ class ScriptGenerator:
                 f"Check RESP convergence or add a neutralising counterion."
             )
 
+        # ── 3b. Structural integrity: header count vs rows, dangling topology ──
+        # A truncated data file is round-1's F6 fault and the shape a half-written EMC or
+        # restart write leaves behind. Until 2026-09-13 nothing here detected it: dropping
+        # atom rows was caught only INCIDENTALLY, by the charge sum above, because the
+        # deleted atoms happened to carry charge. Measured by injecting the same fault into
+        # three chemistries -- PLLA (PEST/PCFF) and PTFE (PHAL/OPLS-AA) reported a net-charge
+        # error, the right verdict for the wrong reason, while PE (PHYC/TraPPE-UA, uncharged)
+        # reported NO error at all and the truncated cell validated clean. The bond/atom
+        # ratio warning above does not cover it either: three atoms out of thousands does
+        # not move the ratio past its 0.5/3.0 bounds.
+        if charge_parse_ok and n_atoms > 0 and n_atom_rows != n_atoms:
+            errors.append(
+                f"Atoms section has {n_atom_rows} rows but the header declares {n_atoms} "
+                f"— data file is truncated or the header over-counts."
+            )
+        stats["n_atom_rows"] = n_atom_rows
+
+        # Referenced-atom columns per section: id type a1 a2 [a3 [a4]]
+        topology_widths = {"Bonds": 2, "Angles": 3, "Dihedrals": 4, "Impropers": 4}
+        dangling: list = []
+        current_topo = None
+        topo_seen_data = False
+        for line in lines:
+            stripped = line.strip()
+            head = stripped.split("#")[0].strip()
+            if head in topology_widths:
+                current_topo, topo_seen_data = head, False
+                continue
+            if current_topo is None:
+                continue
+            if stripped == "":
+                if topo_seen_data:
+                    current_topo = None
+                continue
+            if stripped.startswith("#"):
+                continue
+            parts = stripped.split()
+            width = topology_widths[current_topo]
+            if len(parts) < 2 + width:
+                continue
+            try:
+                refs = [int(x) for x in parts[2:2 + width]]
+            except ValueError:
+                continue
+            topo_seen_data = True
+            missing = [r for r in refs if r not in atom_ids]
+            if missing:
+                dangling.append(f"{current_topo} {parts[0]} -> atom {missing[0]}")
+            if len(dangling) >= 8:
+                break
+
+        if atom_ids and dangling:
+            errors.append(
+                f"Topology references atom id(s) absent from the Atoms section "
+                f"({'; '.join(dangling[:3])}"
+                f"{', ...' if len(dangling) > 3 else ''}) — data file is truncated or corrupt."
+            )
+        stats["dangling_topology_refs"] = len(dangling)
+
         # ── 4. Density plausibility ───────────────────────────────────────────
         if type_counts and masses_by_type:
             total_mass_amu = sum(
@@ -840,12 +959,12 @@ class ScriptGenerator:
                 density = total_mass_amu / box_vol_A3 * 1.66054
                 stats["density_g_cm3"] = round(density, 4)
                 if density < 0.1:
-                    warnings.append(
+                    errors.append(
                         f"Density = {density:.3f} g/cm³ — unusually low. "
                         f"Cell may be over-expanded or have vacuum voids."
                     )
                 elif density > 2.5:
-                    warnings.append(
+                    errors.append(
                         f"Density = {density:.3f} g/cm³ — unusually high. "
                         f"Cell may be over-compressed or overlapping atoms."
                     )
@@ -966,20 +1085,6 @@ class ScriptGenerator:
         # Build all substitution blocks
         subs = self._build_substitutions(template_name, cfg, data_file, raw_params=params)
 
-        # Staircase expansion: npt_tg_step + T_END + T_STEP → full cooling loop.
-        # A Tg sweep MUST be a multi-temperature ramp. Guard against the silent failure where
-        # the npt_tg_step template is requested without ramp bounds and falls through to a
-        # single-temperature NPT render (an invalid Tg sweep — no per-T dump, no cooling).
-        if template_name == "npt_tg_step":
-            missing = [k for k in ("T_END", "T_STEP") if params.get(k) is None]
-            if missing:
-                raise ValueError(
-                    f"Tg sweep (template 'npt_tg_step') requires ramp bounds {missing} "
-                    f"(plus T_START); without them this would emit a single-temperature NPT, "
-                    f"not a cooling sweep. Pass T_START, T_END and T_STEP.")
-            script = self._generate_tg_staircase(cfg, subs, output_path)
-            return script
-
         # Load template
         tpl_path = self.templates_dir / f"{template_name}.in"
         with open(tpl_path, "r") as f:
@@ -989,127 +1094,6 @@ class ScriptGenerator:
         script = self._fill_template(template, subs)
 
         # Write output
-        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-        with open(output_path, "w") as f:
-            f.write(script)
-
-        return script
-
-    def _generate_tg_staircase(self, cfg: dict, subs: dict, output_path: str) -> str:
-        """
-        Generate a full Tg cooling staircase script using a LAMMPS variable-index loop.
-        Triggered when T_END and T_STEP are both present in the caller's params.
-        Velocities are initialized once at T_START; subsequent steps inherit momenta.
-        """
-        t_start    = float(cfg.get("T_START",       450.0))
-        t_end      = float(cfg.get("T_END",         100.0))
-        t_step     = float(cfg.get("T_STEP",         20.0))
-        n_steps    = int(cfg.get("N_STEPS_PER_T",
-                         cfg.get("N_STEPS",         500000)))
-        p_target   = cfg.get("P_TARGET",   1.0)
-        p_damp     = cfg.get("P_DAMP",  1000.0)
-        t_damp     = cfg.get("T_DAMP",   100.0)
-        timestep   = cfg.get("TIMESTEP",    1.0)
-        thermo_freq = int(cfg.get("THERMO_FREQ", 500))
-        log_file   = subs["LOG_FILE"]
-        write_per_t_dump = bool(cfg.get("WRITE_PER_T_DUMP", False))
-        per_t_dump_file  = str(cfg.get("PER_T_DUMP_FILE", "per_t_structs.dump"))
-
-        # Defense-in-depth (never raises): too few ps per temperature collapses the bilinear
-        # Tg fit (cis-PBD2 r400=50ps, PEEK2 r160/r400). Feasibility is enforced upstream at
-        # plan time; this only annotates the deck if a low N_STEPS_PER_T slips through.
-        ps_per_t  = n_steps * timestep * 1e-3
-        floor_ps  = float(cfg.get("TG_MIN_PS_PER_T", 200.0))
-        floor_comment = ""
-        if ps_per_t < floor_ps:
-            msg = (f"Tg staircase: {n_steps} steps x {timestep} fs = {ps_per_t:.0f} ps/T, "
-                   f"below the {floor_ps:.0f} ps/T floor — bilinear Tg fit may be degenerate.")
-            warnings.warn(msg)
-            floor_comment = f"# WARNING: {msg}\n"
-
-        # Build temperature list: T_START down to T_END, always include T_END
-        temps: list[float] = []
-        t = t_start
-        while t > t_end + 1e-6:
-            temps.append(t)
-            t -= t_step
-        if not temps or abs(temps[-1] - t_end) > 1e-6:
-            temps.append(t_end)
-
-        temp_list_str = " ".join(str(int(t) if t == int(t) else t) for t in temps)
-
-        seed = (int(cfg["_velocity_seed"]) if cfg.get("_velocity_seed") is not None
-                else random.randint(10000, 999999))
-
-        if write_per_t_dump:
-            per_t_dump_block = (
-                f"  dump per_t_snap all atom 1 {per_t_dump_file}\n"
-                f"  dump_modify per_t_snap append yes\n"
-                f"  run 0\n"
-                f"  undump per_t_snap\n"
-            )
-        else:
-            per_t_dump_block = ""
-
-        # Progress reporting: write a JSON event per temperature step if PROGRESS_FILE given.
-        pf = cfg.get("PROGRESS_FILE", "")
-        progress_line = (
-            '  shell echo \'{"stage":"T${temps}","status":"done"}\''
-            f' >> {pf}\n'
-            if pf else ""
-        )
-
-        script = f"""\
-# ============================================================
-# PolyJarvis LAMMPS Engine - Tg Sweep Staircase
-# T_START={t_start} → T_END={t_end} K, step={t_step} K
-# {len(temps)} temperature points × {n_steps} steps/T
-# ============================================================
-{floor_comment}
-log {log_file} append
-units real
-atom_style full
-boundary p p p
-
-# --- Force Field Styles ---
-{subs["PAIR_STYLE_BLOCK"]}
-dielectric 1.000000
-bond_style {subs["BOND_STYLE"]}
-angle_style {subs["ANGLE_STYLE"]}
-dihedral_style {subs["DIHEDRAL_STYLE"]}
-improper_style {subs["IMPROPER_STYLE"]}
-{subs["SPECIAL_BONDS"]}
-pair_modify {subs["PAIR_MODIFY"]}
-neighbor 2.0 bin
-neigh_modify delay 0 every 1 check yes
-neigh_modify one 4000
-{subs["GPU_PACKAGE"]}
-
-read_data {subs["DATA_FILE"]}
-{subs["INCLUDE_PARAMS_BLOCK"]}
-
-# --- Thermo Output ---
-thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz
-thermo_modify flush yes
-thermo {thermo_freq}
-
-# --- Velocity initialization at T_START (once only — Rule A) ---
-velocity all create {t_start} {seed} mom yes rot yes dist gaussian
-
-# --- Temperature staircase (inherits momenta across steps — Rule A) ---
-variable temps index {temp_list_str}
-label TEMP_LOOP
-  timestep {timestep}
-  fix npt_tg all npt temp ${{temps}} ${{temps}} {t_damp} iso {p_target} {p_target} {p_damp}
-  run {n_steps}
-  unfix npt_tg
-{progress_line}{per_t_dump_block}  print "STAGE COMPLETE: Tg step T=${{temps}}K P={p_target}atm steps={n_steps}"
-  next temps
-  jump SELF TEMP_LOOP
-
-write_data tg_step_out.data
-"""
-
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         with open(output_path, "w") as f:
             f.write(script)
@@ -1130,11 +1114,28 @@ write_data tg_step_out.data
         subs["DUMP_FILE"]        = cfg.get("DUMP_FILE", f"{template_name}.dump")
         subs["LAST_DUMP_FILE"]   = cfg.get("LAST_DUMP_FILE", f"{template_name}_last.dump")
         subs["WRITE_DATA_FILE"]  = cfg.get("WRITE_DATA_FILE", f"{template_name}_out.data")
+        # Unconditional final-state restart file (independent of periodic RESTART_BLOCK
+        # checkpointing): every nvt/npt/npt_compress run writes one, so a later
+        # restart-based continuation call always has a definitive state to read from.
+        subs["WRITE_RESTART_FILE"] = cfg.get("WRITE_RESTART_FILE", f"{template_name}_out.restart")
+        # dump_modify ... append yes: set only when this run is CONTINUING a trajectory
+        # an earlier run already started into the same DUMP_FILE (paired with
+        # use_restart=True / LOG_APPEND=True) -- never on a fresh-start run.
+        _dump_id = self._DUMP_ID_BY_TEMPLATE.get(template_name)
+        if cfg.get("dump_append", False) and _dump_id:
+            subs["DUMP_APPEND_BLOCK"] = f"dump_modify {_dump_id} append yes"
+        else:
+            subs["DUMP_APPEND_BLOCK"] = ""
 
         # ── Force field styles ────────────────────────────────────────────
-        use_pcff   = cfg.get("use_pcff",   False)
-        use_opls   = cfg.get("use_opls",   False)
-        use_trappe = cfg.get("use_trappe", False)
+        use_pcff     = cfg.get("use_pcff",     False)
+        use_opls     = cfg.get("use_opls",     False)
+        use_trappe   = cfg.get("use_trappe",   False)
+        # use_dreiding is never auto-detected (see _detect_ff_from_data_file's docstring --
+        # RadonPy pre-equil files return {} for every RadonPy-routed FF, GAFF2 included) --
+        # it depends entirely on the explicit flag stage_params.py derives from the plan's
+        # preferred_ff, exactly like GAFF2/GAFF2_mod already do via the "else" default below.
+        use_dreiding = cfg.get("use_dreiding", False)
 
         if data_file and os.path.exists(data_file):
             detected = _detect_ff_from_data_file(data_file)
@@ -1166,6 +1167,8 @@ write_data tg_step_out.data
             ff_styles = OPLS_STYLES
         elif use_trappe:
             ff_styles = TRAPPE_UA_STYLES
+        elif use_dreiding:
+            ff_styles = DREIDING_STYLES
         else:
             ff_styles = GAFF2_STYLES
         subs["BOND_STYLE"]      = cfg.get("BOND_STYLE",     ff_styles["BOND_STYLE"])
@@ -1182,6 +1185,8 @@ write_data tg_step_out.data
             subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_PCFF_PPPM if use_pppm else PAIR_STYLE_PCFF_CUTOFF
         elif use_opls:
             subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_OPLS_PPPM if use_pppm else PAIR_STYLE_OPLS_CUTOFF
+        elif use_dreiding:
+            subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_DREIDING_PPPM if use_pppm else PAIR_STYLE_DREIDING_CUTOFF
         else:
             subs["PAIR_STYLE_BLOCK"] = PAIR_STYLE_PPPM if use_pppm else PAIR_STYLE_CUTOFF
 
@@ -1388,6 +1393,24 @@ write_data tg_step_out.data
             subs["UNDUMP_BLOCK"]    = ""
             subs["LAST_DUMP_BLOCK"] = ""
 
+        # ── Optional per-point structural snapshot (npt_tg_step only) ──────
+        # One frame per submitted job, appended to a shared multi-frame dump via `run 0`
+        # (writes at the current, already-equilibrated state without integrating further) --
+        # extract_thermal.py's _analyze_per_t_dump reads the accumulated file as one frame per
+        # temperature. Must render BEFORE `write_data`/`quit` in the template, not appended
+        # after the whole script -- npt_tg_step.in ends with `quit`, so anything textually
+        # after the filled template would never execute.
+        if cfg.get("WRITE_PER_T_DUMP", False):
+            per_t_dump_file = str(cfg.get("PER_T_DUMP_FILE", "per_t_structs.dump"))
+            subs["PER_T_DUMP_BLOCK"] = (
+                f"dump per_t_snap all atom 1 {per_t_dump_file}\n"
+                f"dump_modify per_t_snap append yes\n"
+                f"run 0\n"
+                f"undump per_t_snap"
+            )
+        else:
+            subs["PER_T_DUMP_BLOCK"] = ""
+
         # ── Common placeholders present in all templates ───────────────────
         if use_pcff:
             default_sb, default_pm = PCFF_SPECIAL_BONDS, PCFF_PAIR_MODIFY
@@ -1395,6 +1418,8 @@ write_data tg_step_out.data
             default_sb, default_pm = OPLS_SPECIAL_BONDS, OPLS_PAIR_MODIFY
         elif use_trappe:
             default_sb, default_pm = TRAPPE_SPECIAL_BONDS, TRAPPE_PAIR_MODIFY
+        elif use_dreiding:
+            default_sb, default_pm = DREIDING_SPECIAL_BONDS, DREIDING_PAIR_MODIFY
         else:
             default_sb, default_pm = GAFF2_SPECIAL_BONDS, GAFF2_PAIR_MODIFY
         subs["SPECIAL_BONDS"]  = cfg.get("SPECIAL_BONDS", default_sb)

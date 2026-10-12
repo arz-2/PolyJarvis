@@ -1,0 +1,218 @@
+{
+  "_metadata": {
+    "description": "Chemical groups measured to block an EMC build, with the per-field failure rate each was measured at. Used by forcefield.select_by_moiety to decide WHETHER to probe, never to decide the force field: a match narrows the search, a real EMC trial build decides.",
+    "source": "docs/ff_coverage_sweep/{arm0,arm1}.jsonl -- real EMC trial builds at dp=4, nchains=2 over all 982 EMC-routed polymers in RadonPy's PI1070.",
+    "generated": "2026-09-03",
+    "population": {
+      "n": 982,
+      "built_under_class_prior": 635,
+      "failed": 347
+    },
+    "how_to_read_blocks": "`tried` counts trial builds of matching monomers against that field across both arms; the class prior (arm0) sees every match, the alternatives (arm1) see only arm0's failures. A fail_rate at or near 1.00 for EVERY field means no cascade can rescue these -- probe the prior once to catch the false positives, then refuse.",
+    "coverage_gap": "These rules match 266 of the 347 measured failures (77%). The remainder -- chiefly missing torsion rows -- has no compact structural signature yet, so a SMILES matching no rule is UNSCREENED, not cleared."
+  },
+  "moieties": [
+    {
+      "id": "carbonyl_adjacent_N",
+      "smarts": "[NX3][CX3]=[OX1]",
+      "label": "amide / imide / urea / urethane nitrogen",
+      "blocks": {
+        "compass": {
+          "tried": 240,
+          "failed": 240,
+          "fail_rate": 1.0
+        },
+        "opls/2012/opls-aa": {
+          "tried": 240,
+          "failed": 240,
+          "fail_rate": 1.0
+        },
+        "opls/2012/opls-ua": {
+          "tried": 240,
+          "failed": 239,
+          "fail_rate": 0.996
+        },
+        "opls/2024/opls-aa": {
+          "tried": 240,
+          "failed": 237,
+          "fail_rate": 0.988
+        },
+        "opls/2024/opls-ua": {
+          "tried": 240,
+          "failed": 240,
+          "fail_rate": 1.0
+        },
+        "pcff": {
+          "tried": 247,
+          "failed": 240,
+          "fail_rate": 0.972
+        },
+        "pcff_ore": {
+          "tried": 240,
+          "failed": 240,
+          "fail_rate": 1.0
+        },
+        "trappe-eh": {
+          "tried": 240,
+          "failed": 239,
+          "fail_rate": 0.996
+        },
+        "trappe-ua": {
+          "tried": 240,
+          "failed": 238,
+          "fail_rate": 0.992
+        }
+      },
+      "evidence": {
+        "matches": 247,
+        "failures": 240,
+        "precision": 0.972,
+        "classes_spanned": [
+          "PACR",
+          "PEST",
+          "PIMD",
+          "POXI",
+          "PSTR",
+          "PURT",
+          "PVNL"
+        ],
+        "class_priors_seen": [
+          "pcff"
+        ]
+      },
+      "note": "EMC perceives this N as SP3 and types it PCFF `na` (\"sp3 nitrogen in amines\"). The published carbonyl rows belong to `n` (\"generic sp2 nitrogen (in amids)\"), so the {na, c_1} bond increment does not exist and typing stops. `na` is CORRECT for a real amine -- PIMN builds 11/11 -- so the rule must require the adjacent C=O, not just an N. Nine template variants were tried and all lost to `na`: the perception is upstream, in the EMC binary, not in a table this repo can patch. DELIBERATELY ALIPHATIC: uppercase N/C in SMARTS do not match an atom RDKit aromatized, so a five-membered aromatic imide is NOT matched. That exclusion is measured, not an oversight -- widening to [#7;X3][#6;X3]=[#8;X1] adds 58 matches of which only 21 fail (31 aromatic-imide PIMD members build), dropping precision 0.97 -> 0.86. Aromatic imides remain UNSCREENED."
+    },
+    {
+      "id": "nitro",
+      "smarts": "[$([NX3](=O)=O),$([NX3+](=O)[O-])]",
+      "label": "nitro group",
+      "blocks": {
+        "compass": {
+          "tried": 11,
+          "failed": 11,
+          "fail_rate": 1.0
+        },
+        "opls/2012/opls-aa": {
+          "tried": 11,
+          "failed": 11,
+          "fail_rate": 1.0
+        },
+        "opls/2012/opls-ua": {
+          "tried": 11,
+          "failed": 11,
+          "fail_rate": 1.0
+        },
+        "opls/2024/opls-aa": {
+          "tried": 11,
+          "failed": 11,
+          "fail_rate": 1.0
+        },
+        "opls/2024/opls-ua": {
+          "tried": 11,
+          "failed": 11,
+          "fail_rate": 1.0
+        },
+        "pcff": {
+          "tried": 11,
+          "failed": 11,
+          "fail_rate": 1.0
+        },
+        "pcff_ore": {
+          "tried": 11,
+          "failed": 11,
+          "fail_rate": 1.0
+        },
+        "trappe-eh": {
+          "tried": 11,
+          "failed": 11,
+          "fail_rate": 1.0
+        },
+        "trappe-ua": {
+          "tried": 11,
+          "failed": 11,
+          "fail_rate": 1.0
+        }
+      },
+      "evidence": {
+        "matches": 11,
+        "failures": 11,
+        "precision": 1.0,
+        "classes_spanned": [
+          "PACR",
+          "POXI",
+          "PSTR",
+          "PVNL"
+        ],
+        "class_priors_seen": [
+          "pcff"
+        ]
+      },
+      "note": "No EMC field carries a typing rule for the hypervalent/charge-separated nitro nitrogen."
+    },
+    {
+      "id": "phosphorus_oxo",
+      "smarts": "[PX4]=[OX1]",
+      "label": "phosphoryl / phosphazene P=O",
+      "blocks": {
+        "compass": {
+          "tried": 15,
+          "failed": 15,
+          "fail_rate": 1.0
+        },
+        "opls/2012/opls-aa": {
+          "tried": 15,
+          "failed": 15,
+          "fail_rate": 1.0
+        },
+        "opls/2012/opls-ua": {
+          "tried": 15,
+          "failed": 15,
+          "fail_rate": 1.0
+        },
+        "opls/2024/opls-aa": {
+          "tried": 15,
+          "failed": 15,
+          "fail_rate": 1.0
+        },
+        "opls/2024/opls-ua": {
+          "tried": 15,
+          "failed": 15,
+          "fail_rate": 1.0
+        },
+        "pcff": {
+          "tried": 15,
+          "failed": 15,
+          "fail_rate": 1.0
+        },
+        "pcff_ore": {
+          "tried": 15,
+          "failed": 15,
+          "fail_rate": 1.0
+        },
+        "trappe-eh": {
+          "tried": 15,
+          "failed": 15,
+          "fail_rate": 1.0
+        },
+        "trappe-ua": {
+          "tried": 15,
+          "failed": 15,
+          "fail_rate": 1.0
+        }
+      },
+      "evidence": {
+        "matches": 15,
+        "failures": 15,
+        "precision": 1.0,
+        "classes_spanned": [
+          "PIMD",
+          "PVNL"
+        ],
+        "class_priors_seen": [
+          "pcff"
+        ]
+      },
+      "note": "No EMC field carries the P=O bond increment. Appears in PIMD and PVNL members and NOT in PPHS, the polyphosphazene class -- the clearest single case of chemistry crossing the class taxonomy."
+    }
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "match_method": "class_representative",
+  "match_confidence": "medium",
+  "polymer_id": 2103,
+  "polymer_name": "Poly(tetrafluoroethylene)",
+  "n_polymer_ids": 3,
+  "tg": {
+    "agg_median_K": 189.2,
+    "agg_range_K": [
+      160.1,
+      400.1
+    ],
+    "n_rows": 6,
+    "form_filter": "all_clean",
+    "outliers_clipped": false,
+    "preferred_method": null,
+    "rows": [
+      {
+        "tg_K": 160.14999999999998,
+        "form": null,
+        "method": null,
+        "notes": "Much data, some conflicting; conflicting data",
+        "source_key": "PolymerHandbook4ed",
+        "polymer_name": "Poly(tetrafluoroethylene) [poly(difluoromethylene)]"
+      },
+      {
+        "tg_K": 187.5,
+        "form": null,
+        "method": null,
+        "notes": "Glasstransition K \u2014 187.5 (12)",
+        "source_key": "PolymerDataHandbook1999",
+        "polymer_name": "Poly(tetrafluoroethylene)"
+      },
+      {
+        "tg_K": 189.0,
+        "form": null,
+        "method": null,
+        "notes": "temperature 189 (6,17,18)",
+        "source_key": "PolymerDataHandbook1999",
+        "polymer_name": "Poly(tetrafluoroethylene)"
+      },
+      {
+        "tg_K": 189.5,
+        "form": null,
+        "method": null,
+        "notes": "189.5 (19)",
+        "source_key": "PolymerDataHandbook1999",
+        "polymer_name": "Poly(tetrafluoroethylene)"
+      },
+      {
+        "tg_K": 390.15,
+        "form": null,
+        "method": null,
+        "notes": null,
+        "source_key": "PolymerHandbook4ed",
+        "polymer_name": "Poly(tetrafluoroethylene) [poly(difluoromethylene)]"
+      },
+      {
+        "tg_K": 400.15,
+        "form": null,
+        "method": null,
+        "notes": "Much data, some conflicting; conflicting data",
+        "source_key": "PolymerHandbook4ed",
+        "polymer_name": "Poly(tetrafluoroethylene) [poly(difluoromethylene)]"
+      }
+    ]
+  },
+  "density": {
+    "value_gcm3": 0.982,
+    "T_K": 298.15,
+    "phase": "amorphous",
+    "source_key": "PolymerDataHandbook1999",
+    "n_rows": 1
+  },
+  "density_equations": {
+    "n_rows": 1,
+    "rows": [
+      {
+        "equation": "2.340\u221224.33\u00d710\u207b4t+0.309\u00d710\u207b6t\u00b2",
+        "py_expr": "2.340-24.33*1e-4*t+0.309*1e-6*t**2",
+        "t_min_C": 330.0,
+        "t_max_C": 372.0,
+        "phase": "melt",
+        "tg_C": null,
+        "notes": "Table 7.1 ref [25]",
+        "source_key": "Mark2007"
+      }
+    ]
+  },
+  "thermal_conductivity": {
+    "agg_median_WmK": 0.25,
+    "agg_range_WmK": [
+      0.25,
+      0.25
+    ],
+    "n_rows": 1,
+    "rows": [
+      {
+        "k_WmK": 0.25,
+        "T_K": 293.0,
+        "phase": null,
+        "notes": "Table 10.1 ref [19]",
+        "source_key": "Mark2007"
+      }
+    ]
+  }
+}

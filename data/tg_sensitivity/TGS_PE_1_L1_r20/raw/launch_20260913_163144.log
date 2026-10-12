@@ -1,0 +1,606 @@
+INFO: mpi_ranks not given — derived 1 from hardware_policy[trappe] (engine=gpu)
+INFO: gpu_ids not given — derived "0" from hardware_policy[trappe]; claim free GPU(s) with orchestration/scripts/hardware_runtime.py
+2026-09-13 16:31:45,094 [LAMMPS-ENGINE] INFO Loaded 130 runs from /home/alexzhao/PolyJarvis/data/_engine/run_state.json
+[wait] tg sweep T=550.0K (ext 0): watching 24e4f892
+2026-09-13 16:31:49,534 [LAMMPS-ENGINE] INFO [24e4f892] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 16:31:49,534 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/24e4f892_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_24e4f892
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T550_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/24e4f892_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"24e4f892","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_24e4f892.json
+else
+  echo '{"run_id":"24e4f892","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_24e4f892.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_24e4f892
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/24e4f892_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/24e4f892_run.sh </dev/null & disown; echo $!
+2026-09-13 16:32:19,565 [LAMMPS-ENGINE] INFO [24e4f892] nohup PID=unknown
+2026-09-13 16:36:19,751 [LAMMPS-ENGINE] INFO [24e4f892] LAMMPS completed successfully
+[wait] tg sweep T=530.0K (ext 0): watching 49bf574e
+2026-09-13 16:36:20,831 [LAMMPS-ENGINE] INFO [49bf574e] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 16:36:20,831 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/49bf574e_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_49bf574e
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T530_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/49bf574e_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"49bf574e","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_49bf574e.json
+else
+  echo '{"run_id":"49bf574e","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_49bf574e.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_49bf574e
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/49bf574e_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/49bf574e_run.sh </dev/null & disown; echo $!
+2026-09-13 16:36:50,862 [LAMMPS-ENGINE] INFO [49bf574e] nohup PID=unknown
+2026-09-13 16:40:51,049 [LAMMPS-ENGINE] INFO [49bf574e] LAMMPS completed successfully
+[wait] tg sweep T=510.0K (ext 0): watching 13d15a40
+2026-09-13 16:40:52,116 [LAMMPS-ENGINE] INFO [13d15a40] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 16:40:52,116 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/13d15a40_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_13d15a40
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T510_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/13d15a40_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"13d15a40","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_13d15a40.json
+else
+  echo '{"run_id":"13d15a40","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_13d15a40.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_13d15a40
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/13d15a40_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/13d15a40_run.sh </dev/null & disown; echo $!
+2026-09-13 16:41:22,147 [LAMMPS-ENGINE] INFO [13d15a40] nohup PID=unknown
+2026-09-13 16:45:32,162 [LAMMPS-ENGINE] INFO [13d15a40] LAMMPS completed successfully
+[wait] tg sweep T=490.0K (ext 0): watching 460aa87b
+2026-09-13 16:45:53,399 [LAMMPS-ENGINE] INFO [460aa87b] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 16:45:53,399 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/460aa87b_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_460aa87b
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T490_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/460aa87b_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"460aa87b","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_460aa87b.json
+else
+  echo '{"run_id":"460aa87b","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_460aa87b.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_460aa87b
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/460aa87b_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/460aa87b_run.sh </dev/null & disown; echo $!
+2026-09-13 16:46:23,430 [LAMMPS-ENGINE] INFO [460aa87b] nohup PID=unknown
+2026-09-13 16:50:23,662 [LAMMPS-ENGINE] INFO [460aa87b] LAMMPS completed successfully
+[wait] tg sweep T=470.0K (ext 0): watching 33c2c7b6
+2026-09-13 16:50:24,730 [LAMMPS-ENGINE] INFO [33c2c7b6] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 16:50:24,730 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/33c2c7b6_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_33c2c7b6
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T470_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/33c2c7b6_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"33c2c7b6","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_33c2c7b6.json
+else
+  echo '{"run_id":"33c2c7b6","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_33c2c7b6.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_33c2c7b6
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/33c2c7b6_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/33c2c7b6_run.sh </dev/null & disown; echo $!
+2026-09-13 16:50:54,761 [LAMMPS-ENGINE] INFO [33c2c7b6] nohup PID=unknown
+2026-09-13 16:54:55,006 [LAMMPS-ENGINE] INFO [33c2c7b6] LAMMPS completed successfully
+[wait] tg sweep T=450.0K (ext 0): watching 318c0367
+2026-09-13 16:54:56,099 [LAMMPS-ENGINE] INFO [318c0367] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 16:54:56,099 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/318c0367_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_318c0367
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T450_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/318c0367_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"318c0367","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_318c0367.json
+else
+  echo '{"run_id":"318c0367","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_318c0367.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_318c0367
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/318c0367_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/318c0367_run.sh </dev/null & disown; echo $!
+2026-09-13 16:55:26,130 [LAMMPS-ENGINE] INFO [318c0367] nohup PID=unknown
+2026-09-13 16:59:36,151 [LAMMPS-ENGINE] INFO [318c0367] LAMMPS completed successfully
+[wait] tg sweep T=430.0K (ext 0): watching 58b5b04d
+2026-09-13 16:59:57,422 [LAMMPS-ENGINE] INFO [58b5b04d] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 16:59:57,422 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/58b5b04d_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_58b5b04d
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T430_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/58b5b04d_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"58b5b04d","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_58b5b04d.json
+else
+  echo '{"run_id":"58b5b04d","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_58b5b04d.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_58b5b04d
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/58b5b04d_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/58b5b04d_run.sh </dev/null & disown; echo $!
+2026-09-13 17:00:27,453 [LAMMPS-ENGINE] INFO [58b5b04d] nohup PID=unknown
+2026-09-13 17:04:27,715 [LAMMPS-ENGINE] INFO [58b5b04d] LAMMPS completed successfully
+[wait] tg sweep T=410.0K (ext 0): watching fced33bf
+2026-09-13 17:04:28,788 [LAMMPS-ENGINE] INFO [fced33bf] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 17:04:28,788 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/fced33bf_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_fced33bf
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T410_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/fced33bf_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"fced33bf","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_fced33bf.json
+else
+  echo '{"run_id":"fced33bf","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_fced33bf.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_fced33bf
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/fced33bf_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/fced33bf_run.sh </dev/null & disown; echo $!
+2026-09-13 17:04:58,819 [LAMMPS-ENGINE] INFO [fced33bf] nohup PID=unknown
+2026-09-13 17:08:59,057 [LAMMPS-ENGINE] INFO [fced33bf] LAMMPS completed successfully
+[wait] tg sweep T=390.0K (ext 0): watching 521cccc9
+2026-09-13 17:09:00,146 [LAMMPS-ENGINE] INFO [521cccc9] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 17:09:00,146 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/521cccc9_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_521cccc9
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T390_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/521cccc9_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"521cccc9","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_521cccc9.json
+else
+  echo '{"run_id":"521cccc9","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_521cccc9.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_521cccc9
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/521cccc9_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/521cccc9_run.sh </dev/null & disown; echo $!
+2026-09-13 17:09:30,177 [LAMMPS-ENGINE] INFO [521cccc9] nohup PID=unknown
+2026-09-13 17:13:30,420 [LAMMPS-ENGINE] INFO [521cccc9] LAMMPS completed successfully
+[wait] tg sweep T=370.0K (ext 0): watching 197a1540
+2026-09-13 17:13:31,497 [LAMMPS-ENGINE] INFO [197a1540] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 17:13:31,497 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/197a1540_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_197a1540
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T370_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/197a1540_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"197a1540","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_197a1540.json
+else
+  echo '{"run_id":"197a1540","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_197a1540.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_197a1540
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/197a1540_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/197a1540_run.sh </dev/null & disown; echo $!
+2026-09-13 17:14:01,528 [LAMMPS-ENGINE] INFO [197a1540] nohup PID=unknown
+2026-09-13 17:18:01,714 [LAMMPS-ENGINE] INFO [197a1540] LAMMPS completed successfully
+[wait] tg sweep T=350.0K (ext 0): watching 63de417b
+2026-09-13 17:18:02,860 [LAMMPS-ENGINE] INFO [63de417b] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 17:18:02,860 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/63de417b_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_63de417b
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T350_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/63de417b_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"63de417b","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_63de417b.json
+else
+  echo '{"run_id":"63de417b","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_63de417b.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_63de417b
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/63de417b_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/63de417b_run.sh </dev/null & disown; echo $!
+2026-09-13 17:18:32,891 [LAMMPS-ENGINE] INFO [63de417b] nohup PID=unknown
+2026-09-13 17:22:32,965 [LAMMPS-ENGINE] INFO [63de417b] LAMMPS completed successfully
+[wait] tg sweep T=330.0K (ext 0): watching 8b426291
+2026-09-13 17:22:34,226 [LAMMPS-ENGINE] INFO [8b426291] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 17:22:34,227 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/8b426291_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_8b426291
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T330_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/8b426291_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"8b426291","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_8b426291.json
+else
+  echo '{"run_id":"8b426291","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_8b426291.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_8b426291
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/8b426291_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/8b426291_run.sh </dev/null & disown; echo $!
+2026-09-13 17:23:04,258 [LAMMPS-ENGINE] INFO [8b426291] nohup PID=unknown
+2026-09-13 17:27:04,349 [LAMMPS-ENGINE] INFO [8b426291] LAMMPS completed successfully
+[wait] tg sweep T=310.0K (ext 0): watching 8c80c91e
+2026-09-13 17:27:05,628 [LAMMPS-ENGINE] INFO [8c80c91e] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 17:27:05,628 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/8c80c91e_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_8c80c91e
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T310_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/8c80c91e_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"8c80c91e","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_8c80c91e.json
+else
+  echo '{"run_id":"8c80c91e","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_8c80c91e.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_8c80c91e
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/8c80c91e_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/8c80c91e_run.sh </dev/null & disown; echo $!
+2026-09-13 17:27:35,658 [LAMMPS-ENGINE] INFO [8c80c91e] nohup PID=unknown
+2026-09-13 17:31:35,705 [LAMMPS-ENGINE] INFO [8c80c91e] LAMMPS completed successfully
+[wait] tg sweep T=290.0K (ext 0): watching 7106fcfb
+2026-09-13 17:31:37,041 [LAMMPS-ENGINE] INFO [7106fcfb] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 17:31:37,041 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/7106fcfb_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_7106fcfb
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T290_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/7106fcfb_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"7106fcfb","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_7106fcfb.json
+else
+  echo '{"run_id":"7106fcfb","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_7106fcfb.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_7106fcfb
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/7106fcfb_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/7106fcfb_run.sh </dev/null & disown; echo $!
+2026-09-13 17:32:07,071 [LAMMPS-ENGINE] INFO [7106fcfb] nohup PID=unknown
+2026-09-13 17:36:07,238 [LAMMPS-ENGINE] INFO [7106fcfb] LAMMPS completed successfully
+[wait] tg sweep T=270.0K (ext 0): watching eb94c659
+2026-09-13 17:36:08,448 [LAMMPS-ENGINE] INFO [eb94c659] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 17:36:08,449 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/eb94c659_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_eb94c659
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T270_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/eb94c659_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"eb94c659","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_eb94c659.json
+else
+  echo '{"run_id":"eb94c659","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_eb94c659.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_eb94c659
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/eb94c659_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/eb94c659_run.sh </dev/null & disown; echo $!
+2026-09-13 17:36:38,474 [LAMMPS-ENGINE] INFO [eb94c659] nohup PID=unknown
+2026-09-13 17:40:38,537 [LAMMPS-ENGINE] INFO [eb94c659] LAMMPS completed successfully
+[wait] tg sweep T=250.0K (ext 0): watching c70d6499
+2026-09-13 17:40:39,853 [LAMMPS-ENGINE] INFO [c70d6499] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 17:40:39,853 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/c70d6499_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_c70d6499
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T250_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/c70d6499_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"c70d6499","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_c70d6499.json
+else
+  echo '{"run_id":"c70d6499","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_c70d6499.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_c70d6499
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/c70d6499_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/c70d6499_run.sh </dev/null & disown; echo $!
+2026-09-13 17:41:09,884 [LAMMPS-ENGINE] INFO [c70d6499] nohup PID=unknown
+2026-09-13 17:45:09,959 [LAMMPS-ENGINE] INFO [c70d6499] LAMMPS completed successfully
+[wait] tg sweep T=230.0K (ext 0): watching 820d5f72
+2026-09-13 17:45:11,290 [LAMMPS-ENGINE] INFO [820d5f72] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 17:45:11,290 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/820d5f72_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_820d5f72
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T230_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/820d5f72_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"820d5f72","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_820d5f72.json
+else
+  echo '{"run_id":"820d5f72","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_820d5f72.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_820d5f72
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/820d5f72_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/820d5f72_run.sh </dev/null & disown; echo $!
+2026-09-13 17:45:41,321 [LAMMPS-ENGINE] INFO [820d5f72] nohup PID=unknown
+2026-09-13 17:49:41,375 [LAMMPS-ENGINE] INFO [820d5f72] LAMMPS completed successfully
+[wait] tg sweep T=210.0K (ext 0): watching 4ecc71c6
+2026-09-13 17:49:42,711 [LAMMPS-ENGINE] INFO [4ecc71c6] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 17:49:42,711 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/4ecc71c6_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_4ecc71c6
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T210_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/4ecc71c6_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"4ecc71c6","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_4ecc71c6.json
+else
+  echo '{"run_id":"4ecc71c6","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_4ecc71c6.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_4ecc71c6
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/4ecc71c6_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/4ecc71c6_run.sh </dev/null & disown; echo $!
+2026-09-13 17:50:12,742 [LAMMPS-ENGINE] INFO [4ecc71c6] nohup PID=unknown
+2026-09-13 17:54:02,756 [LAMMPS-ENGINE] INFO [4ecc71c6] LAMMPS completed successfully
+[wait] tg sweep T=190.0K (ext 0): watching 6549f719
+2026-09-13 17:54:14,162 [LAMMPS-ENGINE] INFO [6549f719] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 17:54:14,162 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/6549f719_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_6549f719
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T190_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/6549f719_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"6549f719","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_6549f719.json
+else
+  echo '{"run_id":"6549f719","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_6549f719.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_6549f719
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/6549f719_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/6549f719_run.sh </dev/null & disown; echo $!
+2026-09-13 17:54:44,186 [LAMMPS-ENGINE] INFO [6549f719] nohup PID=unknown
+2026-09-13 17:58:44,255 [LAMMPS-ENGINE] INFO [6549f719] LAMMPS completed successfully
+[wait] tg sweep T=170.0K (ext 0): watching c34a511a
+2026-09-13 17:58:45,595 [LAMMPS-ENGINE] INFO [c34a511a] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 17:58:45,595 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/c34a511a_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_c34a511a
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T170_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/c34a511a_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"c34a511a","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_c34a511a.json
+else
+  echo '{"run_id":"c34a511a","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_c34a511a.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_c34a511a
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/c34a511a_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/c34a511a_run.sh </dev/null & disown; echo $!
+2026-09-13 17:59:15,626 [LAMMPS-ENGINE] INFO [c34a511a] nohup PID=unknown
+2026-09-13 18:03:15,716 [LAMMPS-ENGINE] INFO [c34a511a] LAMMPS completed successfully
+[wait] tg sweep T=150.0K (ext 0): watching b4b6b9f9
+2026-09-13 18:03:17,054 [LAMMPS-ENGINE] INFO [b4b6b9f9] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 18:03:17,054 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/b4b6b9f9_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_b4b6b9f9
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T150_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/b4b6b9f9_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"b4b6b9f9","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_b4b6b9f9.json
+else
+  echo '{"run_id":"b4b6b9f9","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_b4b6b9f9.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_b4b6b9f9
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/b4b6b9f9_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/b4b6b9f9_run.sh </dev/null & disown; echo $!
+2026-09-13 18:03:47,080 [LAMMPS-ENGINE] INFO [b4b6b9f9] nohup PID=unknown
+2026-09-13 18:07:37,095 [LAMMPS-ENGINE] INFO [b4b6b9f9] LAMMPS completed successfully
+[wait] tg sweep T=130.0K (ext 0): watching 2e5159b9
+2026-09-13 18:07:48,495 [LAMMPS-ENGINE] INFO [2e5159b9] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 18:07:48,495 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/2e5159b9_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_2e5159b9
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T130_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/2e5159b9_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"2e5159b9","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_2e5159b9.json
+else
+  echo '{"run_id":"2e5159b9","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_2e5159b9.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_2e5159b9
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/2e5159b9_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/2e5159b9_run.sh </dev/null & disown; echo $!
+2026-09-13 18:08:18,525 [LAMMPS-ENGINE] INFO [2e5159b9] nohup PID=unknown
+2026-09-13 18:12:08,540 [LAMMPS-ENGINE] INFO [2e5159b9] LAMMPS completed successfully
+[wait] tg sweep T=110.0K (ext 0): watching 3de196a6
+2026-09-13 18:12:19,941 [LAMMPS-ENGINE] INFO [3de196a6] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 18:12:19,941 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/3de196a6_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_3de196a6
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T110_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/3de196a6_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"3de196a6","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_3de196a6.json
+else
+  echo '{"run_id":"3de196a6","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_3de196a6.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_3de196a6
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/3de196a6_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/3de196a6_run.sh </dev/null & disown; echo $!
+2026-09-13 18:12:49,950 [LAMMPS-ENGINE] INFO [3de196a6] nohup PID=unknown
+2026-09-13 18:16:39,964 [LAMMPS-ENGINE] INFO [3de196a6] LAMMPS completed successfully
+[wait] tg sweep T=100K (ext 0): watching 0e831ce2
+2026-09-13 18:16:51,418 [LAMMPS-ENGINE] INFO [0e831ce2] Launching LAMMPS via nohup wrapper (engine=gpu): /home/alexzhao/lammps-install/bin/lmp
+2026-09-13 18:16:51,418 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20 && cat > /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/0e831ce2_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_0e831ce2
+cd /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20
+env CUDA_VISIBLE_DEVICES=1 /home/alexzhao/lammps-install/bin/lmp -sf gpu -pk gpu 1 -in /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_step_T100_e0.in >> /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/0e831ce2_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"0e831ce2","status":"completed","work_dir":"/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20"}' > /tmp/polyjarvis/sentinels/done_0e831ce2.json
+else
+  echo '{"run_id":"0e831ce2","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_0e831ce2.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_0e831ce2
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/0e831ce2_run.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/0e831ce2_run.sh </dev/null & disown; echo $!
+2026-09-13 18:17:21,449 [LAMMPS-ENGINE] INFO [0e831ce2] nohup PID=unknown
+2026-09-13 18:21:11,463 [LAMMPS-ENGINE] INFO [0e831ce2] LAMMPS completed successfully
+2026-09-13 18:21:21,571 [LAMMPS-ENGINE] INFO Running thermal extraction via CLI: python /home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/analysis_scripts/extract_thermal.py --log_file /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_sweep.log --output_dir /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/raw --equilibration_fraction 0.5 --temp_col Temp --density_col Density --enthalpy_col Enthalpy --graphs_dir /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/graphs --per_t_dump_file /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/per_t_structs.dump --tg_data_file /home/alexzhao/PolyJarvis/data/PE_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data
+2026-09-13 18:21:21,571 [LAMMPS-ENGINE] INFO Running: python /home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/analysis_scripts/extract_thermal.py --log_file /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/tg_sweep.log --output_dir /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/raw --equilibration_fraction 0.5 --temp_col Temp --density_col Density --enthalpy_col Enthalpy --graphs_dir /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/graphs --per_t_dump_file /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/work/tg_sweep_r20/per_t_structs.dump --tg_data_file /home/alexzhao/PolyJarvis/data/PE_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data
+2026-09-13 18:21:24,525 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_bd05f816.json
+Traceback (most recent call last):
+  File "/home/alexzhao/PolyJarvis/db/query_best_match.py", line 516, in <module>
+    main()
+  File "/home/alexzhao/PolyJarvis/db/query_best_match.py", line 434, in main
+    polymer_ids, match_method, match_confidence = find_polymer_ids(
+                                                  ^^^^^^^^^^^^^^^^^
+  File "/home/alexzhao/PolyJarvis/db/query_best_match.py", line 128, in find_polymer_ids
+    rows = conn.execute(
+           ^^^^^^^^^^^^^
+sqlite3.OperationalError: no such table: polymers
+2026-09-13 18:21:27,394 [LAMMPS-ENGINE] INFO Running generate_run_summary via CLI: python /home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/analysis_scripts/generate_run_summary.py --output_dir /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/summary/attempt-0001/raw --run_name tg_sensitivity/TGS_PE_1_L1_r20 --smiles '*CC*' --polymer_class PHYC --ff 'trappe-ua' --charge_method 'embedded' --dp 179 --n_chains 10 --d01 'trappe-ua' --d02 'embedded' --d03 'lj_cut' --d04 'DP=179, 10 chains' --d05 'PASS' --d06 'EXCELLENT' --graphs_dir /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/graphs --n_replicates 1 --tg_path /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/raw/thermal.json --equilibration_path /home/alexzhao/PolyJarvis/data/PE_1/attempts/equilibration/attempt-0001/raw/equilibration.json --melt_equilibration_path /home/alexzhao/PolyJarvis/data/PE_1/attempts/equilibration/attempt-0001/raw/equilibration.json --byproducts_spec /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/summary/attempt-0001/raw/byproducts_spec.json
+2026-09-13 18:21:27,394 [LAMMPS-ENGINE] INFO Running: python /home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/analysis_scripts/generate_run_summary.py --output_dir /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/summary/attempt-0001/raw --run_name tg_sensitivity/TGS_PE_1_L1_r20 --smiles '*CC*' --polymer_class PHYC --ff 'trappe-ua' --charge_method 'embedded' --dp 179 --n_chains 10 --d01 'trappe-ua' --d02 'embedded' --d03 'lj_cut' --d04 'DP=179, 10 chains' --d05 'PASS' --d06 'EXCELLENT' --graphs_dir /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/graphs --n_replicates 1 --tg_path /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/thermal/attempt-0001/raw/thermal.json --equilibration_path /home/alexzhao/PolyJarvis/data/PE_1/attempts/equilibration/attempt-0001/raw/equilibration.json --melt_equilibration_path /home/alexzhao/PolyJarvis/data/PE_1/attempts/equilibration/attempt-0001/raw/equilibration.json --byproducts_spec /home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/attempts/summary/attempt-0001/raw/byproducts_spec.json
+2026-09-13 18:21:27,658 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_db903172.json
+{
+  "status": "accepted",
+  "run_name": "tg_sensitivity/TGS_PE_1_L1_r20",
+  "state_path": "/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L1_r20/workflow_state.json",
+  "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0001",
+    "thermal": "attempt-0001",
+    "summary": "attempt-0001"
+  }
+}

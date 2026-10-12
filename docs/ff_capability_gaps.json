@@ -1,0 +1,179 @@
+{
+  "_metadata": {
+    "description": "Tracked list of cases where fresh MD literature grounding (2026-08-26 polymer_rules.json re-audit) favored a force field that this platform cannot currently route to for that class, and why -- so a future audit doesn't have to rediscover these from scratch, and so they're visible as concrete roadmap items rather than buried in per-class ff_note prose. Each entry records what's blocked, the exact mechanized error behind it, and which blocker_category it falls into (see categories below).",
+    "blocker_categories": {
+      "platform_wiring": "The field is genuinely buildable by an existing PolyJarvis-integrated toolchain (EMC or RadonPy), but this repo's own code (ENUM_OVERRIDES, EMC_FF_FAMILIES, MCP tool Literal types, script_generator.py styles, detection logic) doesn't expose or route to it yet. Fixable entirely within this repo -- the kind of gap worth scheduling as real feature work.",
+      "third_party_field_gap": "The field fails inside EMC's own third-party field-definition files (~/emc/field/<family>/) -- a typing-rule gap ('Missing rules') or a parameter-coverage gap ('Missing force field parameters') for this specific SMILES's local chemical environment. Fixing this means authoring new EMC typing rules or parameter rows in EMC's own rule syntax. NOTE (2026-08-31): the original text called this 'a different skill/toolchain than anything in this repo'. That is no longer accurate -- emc_fields/ tracks a vendor baseline, three patch files and a hash manifest precisely because an EMC reinstall silently reverts local edits, and the PSIL/PDMS siloxane types (si4/o2/o2h/h1o across .define/.top/.prm) were authored, patched and are in use. ff_provenance.py then classifies every emitted coefficient as LOCAL_PATCH / ZERO_SUBSTITUTED / AUTO_FALLBACK / NO_SOURCE_ROW. It is a version-controlled workflow that has been exercised successfully, not a foreign toolchain.",
+      "repeat_unit_representation": "Not a field gap at all: the field types and parameterizes this chemistry correctly, but EMC assigns the wrong atom type because of how the repeat unit was CUT. EMC types the repeat group before resolving the * connection points, so an atom adjacent to a * cannot complete an environment pattern that specifies all its neighbours, and falls back to a generic type -- whose increment/parameter pairs with the correctly-typed neighbours then legitimately do not exist. Diagnosed by reading EMC's own 'increment pair {X, Y} not found' warning rather than the 'Missing force field parameters' error it aborts with. Fixed by re-cutting the repeat unit at a C-C bond whose carbons carry no heteroatom, which invents nothing. Only possible when the polymer HAS such a bond."
+    },
+    "created": "2026-08-26",
+    "source": "guides/polymer_rules.json re-audit session -- see individual class ff_note entries for the full literature grounding behind each row here",
+    "emc_typing_survey_2026-08-31": {
+      "what": "Stratified sample of RadonPy's PI1070 (real PoLyInfo chemistry) built through each polymer's OWN class-preferred force field, tiny cells (dp=2, nchains=1) since typing is what is under test, not packing. Records EMC's per-pair 'increment pair {X, Y} not found' warnings rather than only the 'Missing force field parameters' abort.",
+      "result": "71 of 109 built (65%). The three RadonPy-routed classes (PAMD, PCBN, PURA) were not tested. Harness validated against curated members that do build (PSTR 8/8, PIMN 8/8, PPNL 6/6, and PDIE's own *CC=CC* control).",
+      "per_class_built": {
+        "PACR": "3/8",
+        "PANH": "1/1",
+        "PDIE": "0/8",
+        "PEST": "7/8",
+        "PHAL": "4/8",
+        "PHYC": "7/8",
+        "PIMD": "1/8",
+        "PIMN": "8/8",
+        "PKTN": "1/1",
+        "POXI": "4/8",
+        "PPHS": "1/1",
+        "PPNL": "6/6",
+        "PSFO": "3/4",
+        "PSTR": "8/8",
+        "PSUL": "7/8",
+        "PURT": "3/8",
+        "PVNL": "7/8"
+      },
+      "interpretation": "The class defaults are sound for the members each class curated; the ~35% failure rate is against the class's WIDER chemical space, which is exactly the population a novel-polymer platform is aimed at. Two classes fail structurally rather than marginally -- see the PDIE and PIMD entries below.",
+      "caveat": "A sample of 8 per class is enough to rank classes and to find the two structural failures, not to put a confidence interval on any single class's rate."
+    }
+  },
+  "gaps": [
+    {
+      "polymer_class": "PCBN",
+      "member": "BPA-PC",
+      "smiles": "*Oc1ccc(C(C)(C)c2ccc(OC(*)=O)cc2)cc1",
+      "literature_best_ff": "DREIDING (modified)",
+      "literature_source": {
+        "title": "Molecular Modeling of Polycarbonate. 1. Force Field, Static Structure, and Mechanical Properties",
+        "authors": "Fan, Cagin, Chen, Smith",
+        "year": 1994,
+        "doi": "10.1021/ma00087a004",
+        "note": "A force-field-development paper written specifically for BPA-PC -- the strongest possible kind of literature match, stronger than the class-analogy evidence backing most other rows in polymer_rules.json."
+      },
+      "currently_routed_to": "Dreiding via RadonPy (real fix, not a workaround)",
+      "blocker_category": "platform_wiring (RESOLVED) -- plus an unrelated upstream RadonPy bug found and fixed along the way",
+      "blocker_detail": "DREIDING is NOT an EMC field on this box (no ~/emc/field/dreiding directory; ff_capability.py's own registry marks front_end='radonpy' for it) -- an earlier pass in this same session incorrectly reported it as EMC-admissible; that was wrong and has been corrected. RadonPy DOES have a working, installed Dreiding module (radonpy/ff/dreiding.py, confirmed present in the mol-builder conda env: pair_style='lj', bond='harmonic', angle='harmonic', dihedral='harmonic', improper='umbrella', ff_class='1', RESP-charge-compatible via ff_assign(mol, charge=...)) -- but mcp-mol-builder-server/server.py's tool signatures only expose forcefield: Literal['GAFF','GAFF2','GAFF2_mod'], so Dreiding is unreachable through the MCP layer despite the underlying library supporting it.",
+      "work_required_if_pursued": [
+        "mcp-mol-builder-server/server.py: add 'Dreiding' to the forcefield Literal, import radonpy.ff.dreiding.Dreiding, add a construction branch",
+        "script_generator.py: DREIDING_STYLES (dihedral=harmonic, improper=umbrella -- differs from GAFF2's fourier/cvff; pair/bond/angle match GAFF2's existing composition), DREIDING_SPECIAL_BONDS/PAIR_MODIFY from the module's c_c14=5/6, lj_c14=0.5 constants, a use_dreiding branch in both style-selection chains (~line 1183 and ~1412), and a fix to _detect_ff_from_data_file's collision with PCFF's improper-count heuristic (DREIDING also emits improper types)",
+        "stage_params.py: extend the class_ii-style family logic",
+        "scientific_control.py: add 'dreiding' or 'Dreiding' to ENUM_OVERRIDES['preferred_ff']",
+        "test_polymer_rules_schema.py: extend test_build_route_consistency's radonpy branch (currently asserts pref_ff in {'GAFF2','GAFF2_mod'} only) and test_ff_routing.py",
+        "Validation bar: actually build a cell, generate a deck, run a real short CPU minimize and confirm convergence -- a generated script that merely parses is not proof the styles/coefficients are right"
+      ],
+      "status": "RESOLVED 2026-08-26",
+      "last_updated": "2026-08-26",
+      "resolution": "1) Corrected an earlier wrong claim in this same audit that DREIDING was EMC-admissible -- it is not; ff_capability.py registers it front_end='radonpy'. 2) mcp-mol-builder-server/server.py extended: 'Dreiding' added to the forcefield Literal in assign_forcefield() and submit_copolymerize_job(), plus construction branches (radonpy.ff.dreiding.Dreiding). 3) Found and patched a genuine upstream RadonPy bug (not a PolyJarvis bug): Dreiding.assign_atypes/assign_dtypes/assign_itypes reset mol.angles/dihedrals/impropers to empty lists (setattr(mol, 'angles', [])) instead of preserving the dict every other ff module and core/utils.py's combine_mols/MolToJSON_dict expect -- broke amorphous-cell generation for ANY Dreiding-built polymer, not just BPA-PC. Patched in the installed package (~/miniforge3/envs/mol-builder/.../radonpy/ff/dreiding.py) to dict-key exactly like amber.py/gaff.py's own set_atype/set_dtype/set_itype convention ('%i,%i,%i[,%i]' % (a,b,c[,d])). Only the mol-builder conda env needed patching -- confirmed no other code path in this repo invokes RadonPy's ff-assignment modules via the other two installs on this machine (~/RadonPy/, ~/miniforge3/envs/radonpy/ are only used for RDKit-only SMILES/group-contribution scripts). 4) script_generator.py: DREIDING_STYLES/PAIR_STYLE_DREIDING_PPPM/CUTOFF/SPECIAL_BONDS/PAIR_MODIFY added as a genuine 4th branch (bond=harmonic, angle=harmonic, dihedral=harmonic [not GAFF2's fourier], improper=umbrella [not GAFF2's cvff]) -- all bonded styles confirmed against a real emitted .data file; the geometric mixing rule is the one piece taken from the published DREIDING force field's own stated convention (Mayo/Olafson/Goddard 1990) rather than independently re-derived from an emitted file. 5) stage_params.py, scientific_control.py (ENUM_OVERRIDES), test_polymer_rules_schema.py (test_build_route_consistency's radonpy branch) all updated. 6) VALIDATED END-TO-END: built a real 3-mer x 2-chain BPA-PC cell, ran ff_assign (177 angles / 256 dihedrals / 39 impropers, all correctly dict-keyed), wrote a LAMMPS .data file, generated a real minimize.in deck via script_generator.py, and ran an actual LAMMPS minimize -- converged (energy 443.8->106.8, force norm 727.7->7.2), LAMMPS itself reported 'Generated 15 of 15 mixed pair_coeff terms from geometric mixing rule' confirming every style/coefficient was accepted cleanly, not just that the script parsed. guides/polymer_rules.json PCBN now routes preferred_ff=Dreiding, preferred_builder=radonpy, charge_method=RESP."
+    },
+    {
+      "polymer_class": "POXI",
+      "member": "PEO",
+      "smiles": "*CCO*",
+      "literature_best_ff": "OPLS-AA (all-atom)",
+      "literature_source": {
+        "title": "Temperature Dependence of Conformational Relaxation of Poly(ethylene oxide) Melts",
+        "year": 2021,
+        "doi": "10.3390/polym13224049",
+        "note": "Full-text-verified: all-atom OPLS-AA melt MD, density/Tg both independently confirmed against this class's existing polymer_rules.json defaults."
+      },
+      "currently_routed_to": "PCFF via EMC (class default unchanged); OPLS-AA is now reachable for PEO and available to D-01 as a real alternative",
+      "blocker_category": "repeat_unit_representation (RESOLVED) -- NOT the third_party_field_gap this was originally filed as",
+      "blocker_detail": "ORIGINAL (2026-08-26, WRONG): 'opls/2024/opls-aa: EMC error Missing force field parameters -- a .prm coverage gap for this ether-oxygen environment.' The error was real and reproduces, but the diagnosis was not: nothing is missing from the field file. EMC's own message names the cause -- `Warning: increment pair {c4, o2e} not found` -- and o2e (ether O) types correctly via its catch-all rule O(~C)(~C), while c4oe (ether-adjacent carbon) already carries the increment (c4oe o2e 0.2 -0.2). The failure is that a carbon was typed generic c4 when OPLS-AA's own convention demands c4oe. EMC types the repeat GROUP before resolving the * connection points, so a carbon adjacent to * cannot complete the 4-neighbour environment pattern rule 125 requires (C(~O(~C))(~C)(H)(H)) and falls back to c4. In *CCO* both backbone carbons touch a *, so both mis-type.",
+      "status": "RESOLVED 2026-08-31",
+      "resolution": "Write the repeat unit so no ether-adjacent carbon touches a connection point. *CCOCC* is the same polymer cut across a C-C bond instead of at the oxygen: its boundary carbons are plain alkyl (bonded to C, *, H, H), where generic c4 is CORRECT, and the interior carbons see their ether oxygen and type c4oe. No field-file edit, no invented parameter -- every value comes from the stock opls-aa.prm. VALIDATED END-TO-END: *CCO* dies after writing input scripts only; *CCOCC* built a real 3270-atom cell (dp=25, nchain=10) with zero warnings, 4 atom types {c4, c4oe, h1, o2e} and no c4-o2e pairing anywhere, then ran a real LAMMPS minimize to convergence (PotEng 4442.6 -> -1531.5 over 1994 steps, pressure 25290 -> -789 atm, exit 0) with LAMMPS reporting 'Generated 6 of 6 mixed pair_coeff terms from geometric mixing rule' -- every style and coefficient accepted, not merely a script that parses. Same bar the PCBN/Dreiding entry above was held to.",
+      "generalizes": "Partially, and the limit is chemical. Re-cutting took PET from 3 missing increments to 1 and TPU from 5 to 2, but neither closes: PET's only C-C bond sits between two oxygens, so every cut leaves a heteroatom-adjacent boundary carbon. The rule is 'cut at a C-C bond whose carbons are not bonded to a heteroatom', and a polymer with no such bond cannot be fixed this way. Those two remain open below.",
+      "not_done": "The class default is deliberately NOT switched. This closes a CAPABILITY gap (can we reach OPLS-AA at all) and leaves the ACCURACY question (should OPLS-AA displace PCFF) to D-01, which is a Class-II-vs-Class-I tradeoff the class ff_note argues on other grounds. preferred_ff is class-level and POXI also contains PPO and PVME, neither of which was tested -- switching a class default on one member's validation is exactly the over-generalization the 2026-08-26 re-audit caught elsewhere.",
+      "last_updated": "2026-08-31"
+    },
+    {
+      "polymer_class": "PEST",
+      "member": "PET",
+      "smiles": "*OCCOC(=O)c1ccc(C(*)=O)cc1",
+      "literature_best_ff": "COMPASS (Tg within a few K of experiment) or refined OPLS-AA (density ~3% low)",
+      "literature_source": {
+        "note": "Two full-text-verified bulk-amorphous-PET MD papers found this session, one per field; neither uses PCFF specifically."
+      },
+      "currently_routed_to": "PCFF via EMC (only viable Class-II option -- see below)",
+      "blocker_category": "third_party_field_gap",
+      "blocker_detail": "Neither compass nor opls/2024/opls-aa is EMC-admissible for this SMILES (mechanized select_forcefield.py, 2026-08-26): admissible=[dreiding, gaff, gaff2, gaff2_mod, pcff] only -- both literature-favored fields fail with 'Missing rules'/'Missing force field parameters' for PET's aromatic-ester backbone. PCFF remains the only Class-II option platform-wide can actually build for this SMILES, regardless of literature preference. REFINED 2026-08-31: reproduced against the current field files, and EMC's own warnings name what is missing rather than leaving it as 'Missing force field parameters' -- for opls-aa the pairs are {c4, o2s}, {o2e, c3oe} and {o2e, c4}, every one of them a carbon typed generic c4 where OPLS-AA's convention demands the ether/ester-adjacent c4oe (whose increments c4oe o2s 0.25 -0.25 and c4oe o2e 0.2 -0.2 already exist). Re-cutting the repeat unit across the C-C bond (*COC(=O)c1ccc(C(=O)OC*)cc1) drops it from 3 missing pairs to 1, but cannot close it: PET's only C-C bond sits between two oxygens, so every cut leaves a heteroatom-adjacent boundary carbon. compass fails differently and harder -- 'Missing rules' with 1 unmatched site, a typing-rule gap needing .define/.top authoring, not parameter rows. Note the literature accepted 'COMPASS or refined OPLS-AA', so the OPLS-AA route would close this without touching compass.",
+      "status": "open -- third-party EMC field-file gap, not attempted",
+      "last_updated": "2026-08-31",
+      "remaining_work": "One increment row (c4 o2s) via emc_fields/. NOT done: it would transplant c4oe's published 0.25/-0.25 onto c4, giving the boundary carbon the right CHARGE while it keeps c4's LJ and bonded terms -- a hybrid that exists nowhere in the published force field. That is an approximation, not a transcription, and belongs in ff_note as a documented compromise rather than a silent patch. Held pending an explicit decision."
+    },
+    {
+      "polymer_class": "PURT",
+      "member": "aliphatic TPU (synthetic proxy SMILES, no curated member_smiles exists)",
+      "smiles": "*OCCOC(=O)NCCCCCCNC(*)=O",
+      "literature_best_ff": "OPLS-AA / OpenFF",
+      "literature_source": {
+        "note": "The only genuinely on-chemistry (aliphatic HDI-based) MD benchmark found uses OPLS-AA/OpenFF, though it over-predicts DSC Tg by 20-75K at its own cooling rate -- an accuracy caution independent of admissibility."
+      },
+      "currently_routed_to": "PCFF via EMC (only viable Class-II option -- see below)",
+      "blocker_category": "third_party_field_gap",
+      "blocker_detail": "Neither opls/2024/opls-aa nor compass is EMC-admissible for this SMILES: admissible=[dreiding, gaff, gaff2, gaff2_mod, pcff, trappe-ua] only -- both fail with 'Missing rules'/'Missing force field parameters' for the urethane linkage. Separately: plain 'gaff' (not gaff2) appears admissible in several classes' mechanized sweeps but has NO legal path anywhere in this platform (absent from scientific_control.py's ENUM_OVERRIDES['preferred_ff'] and from EMC_FF_FAMILIES) -- a minor, low-priority structural gap noted here for completeness, not urgent since gaff2 already covers the same lineage. REFINED 2026-08-31: same shape as PEST. opls-aa's missing pairs are {c4, h1co}, {c4, o2s}, {n3am1, c4n}, {o2e, c3oe} and {o2e, c4}; re-cutting mid-hexamethylene (*CCCNC(=O)OCCOC(=O)NCCC*) drops it from 5 to 2 ({c4, o2s}, {c4, h1co}) but does not close it. compass fails with 'Missing rules' at 4 unmatched sites. Every missing pair is again a c4-where-c4oe-belongs, and c4oe already carries the value (c4oe o2s 0.25 -0.25, c4oe h1co -0.03 0.03).",
+      "status": "open -- third-party EMC field-file gap, not attempted",
+      "last_updated": "2026-08-31",
+      "remaining_work": "Two increment rows (c4 o2s, c4 h1co) via emc_fields/, with the same transplant caveat as PEST."
+    },
+    {
+      "polymer_class": "PDIE",
+      "member": "PI (polyisoprene) -- a CURATED member, not a novel SMILES",
+      "smiles": "*CC=C(C)C*",
+      "literature_best_ff": "n/a -- this is an admissibility defect, not a force-field preference",
+      "currently_routed_to": "trappe-ua via EMC (the class default, which cannot build this member)",
+      "blocker_category": "third_party_field_gap",
+      "blocker_detail": "TraPPE-UA has no torsion coefficients for a TRISUBSTITUTED alkene. EMC names them: 'no torsion coefficients found for [c3h:c3:c4h2:c4h3]', '[c4h2:c3h:c3:c4h2]', '[c4h2:c3h:c3:c4h3]' -- c3 being an sp2 carbon bearing a methyl where PBD's c3h bears an H. PBD (*CC=CC*) builds cleanly at the same size; PI does not, at any size (retested at dp=20/nchains=5 to rule out a small-cell artifact). 0 of 8 sampled PI1070 polydienes built, and stripping the /C=C\\ stereo annotation does NOT recover them -- the failure is parameter coverage for substituted alkenes, not SMILES stereo parsing (a separate, already-documented issue where EMC silently discards stereo).",
+      "impact": "polymer_rules.json lists PI under PDIE.member_smiles with experimental_tg_K=200, so it presents as a supported member. A request for polyisoprene fails at build. The whole substituted-diene family (isoprene, chloroprene, and the branched dienes PoLyInfo carries) is affected; only the unsubstituted 1,4-butadiene backbone is buildable.",
+      "status": "open -- newly found 2026-08-31, not previously tracked",
+      "options": [
+        "Route PDIE's substituted members to a field that covers them (PCFF is Class II and does carry these torsions -- needs admissibility testing, and would split the class's FF by member).",
+        "Author the missing TraPPE-UA torsion rows via emc_fields/, the same tracked-patch route used for PSIL's siloxane types.",
+        "Mark PI unsupported in member_smiles so it stops presenting as available."
+      ],
+      "last_updated": "2026-09-02",
+      "mechanized_recheck_2026-09-02": {
+        "what": "orchestration/scripts/forcefield.py capability '*CC=C(C)C*' --fields pcff,trappe-ua -- a real EMC trial build per field, not a file inspection.",
+        "result": {
+          "pcff": "types_smiles=true, typing_evidence='built_cell' -- PCFF builds polyisoprene to a runnable cell.",
+          "trappe-ua": "types_smiles=false, 'Missing force field parameters' -- reproduces the class default's failure."
+        },
+        "why_trappe_cannot_be_patched_cleanly": "Checked against the installed trappe/2014/trappe-ua.prm. The torsion across a DIsubstituted C=C exists (ITEM TORSION 'c* c3h c3h c*'), which is why PBD builds; there is no row with c3h/c3 as the central pair, and ITEM EQUIVALENCE_AUTO maps c3 to itself in the torsion column, so no fallback reaches one. Copying the disubstituted values onto the trisubstituted case would assert the two have the same torsional barrier -- a physical claim about chain stiffness, not a transcription. That is invention, and is exactly the kind of row this file's PEST/PURT entries already refuse to write.",
+        "bearing_on_options": "Option 1 (route substituted dienes to PCFF) is now evidence-backed rather than a hypothesis needing admissibility testing -- the test has been run. Option 2 (author the TraPPE torsion rows) is ruled out on the no-invented-numbers standard. Option 3 (mark PI unsupported) remains the smallest honest step while option 1 is unimplemented: preferred_ff is class-level today, so splitting PDIE's field by member needs a per-member routing mechanism that does not exist yet.",
+        "not_done": "No routing change made. Recorded as evidence only, so the probe does not have to be re-run to make the decision."
+      },
+      "literature_resolution_2026-09-02": {
+        "question": "Are the missing trisubstituted-alkene torsions published anywhere, so they could be transcribed into emc_fields/ rather than invented?",
+        "answer": "Not in TraPPE. They are published, in a different force field.",
+        "trappe_checked_at_source": {
+          "Wick2000_TraPPE4_10.1021/jp001044x": "Table 4 carries CHx-CH2-CH2-CHy, CHx-CH2-CH=CHy, and CHx-CH=CH-CHy cis/trans (harmonic, d0=12400/13400 K). All DIsubstituted. C(sp2) was parametrized from 2-methylpropene only, where no through-chain torsion across it is needed.",
+          "Maerzke2009_acrylates_10.1021/jp810558v": "Fit the C(sp2) site to isoprene and added the MONOMER conjugated-diene torsion CH2=CH-C(sp2)-CH3 (a0=1861.27, a1=-349.97). EMC already carries exactly this row -- trappe/2014/trappe-ua.prm 'c3* c3* c3h c4*' 1861/-349.97. It is not the term polyisoprene needs, which is the dihedral about a trisubstituted C=C inside the chain (EMC asks for c4h2:c3h:c3:c4h2 and c4h2:c3h:c3:c4h3)."
+        },
+        "where_the_parameters_do_exist": {
+          "Harmandaris2002_cis-1,4-PI_10.1063/1.1416872": "J. Chem. Phys. 116, 436-446. Table I(b) gives the complete UA set: bending (CH2-C=CH 125.9 deg), a HARMONIC DIHEDRAL C(2)-CH(3)-CH2(4) with phi0=160 deg -- the term EMC reports missing -- and torsional potentials for the backbone.",
+          "Faller2001_trans-PI_10.1021/ma0016782": "Macromolecules 34, 1436-1448. Table 2, force-field parameters for the torsion angles of trans-PI, fit to quantum-chemical energies.",
+          "Sharma2016_validation_10.1021/acs.jpcb.5b10789": "Validated and QC-refined those force fields for cis/trans PI and PB against Tg, density, thermal expansion (cis-PI alpha 5.1e-4 vs exp 6.7-7.5e-4, better than the original 10e-4), Rg, end-to-end distance and BULK MODULUS. This is the paper polymer_rules.json already cites for PDIE -- and it validates Harmandaris/Faller, NOT TraPPE-UA, which is what the class is routed to."
+        },
+        "why_transcription_into_trappe_is_still_refused": "Harmandaris/Faller are a self-consistent force field with their own LJ parameterization (epsilon in kcal/mol, r_min 3.8 A for C) that is not TraPPE's (epsilon/kB in K, sigma). Lifting their dihedrals into trappe-ua.prm mixes two fields -- the same transplant this file already refuses for PEST and PURT, and the failure mode Turney 2025 (10.1021/acs.macromol.5c01166) names directly: 'parameter proliferation, loss of transferability, and importantly poor reproducibility, since new parameters are often generated using different methods from those used in the original force field.'",
+        "clean_options_remaining": [
+          "Route substituted dienes to PCFF. Measured to build polyisoprene to a runnable cell (forcefield.py capability, typing_evidence=built_cell). Zero invention, but no PI-specific PCFF validation exists.",
+          "Register Harmandaris/Faller as a NEW EMC field rather than patching TraPPE. Zero invention, and it is the only route with published PI Tg + density + bulk-modulus validation. Cost: authoring EMC .prm/.top/.define for a field that has none.",
+          "Mark PI unsupported in member_smiles so it stops presenting as available."
+        ],
+        "mechanism_status_2026-09-04": "Option 1 is no longer blocked on missing machinery. The mechanized_recheck entry above says 'splitting PDIE's field by member needs a per-member routing mechanism that does not exist yet' -- that was true when written. forcefield.select_by_moiety now resolves D-01 per SMILES and writes decided_params.preferred_ff, and the class key is a literature prior (ff_accuracy_prior) that routes nothing. Routing substituted dienes to PCFF is now a rules change, not a build. The scientific question -- no PI-specific PCFF validation exists -- is unchanged and is still what this decision turns on."
+      }
+    },
+    {
+      "polymer_class": "PIMD",
+      "member": "polyimides generally (largest class in PI1070: 208 of 1006)",
+      "smiles": "(class-wide)",
+      "literature_best_ff": "n/a -- admissibility defect",
+      "currently_routed_to": "pcff via EMC",
+      "blocker_category": "third_party_field_gap",
+      "blocker_detail": "1 of 8 sampled polyimides built. The missing pairs are all imide-nitrogen charge increments: {na, c_1} (6 occurrences), {c_2, na} (5), {c_1, na} (4) -- the imide N with its flanking carbonyl carbons. This is the same PCFF hole already documented for PURA ('pcff missing {na,c_2} amide-N increment', which is why PURA is RadonPy-routed), reaching a second and much larger class.",
+      "impact": "PIMD is the single largest class in the PI1070 chemical space and is ~12% buildable on its own class default. Kapton-like chemistry is a headline polyimide use case.",
+      "status": "open -- newly found 2026-08-31, not previously tracked",
+      "options": [
+        "Route PIMD to RadonPy/GAFF2 as PURA already is, for the same documented reason.",
+        "Author the {na, c_1}/{na, c_2} increment rows via emc_fields/ -- but see the PEST/PURT caveat: transplanting an increment onto a type whose LJ/bonded terms stay generic is an approximation, not a transcription."
+      ],
+      "last_updated": "2026-08-31"
+    }
+  ]
+}

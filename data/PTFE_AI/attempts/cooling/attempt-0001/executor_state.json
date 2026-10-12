@@ -1,0 +1,932 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/raw/cooling.json",
+      "sha256": "345d48cb8b2eabeac32da30e334b54c878e58d0e7d94e3f39b869a038ada675a",
+      "size": 12305
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/raw/d05_block.md",
+      "sha256": "35a98d8b0ad30c4ae39ecbbe6b24b8d979e65b39fa9e8334fdc91bdfcfacff5b",
+      "size": 2186
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_01/cool_block_01.dump.gz",
+      "sha256": "40bfbbb9c75af28d070f5d8ff13d18caff659a020d7c22045381a652cd0bef58",
+      "size": 22057358
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_01/cool_block_01.in",
+      "sha256": "f0627d2228a3be268ede18426b2ea002d7546f072fc07ca120a75ebbeaabba0e",
+      "size": 4450
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_01/cool_block_01.log",
+      "sha256": "e3301a435986193a2173a5b771d8398993d7567da9374a602e5f8c233180a214",
+      "size": 95967
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_01/cool_block_01_last.dump.gz",
+      "sha256": "6f8038a71b487ce1ac2229e147ea3e6cf0155358c023b0d39ea7654d63f3de87",
+      "size": 102547
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_01/cool_block_01_out.data",
+      "sha256": "46bebe2a9afd0ed0e52db655329b05087de609429ef5e8e0abb85b67517bd072",
+      "size": 843117
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_01/cool_block_01_out.restart",
+      "sha256": "5ab3d77692544deff9a559c5bb149dff1b8fb417c98f83cf09804ae474e61efc",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_01/cool_block_01_run.log",
+      "sha256": "3e0534b66f4c3fa586a80ea8952c76df3ffd34189372de8f4b28efb8a585c5ba",
+      "size": 94615
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_01/log.lammps",
+      "sha256": "90a1eb86aa4285aa285b8670b8108f217863f1840f2c59a127f03b0977988c42",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_01/npt_1.rst",
+      "sha256": "8f0bd4ff6501e13ccd5793ba694bc06ca7e2bbd956c8e595facb0b8ef1a136f6",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_01/npt_2.rst",
+      "sha256": "6800e852e8c482ede610dd1e44a09e99c629a3d43fd426218c41b400dcdf7744",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_02/cool_block_02.dump.gz",
+      "sha256": "97db0dd3b8a14b90b7e05ad7389b46f4eb07adf622c77c2401dc45b064114442",
+      "size": 22035193
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_02/cool_block_02.in",
+      "sha256": "3585b54f6603f43a538c85cd3db6c3af9b623c701b75a1231e8f4b2eff8028e0",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_02/cool_block_02.log",
+      "sha256": "b2362a8117916cd6de81d84042919f33c03ec5a265c5740dc1642689d13a3447",
+      "size": 95974
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_02/cool_block_02_last.dump.gz",
+      "sha256": "8ac992be651926cb85cf36448d3cafc3c6b8cac37b7b02ff224823f155e7d4f2",
+      "size": 102616
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_02/cool_block_02_out.data",
+      "sha256": "b335c96056522488024c66eba3ce6a62aea38575b0ba84d6acbf20111588b29e",
+      "size": 843089
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_02/cool_block_02_out.restart",
+      "sha256": "2bb947cdebfa0ff59416e418efd7d2cbb0563d1197179d2707b0597043737835",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_02/cool_block_02_run.log",
+      "sha256": "6339314ae999121df3a3ee2adbe42fdbed0f3adc58ce5935d21a168b4ccddcb9",
+      "size": 94628
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_02/log.lammps",
+      "sha256": "d15354231f75ba484b9abd7fb1f77f0e5efaa18ab8611a1dcb30dbe0a167f505",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_02/npt_1.rst",
+      "sha256": "5587b55225a33ace9c2315d510cd6e5e472b84b4d2e057b62967e841f8b20ef6",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_02/npt_2.rst",
+      "sha256": "d2ba6aeb5e20645d84e5e1190e3c8f503bd3af0aac4e015ab70de4be95d1419d",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_03/cool_block_03.dump.gz",
+      "sha256": "ab87953fa6461c89d838552b8f785721d34aa5aa3479bc28407f6f5aa3dc929c",
+      "size": 22037282
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_03/cool_block_03.in",
+      "sha256": "2b70dcc45fbc7511a7a7a46bab8486264afe1b8ab5536e3b6f56609d2f7b88f0",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_03/cool_block_03.log",
+      "sha256": "b30bb4400453d49af9b7f79d9e6cf861d0c895d48ab90b0809c561a3fc2e0171",
+      "size": 95974
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_03/cool_block_03_last.dump.gz",
+      "sha256": "386dccef360ba603d929f3eea422f4fe22fcdec6b9fa028b86eb1cbd613105ac",
+      "size": 102926
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_03/cool_block_03_out.data",
+      "sha256": "cb2f5ee2d08d1180c16c74f2186534329b20e79a513e98f9d49faee99bf963b8",
+      "size": 843328
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_03/cool_block_03_out.restart",
+      "sha256": "d36c528823ef508c7f4278f64d5beb379b621212fddf63cb613cdcd98a91cf2d",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_03/cool_block_03_run.log",
+      "sha256": "8b4387fbcaba07f0c840861350d21b5dca3e2ccba670fe792271997b38055d4c",
+      "size": 94628
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_03/log.lammps",
+      "sha256": "182cc0765256ec11d1e9912e8cd81748572a47e8d8b88a74bb9d1d56bba3aaf4",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_03/npt_1.rst",
+      "sha256": "c7b461995bfe900509300107f6fce175f9f3a74f071098abe675a634b5653e34",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_03/npt_2.rst",
+      "sha256": "8777b2027cba1d8143ba2e12ddff5f6a55ba46d92664ed75aa98690befa7f9ca",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_04/cool_block_04.dump.gz",
+      "sha256": "6ca5e048f973a110cc25728242a0ba5f2b7e5b5e8b51e94fc38a3be185c3811a",
+      "size": 22037769
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_04/cool_block_04.in",
+      "sha256": "a4a4a645c769addfccda9f381708ba0f9bc894fe9738baf70417c330f8a0a706",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_04/cool_block_04.log",
+      "sha256": "deeb53e57f2713960d7412df592fae1f621d7a249ff77269b1e22e711bf412d2",
+      "size": 95974
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_04/cool_block_04_last.dump.gz",
+      "sha256": "fbc7e46d76cc66743e523b447f39d2f656eedcc1f6f159f1d77463daa11db061",
+      "size": 102463
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_04/cool_block_04_out.data",
+      "sha256": "c501e825e2f31d4b4894e09144f07413c79e9aff26a373bdf3808a886655fa76",
+      "size": 843411
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_04/cool_block_04_out.restart",
+      "sha256": "b6ea135928bc49d7e034bed39af6aad946e0071bc671278714bbc1b2c63ea7f8",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_04/cool_block_04_run.log",
+      "sha256": "5b5cd595cf07966cbf4a5f19990afa15f798e133f1545922b4d000a2520a5bfa",
+      "size": 94628
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_04/log.lammps",
+      "sha256": "59b82fbed87ab48652145e01faff71f629817f545f365a280d077a1062b2daf7",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_04/npt_1.rst",
+      "sha256": "0a15a15fb0df2f11a935bb0548a719dd322cc9da8994c18a1c48f32192364a11",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_04/npt_2.rst",
+      "sha256": "5ccc9e1292c46b1cdbaff58e18403804530faf5e6a3e7100ca43072926195182",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_05/cool_block_05.dump.gz",
+      "sha256": "9aee12d86419d2879d0a777922ac042f8f7f91ce5efebb44a220b4d511fd5dc3",
+      "size": 22026916
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_05/cool_block_05.in",
+      "sha256": "b5b04e661b6b42cd87ee52190b9e2946c5a20d513b9473b5f918e2c97d57431b",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_05/cool_block_05.log",
+      "sha256": "6d8be7b34545201673a70b9086cca1f4b55c23676b4c14c86d2db05bfab6c0a0",
+      "size": 95971
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_05/cool_block_05_last.dump.gz",
+      "sha256": "778c908f013eab1999afdc16d8e8626decdebc31784a087a56749e0fcc16cbf6",
+      "size": 102340
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_05/cool_block_05_out.data",
+      "sha256": "4b6e39cfdac745b4b3e9d48e0197757e920ad1ed0e65cf9d543d8e7fe1810eea",
+      "size": 843338
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_05/cool_block_05_out.restart",
+      "sha256": "8030f67629aceafc8a93a979209d902007d349c017cb63b8be99fe7db5c09541",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_05/cool_block_05_run.log",
+      "sha256": "bbaa3724e448d5f120ebe90d4319d643a45ad2200195acab64fd2989c93400af",
+      "size": 94625
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_05/log.lammps",
+      "sha256": "2aa2e62c05510a2b15baec7575b534cd217087bbf929596f54dfbf224ad2c553",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_05/npt_1.rst",
+      "sha256": "423683ffc91b20abebe6633d0131a7224ed4eb6d90608fe70e727e02b71c8d28",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_05/npt_2.rst",
+      "sha256": "998473df38707c73cbdd4a76d5b3b026482f05f0f99e05a4c0571ce56e952e9e",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_06/cool_block_06.dump.gz",
+      "sha256": "7273f16d9f80db638e8bc3df27dcf820a9dde02f2b082dac80eeb849f80979f1",
+      "size": 21995984
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_06/cool_block_06.in",
+      "sha256": "60a119b91c58a1e7455238de14e4f75f82c9f252b017d240bf3f88fae3119920",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_06/cool_block_06.log",
+      "sha256": "83710a6cda083a91e280f71269db93743a1e6b383d4b2e4c6743e96b3a11c010",
+      "size": 95974
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_06/cool_block_06_last.dump.gz",
+      "sha256": "6bb0dc57c691dfbbb7624115ac8bd5abe0d4c930aa2b12fd4e50cfd28210dda9",
+      "size": 102228
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_06/cool_block_06_out.data",
+      "sha256": "65516f3c72c1d5632b6357d123d750be2a6a99c2bcde6b5e49476beb0b85230c",
+      "size": 843460
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_06/cool_block_06_out.restart",
+      "sha256": "9101b96387c5b1a5f01da662f11cce3a42d10bf5eb7b059cc220c924eac76359",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_06/cool_block_06_run.log",
+      "sha256": "b0ff8b69692f813ea355094a2ca322af6a5ddd73517ae96a8ba96b2f8dd5c74b",
+      "size": 94628
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_06/log.lammps",
+      "sha256": "b6638ed5c76fa997db26854f999ba1dd9bfc789d5970db831b4cecc144401f27",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_06/npt_1.rst",
+      "sha256": "bc56ad41c598d462826b79c5dd1f1681fed678642c9d01836ed48d6ca0d05fcd",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_06/npt_2.rst",
+      "sha256": "ea1429393316cbf970ff0436e9d17e797bb39d3ba30112a93ef96b50a17dc556",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_07/cool_block_07.dump.gz",
+      "sha256": "e35f5e80d32b878be6dd0b7e3f4736eabfcfd6b44ccde6d33d1b1f15338a9a84",
+      "size": 21996150
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_07/cool_block_07.in",
+      "sha256": "ebc2ecf91b7a216732bf8e4d8b13e81fe36b344ce71d8367d5036eb1f41f38b2",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_07/cool_block_07.log",
+      "sha256": "e7cac1ae7b36d719726b1af89db903d9f5f0dc3fc7877ce80bdbf8cb56ee4ca1",
+      "size": 95966
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_07/cool_block_07_last.dump.gz",
+      "sha256": "824498ed7d9f8c0f78268607e105682dd2e9ddb8b68233b241f5357499fbfc0a",
+      "size": 102391
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_07/cool_block_07_out.data",
+      "sha256": "bc1288bd465e874f9c987fa588be43fa7925375ed0a8fb3f636b02c35603d7ee",
+      "size": 843650
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_07/cool_block_07_out.restart",
+      "sha256": "72f9ad8fb45e9082ab563b9d2585adaa2580c4b6c5c3eb7962ba2d245e5ea33d",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_07/cool_block_07_run.log",
+      "sha256": "4b69e466c2d86b3cf8546c664cee4004cdebb3d69e6b94f0e4fa13dc8e87d473",
+      "size": 94620
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_07/log.lammps",
+      "sha256": "758754b9f58bfa989d32a0a23c12efc06879a4452ee798cbf0e4db89c6c34f7e",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_07/npt_1.rst",
+      "sha256": "248fa61011558ff5e3f4a6b83e4723fd68f2bc03fc67f1fbd416bfd341d173a7",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_07/npt_2.rst",
+      "sha256": "8c0e1d96ec034507f66cfd6276b9da76a087e1c3b58067f7dfb33c1a4356b358",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_08/cool_block_08.dump.gz",
+      "sha256": "7f5a36aa88011a16639d060c4cb23b6bd36c72af8a5d25767c9c2c05d70b46d7",
+      "size": 22003419
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_08/cool_block_08.in",
+      "sha256": "cd1b6f85b466815a12a33c5589bf986dea5294826342d6dbaa2bdc28692f8ba0",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_08/cool_block_08.log",
+      "sha256": "1654a47656a56f581f18e52a829d35f13f69f499c6c64b90fe17b226c8665592",
+      "size": 95971
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_08/cool_block_08_last.dump.gz",
+      "sha256": "7da8744dbc693021e6822b0fd93ff3914877949412aa0c122478b80146c20e1e",
+      "size": 102080
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_08/cool_block_08_out.data",
+      "sha256": "39fd538902ca85402c9fce5afa9adf4a52b8872d1e080b4895b22d7ac1f7aa86",
+      "size": 843730
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_08/cool_block_08_out.restart",
+      "sha256": "7ccf8f957ad93b7ce15b4bd4424ac259167e857fad7174f33ef708adba630293",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_08/cool_block_08_run.log",
+      "sha256": "ef92512272b2327e3abc3b8667b32f5306749db634b5d8c59318dc0f01653401",
+      "size": 94625
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_08/log.lammps",
+      "sha256": "f80a4b58b6c5e6d2566ed1e802c3ad9cb5a56d3843131e3ffe45ab839ba37935",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_08/npt_1.rst",
+      "sha256": "e88e7b3ebd664c519b2213bed808407a415c6a81fffdb75f6cc244e0caa3b622",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_08/npt_2.rst",
+      "sha256": "2109cc0a695cb745abdc717cfec15bccd150e17d5c331c175f6b3a8056221745",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_09/cool_block_09.dump.gz",
+      "sha256": "6b7f8cc8bd0e041b46d1c122a49851d53caf266d98ee3926911caabb82f84b4d",
+      "size": 22006317
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_09/cool_block_09.in",
+      "sha256": "da27f7845cd18a34fe7e442531b94780bdb2b52e8e3a72e733912a185f1256ca",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_09/cool_block_09.log",
+      "sha256": "7a366ffc1e85c613c1c3204968446eeb46fda53733f60a4a483a5d8f350e6e67",
+      "size": 95963
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_09/cool_block_09_last.dump.gz",
+      "sha256": "96d30aaafa253265d998011cd2e2045037e22ebbfbdb35e1a8486b035dc6e395",
+      "size": 102170
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_09/cool_block_09_out.data",
+      "sha256": "bc091b9d4c7cfeb5ba29272c5589fcebedf167a93f20a0685348ffb5c5699a5c",
+      "size": 843788
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_09/cool_block_09_out.restart",
+      "sha256": "ba08dd9ea826957ce7b44b627ca6612a755673b75d2b4ce7e5ee139b48dac88a",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_09/cool_block_09_run.log",
+      "sha256": "baa7881e4198cf444d00a10c755836b3b1975d92084eed5ad597539de1f38ae0",
+      "size": 94617
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_09/log.lammps",
+      "sha256": "8c8f582abc53a5380d6b006a924d5eee6cefd9e8d3b974bc799034ae91c055b9",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_09/npt_1.rst",
+      "sha256": "263c7d0d0459b9fae659af959f343ac8372623606ab9ae9f756ff6e2e6b0eaa7",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_09/npt_2.rst",
+      "sha256": "01a9cb830c19ce41529a9026aafc00b4bed5fa15ac93284725195220fda02909",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_10/cool_block_10.dump.gz",
+      "sha256": "bf6c33778a165ddb94edec54ef8cefb2ba4a66a1c640196d49ef9471d1d00eb5",
+      "size": 22007762
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_10/cool_block_10.in",
+      "sha256": "80a44f18c86f3897ccdfbc5c32e03cf7a067203b1c6939ef7f7d75864aca1021",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_10/cool_block_10.log",
+      "sha256": "858a9a703277e8a1da42ade3332a68a41cde04abb8b6c492ae3cf12bf9c016d1",
+      "size": 95970
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_10/cool_block_10_last.dump.gz",
+      "sha256": "27f3ab4e149e3190e39a974da4dbeb7b5d249d56e7b8b5ba2339134981477f89",
+      "size": 102013
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_10/cool_block_10_out.data",
+      "sha256": "7552802fc5ca11563135a8606056d03d3677bf76efbb36a77989e079df389926",
+      "size": 843984
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_10/cool_block_10_out.restart",
+      "sha256": "b43011c8d1f79a6a3280b52a83cb20e79d7cb3121e4302d0ebb0b37aa65065f1",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_10/cool_block_10_run.log",
+      "sha256": "d94e0f2203dad07b544e7af01024fe07fb16134b2ba8047de1f22b9b96602464",
+      "size": 94624
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_10/log.lammps",
+      "sha256": "b5a913ed823192ab2336cc029887290f83c7330590f79588c8f3ee8a5c2a20d4",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_10/npt_1.rst",
+      "sha256": "7f27291623a07d0247956fc978cf78793788d5edfcdaa7d4bd89e12b0df1542c",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_10/npt_2.rst",
+      "sha256": "b2c440d9af35cd65df8ce6c146e3e9243df864639e1c23453145cc498f5b7444",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_11/cool_block_11.dump.gz",
+      "sha256": "690e4ff1ec9f7b87341800c7233b981056f76cbf1c031ad50511d71ad1e1bfd7",
+      "size": 21997272
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_11/cool_block_11.in",
+      "sha256": "4808409eaaac144886ad49709ac701fdab32b3f51aa99dc14f7bced5fbd8ead2",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_11/cool_block_11.log",
+      "sha256": "0f1496c37007bb14055fb9d8e1121db0f1d85764c00ef85b881a6f8206355f8b",
+      "size": 95971
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_11/cool_block_11_last.dump.gz",
+      "sha256": "013f9b286c2076f1e07ef3aa98716afeacad83d859352199cf5d42c558099309",
+      "size": 102250
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_11/cool_block_11_out.data",
+      "sha256": "4341e579ace4ecf4915ede255feb26b042cbc34865d61a1208dc787bee2e1375",
+      "size": 843909
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_11/cool_block_11_out.restart",
+      "sha256": "dc464c7c717e9b28d5c1c14cb8bf438db310a5d17c929e9ff7bb0d22785587ce",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_11/cool_block_11_run.log",
+      "sha256": "ae1f0d4bfbba047b8001a6acc241a8182412e08899e1ea332387a578c24c20c4",
+      "size": 94625
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_11/log.lammps",
+      "sha256": "229da7b54defae13782adb9871c746db6fdd6b900f54feb7eadd59fc0d7505fd",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_11/npt_1.rst",
+      "sha256": "dc5e51e150919efca83040e699114507a237eec3de218f0571b7af0b907d76ce",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_11/npt_2.rst",
+      "sha256": "aa510f82eff50635c70b1a1210ecf66c7de52ddebe1f27214119571ee3cc63b9",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_12/cool_block_12.dump.gz",
+      "sha256": "113c34f36b5b487bc9cb0edbfdb12f46e4ead662782a75957b6dc74a4bbcd0ef",
+      "size": 22000252
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_12/cool_block_12.in",
+      "sha256": "191c088cbd8604718ed6324aa72280f77c6aac0a8e569323a4934c3c49a04f15",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_12/cool_block_12.log",
+      "sha256": "06d6ec5172e7c552dfe825a4269df5ffc1f74c350bd1332f82bf06a662170031",
+      "size": 95969
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_12/cool_block_12_last.dump.gz",
+      "sha256": "f3def1ef706078492e041dace3bf5b18f629a700f0fe7309e7800bd9f1034771",
+      "size": 102388
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_12/cool_block_12_out.data",
+      "sha256": "497baaa5c30a8d3faa8e4bcd60744736b19ced5d89409b08b3ad274c2d65c7a1",
+      "size": 844410
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_12/cool_block_12_out.restart",
+      "sha256": "630866bd13b3a5b6ba00e453986bf6ae909f4f1f4db3a22dad45a0ce4bf04ddb",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_12/cool_block_12_run.log",
+      "sha256": "2971f567a8b718ee5a3f4a83ddc097d2f2e63943485fa17b39110e2fa6a56c11",
+      "size": 94623
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_12/log.lammps",
+      "sha256": "2dfe512baec5cdaad511b11b194fd9eb73f9c47f2a78e57aa0fdbee723f60053",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_12/npt_1.rst",
+      "sha256": "8c92b2dd8c93e0070e902c00c96827bfafae5ae775d1dd87afb707b384089947",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_12/npt_2.rst",
+      "sha256": "b9d6062a0545d4d600c13e78100eaed4bbce84fa447b43e212c50aeb7d46ca29",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_13/cool_block_13.dump.gz",
+      "sha256": "0e668560d77b3d4532da8cfcbeb2a6351d44685e927a01ba2746a5ba4d1cd2c1",
+      "size": 22001419
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_13/cool_block_13.in",
+      "sha256": "3e3077d14f53676ca327665ee30051a7d8d2e8b6736eed45edbe9d591e217e30",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_13/cool_block_13.log",
+      "sha256": "b0bb3c74ff399179f38bf149e388f7dc3959c0ef9c86a331d0e26b4be01236a5",
+      "size": 95968
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_13/cool_block_13_last.dump.gz",
+      "sha256": "9ae6d210f6f89b46d5b9fc8d4b600e4a2ea75fa4e11440cac305ca8a6a0a32cd",
+      "size": 102297
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_13/cool_block_13_out.data",
+      "sha256": "37c224a75aa459fcb8bb99ced9bfde04b9b61f77b9de69435611cfb4d644264c",
+      "size": 844425
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_13/cool_block_13_out.restart",
+      "sha256": "d6ac6f0e55c77c70f4ffcd26ec8feb2b9f04d8510c0be5b10be1ed939f791999",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_13/cool_block_13_run.log",
+      "sha256": "6bba4fdf7af60a74b6dd39c558c555469c238250917db122b9cf28c4a921fa77",
+      "size": 94622
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_13/log.lammps",
+      "sha256": "ecb7f0a375015c3eab7f90717590f668bc91ecce61b77d9f367da05d77586668",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_13/npt_1.rst",
+      "sha256": "a3693318a00629ab0749f34aa1b09bfa8d89a86a6de30a477459b4ed604fb104",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_13/npt_2.rst",
+      "sha256": "78d2d7158578622120e464313327aeafa328f59303b043f4c54bd2f8920b6d9a",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_14/cool_block_14.dump.gz",
+      "sha256": "aacb24ff3630cd317aa6f21d4a74e59ef379db4f92c3c27ebb36d4e7cdfb6a46",
+      "size": 21998344
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_14/cool_block_14.in",
+      "sha256": "65fb1bcc01d96303da9228e0c7291b75841fd59caa3a18fe7373f0d7fac00722",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_14/cool_block_14.log",
+      "sha256": "77ccc3c50fba3590c407c6b1dcc3fda2ef9d6fc6465403f0d1b9da446d030184",
+      "size": 95970
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_14/cool_block_14_last.dump.gz",
+      "sha256": "811a32783764fbb22cf082204a51b59801892d8120871cc07be4921faf724bea",
+      "size": 102165
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_14/cool_block_14_out.data",
+      "sha256": "adbe3fb65a68b603a8e44bd6f8e1807fa9ed7b8c50819cbb03944a0ba4a7b7ac",
+      "size": 844530
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_14/cool_block_14_out.restart",
+      "sha256": "a2a68b1b8cf41af53ad4126cd12e870ebf3bc53b348c27641849bb6f8e99df5e",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_14/cool_block_14_run.log",
+      "sha256": "06ad6418d656396696b48257ad9e0ef606be86132dcb23c884dde8405900e872",
+      "size": 94624
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_14/log.lammps",
+      "sha256": "f186b357c469b76446028820a335ffd8fbe80798bdd996eea96ce8d09432d2c8",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_14/npt_1.rst",
+      "sha256": "336d0afb4d6cb8658d7952863560c11743dd55e57ac009ab2126935e961092c6",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_14/npt_2.rst",
+      "sha256": "550e26c02bb9cacef8cb67c406bb047107b0c582d09bc9c1c260e74267d2cc26",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_15/cool_block_15.dump.gz",
+      "sha256": "6aee0218a738cb8dd27288ca20da799998a9658a400197c54df4642cd671a8ff",
+      "size": 21997310
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_15/cool_block_15.in",
+      "sha256": "4ad9c1f6a1a32a906b105774e0549359d6b1cd78d972a1f6a3829e636db7dd6a",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_15/cool_block_15.log",
+      "sha256": "823f3a3c5a2c9d3a7ddf9866aa3a401b7be1aa3ff08ce4d11bb7448df138fd08",
+      "size": 95971
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_15/cool_block_15_last.dump.gz",
+      "sha256": "d9c7bae3a534acdc23403b27edc85e7e5c7425ed85781a829854055fde96ecc9",
+      "size": 102222
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_15/cool_block_15_out.data",
+      "sha256": "91f9ebf490100585650c1875f3ee43130dc8129678ee576824c4dba120b8fe14",
+      "size": 844680
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_15/cool_block_15_out.restart",
+      "sha256": "947e5e0dd9aa017c2b83ad2705da07e939eb24c48d192609deaff6d718bb36b4",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_15/cool_block_15_run.log",
+      "sha256": "7ee4e32d63c8ca14ec5524fe38f26743ccdc759fea6190f1d2a0bf6c704418e0",
+      "size": 94625
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_15/log.lammps",
+      "sha256": "570c70f449b596990d22b1b86512710950afd5216082148e6d6804c9674f490a",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_15/npt_1.rst",
+      "sha256": "ccf5d13deba49311d8f7252de71c62472a20d1a005c8dccc0d33992c863111e7",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_15/npt_2.rst",
+      "sha256": "6eb29a8ac317bad9a528862069e313307ee683376690e63375c286156eedfae0",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_16/cool_block_16.dump.gz",
+      "sha256": "8da03734f6dfa3701b9b002fa422f4a99660d875c5587a10a61f90bf0889950d",
+      "size": 21998350
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_16/cool_block_16.in",
+      "sha256": "dbdfd9ab6f89a73fd32989051aa938d94ed03b2efb84d0984d924f9548d9c66a",
+      "size": 4444
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_16/cool_block_16.log",
+      "sha256": "114566dd40cb0edf8c5ecd37ab18cc4584dc8560e60d72d6c5cf262e24637c44",
+      "size": 95971
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_16/cool_block_16_last.dump.gz",
+      "sha256": "1b5447d7b746d7368c041f02982b00b7305ffad8c2121ebecd18c0c2ea21a7fb",
+      "size": 102291
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_16/cool_block_16_out.data",
+      "sha256": "3259859c74c052fd87beb1f02a24fb6a6f43f7755794d376161fc526da16b4ed",
+      "size": 844943
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_16/cool_block_16_out.restart",
+      "sha256": "9c656f2eb850a20dbd38ed6caebaf18a9b9ad2b6e6dbe8dfd96dac311f3cfb3f",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_16/cool_block_16_run.log",
+      "sha256": "fed5e63cabb93d453e93369a52ab458164769bd5ee004f1018072587ebeafc1c",
+      "size": 94625
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_16/log.lammps",
+      "sha256": "c8b1c4bf8fbfe54e9b32c6481fa8660417fe00d1d1e7efc667db68f110854bf9",
+      "size": 2778
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_16/npt_1.rst",
+      "sha256": "3b0d6a8534dbab932219fd25beb6ab0931bc96e7840fb3f04a472eac01620127",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_16/npt_2.rst",
+      "sha256": "657c83e9e69eb1dbdb7926a7d0595e5671bee8bfd6872bb86b4687011425b672",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/log.lammps",
+      "sha256": "2f890eff6c4e99f5e12391f553b5dda5fc2afb5a64bf76061b5b84457ecacfbc",
+      "size": 2774
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/npt_1.rst",
+      "sha256": "e5a333a05c17e81420256ea9c27270769dcd8ed931f196de09f5e9fae275d1c5",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/npt_2.rst",
+      "sha256": "de20ea039138f651c6cd42680906ad9eeed365ce44cf638da14f673915f6fe35",
+      "size": 2510356
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/npt_final.dump.gz",
+      "sha256": "cb1853d1c7392f8ea9e1bf100b30e11342f0ceea70d1390ee8b3c6b12aed49fe",
+      "size": 43905337
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/npt_final.in",
+      "sha256": "ec057f80cd49341174cdd0d4ff332f88d9d7c4f6f21ed2f10e6875e9b53d8391",
+      "size": 4416
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+      "sha256": "f3448bd23ce95c9e101e88c7211e42937bb07a38778be7dd204d7f6b7a1c0e47",
+      "size": 185197
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/npt_final_last.dump.gz",
+      "sha256": "a2ccc635138411173849bf02a106221a503c6e37d437e2f1d83c839ea873fa49",
+      "size": 102133
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/npt_final_out.data",
+      "sha256": "4d5d26fd1f6ac408907d1bf209eb48f7207522ae523d87905cf07a97c1149da9",
+      "size": 844943
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/npt_final_out.restart",
+      "sha256": "54c83e1a87728d02491399040c5652a6a6a9025824d1bf2d1bf8bf5891221c68",
+      "size": 2510084
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/npt_final_run.log",
+      "sha256": "7d2f40e060d065aa928028258e249bf8a5e4cb46d1291532151bc7c22ace3bc9",
+      "size": 183875
+    }
+  ],
+  "attempt_id": "attempt-0001",
+  "findings": [],
+  "finished_at": "2026-09-14T20:07:50.645230+00:00",
+  "input_hash": "c26e29297c7e6d17f0b176d5b3b740044bdb01bb44a849dc9b18d185e2033ad9",
+  "outputs": {
+    "cool_verdict": "PASS",
+    "cooling_json_path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/raw/cooling.json",
+    "density_gcm3": 1.930482,
+    "extend_history": [],
+    "npt_prod_data_path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/npt_final_out.data",
+    "npt_prod_dump_path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/npt_final.dump",
+    "npt_prod_log_path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/npt_final.log",
+    "npt_prod_restart_path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/npt_final_out.restart",
+    "stage_checkpoints": {
+      "cool_block_01": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_01/cool_block_01_out.data",
+      "cool_block_02": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_02/cool_block_02_out.data",
+      "cool_block_03": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_03/cool_block_03_out.data",
+      "cool_block_04": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_04/cool_block_04_out.data",
+      "cool_block_05": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_05/cool_block_05_out.data",
+      "cool_block_06": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_06/cool_block_06_out.data",
+      "cool_block_07": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_07/cool_block_07_out.data",
+      "cool_block_08": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_08/cool_block_08_out.data",
+      "cool_block_09": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_09/cool_block_09_out.data",
+      "cool_block_10": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_10/cool_block_10_out.data",
+      "cool_block_11": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_11/cool_block_11_out.data",
+      "cool_block_12": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_12/cool_block_12_out.data",
+      "cool_block_13": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_13/cool_block_13_out.data",
+      "cool_block_14": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_14/cool_block_14_out.data",
+      "cool_block_15": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_15/cool_block_15_out.data",
+      "cool_block_16": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/cool_block_16/cool_block_16_out.data",
+      "npt_final": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/work/npt_final/npt_final_out.data"
+    }
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 700.0,
+    "T_melt_hold_K": 700.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 780.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "opls-library",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 11.0,
+    "density_initial_gcm3": 0.89,
+    "dp_typical": 50,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 909670995,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 550,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "opls/2024/opls-aa",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 930760043
+  },
+  "stage": "cooling",
+  "status": "accepted"
+}

@@ -18,7 +18,7 @@ import os
 import sqlite3
 
 _DIR = os.path.dirname(__file__)
-DB_PATH = os.path.join(_DIR, "polymer_db.sqlite")
+DB_PATH = os.path.join(_DIR, "experimental_db.sqlite")
 _SCHEMA = os.path.join(_DIR, "schema.sql")
 
 _conn: sqlite3.Connection | None = None

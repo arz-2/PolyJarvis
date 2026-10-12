@@ -29,7 +29,7 @@ _FINITE_SIZE_TERMS = ("longer dp", "finite-size", "finite size", "more chains", 
 
 _RULE_DESC = {
     "density_initial_gcm3": "density-recovery-consensus",
-    "tg_t_high_K": "sweep-ceiling-consensus",
+    "md_tg_ceiling_K": "sweep-ceiling-consensus",
     "eq_annealing_cycles": "review-flag: annealing cycles added to converge",
     "dp_typical": "review-flag: finite-size noted in decisions",
 }
@@ -63,7 +63,7 @@ def extract_signals(record) -> list:
         m = _TSTART_IN_FIX.search(rec.fix)
         if m:
             signals.append(Signal(
-                "tg_t_high_K", "numeric", float(m.group(1)),
+                "md_tg_ceiling_K", "numeric", float(m.group(1)),
                 f"Stage {rec.stage}: sweep ceiling→{m.group(1)} ({rec.outcome[:50]})",
             ))
         if "annealing cycle" in rec.fix.lower():

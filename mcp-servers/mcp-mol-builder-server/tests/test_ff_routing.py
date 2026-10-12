@@ -19,13 +19,13 @@ CLASSES = RULES["classes"]
 
 @pytest.mark.parametrize("cid", sorted(CLASSES))
 def test_routing_matches_polymer_rules(cid):
-    """get_preferred_ff must mirror the authoritative JSON for every class."""
-    got = ff_routing.get_preferred_ff(cid)
+    """get_ff_accuracy_prior must mirror the authoritative JSON for every class."""
+    got = ff_routing.get_ff_accuracy_prior(cid)
     e = CLASSES[cid]
-    assert got["preferred_ff"] == e["preferred_ff"]
+    assert got["ff_accuracy_prior"] == e["ff_accuracy_prior"]
     assert got["preferred_builder"] == e["preferred_builder"]
     # classes.<CLASS>.confidence was retired in 49877fe; ff_confidence is now derived from
-    # citation presence, matching what gen_prompt.py writes into the build prompt.
+    # citation presence, matching stage_params.py's deterministic build arguments.
     assert got["ff_confidence"] == ("cited" if e.get("ff_justification_doi") else "uncited")
     assert got["ff_justification_doi"] == e.get("ff_justification_doi")
 
@@ -36,9 +36,9 @@ def test_routing_matches_polymer_rules(cid):
 )
 def test_previously_divergent_classes_now_authoritative(cid, expected_ff):
     """The old hardcoded helper advised opls-aa/2024 for these; now they follow the JSON."""
-    got = ff_routing.get_preferred_ff(cid)
-    assert got["preferred_ff"] == expected_ff
-    assert got["preferred_ff"] != "opls-aa/2024"
+    got = ff_routing.get_ff_accuracy_prior(cid)
+    assert got["ff_accuracy_prior"] == expected_ff
+    assert got["ff_accuracy_prior"] != "opls-aa/2024"
 
 
 @pytest.mark.parametrize("cid", ["PHAL", "PSIL"])
@@ -47,26 +47,46 @@ def test_opls_classes_use_canonical_field_string(cid):
     (matches mcp-emc-server _select_field). PHAL previously held the malformed
     "opls-aa/2024", which EMC fails to resolve and silently downgrades to united-atom
     opls/2012/opls-ua (no rules for halogenated monomers)."""
-    got = ff_routing.get_preferred_ff(cid)
-    assert got["preferred_ff"] == "opls/2024/opls-aa"
-    assert got["preferred_ff"] != "opls-aa/2024"
+    got = ff_routing.get_ff_accuracy_prior(cid)
+    assert got["ff_accuracy_prior"] == "opls/2024/opls-aa"
+    assert got["ff_accuracy_prior"] != "opls-aa/2024"
 
 
 def test_pstr_routes_pcff():
     """PSTR (polystyrenics) uses PCFF via EMC: Class II explicitly parameterizes aromatic
     C-H charges and pi-dihedral cross-terms governing PS Tg (~373 K). OPLS-AA over-predicts
     aPS Tg by ~+79 K (Afzal 2021) so PCFF is preferred for thermomechanical accuracy."""
-    got = ff_routing.get_preferred_ff("PSTR")
-    assert got["preferred_ff"] == "pcff"
+    got = ff_routing.get_ff_accuracy_prior("PSTR")
+    assert got["ff_accuracy_prior"] == "pcff"
     assert got["preferred_builder"] == "emc"
     assert got["ff_confidence"] == "cited"
-    assert CLASSES["PSTR"]["forcefield"] == "PCFF"
+    assert "forcefield" not in CLASSES["PSTR"]  # retired: display-cased duplicate of the prior
     assert CLASSES["PSTR"]["charge_method"] == "bond-increment"
     assert CLASSES["PSTR"]["electrostatics"] == "pppm"
 
 
+# D-02_charges' own require clause names these tokens by FF family (PCFF uses
+# bond-increment/Gasteiger, TraPPE-UA embeds charges); test_pstr_routes_pcff above
+# only pinned the single class that already had it right (18 of 21 classes carried
+# the generic "none" placeholder until this was corrected).
+_CHARGE_METHOD_BY_FF_FAMILY = {"pcff": "bond-increment", "trappe-ua": "embedded",
+                              "opls/2024/opls-aa": "opls-library"}
+
+
+@pytest.mark.parametrize("cid", sorted(cid for cid in CLASSES
+                                       if CLASSES[cid]["ff_accuracy_prior"]
+                                       in _CHARGE_METHOD_BY_FF_FAMILY))
+def test_charge_method_matches_ff_family_convention(cid):
+    e = CLASSES[cid]
+    expected = _CHARGE_METHOD_BY_FF_FAMILY[e["ff_accuracy_prior"]]
+    assert e["charge_method"] == expected, (
+        f"{cid}: ff_accuracy_prior={e['ff_accuracy_prior']!r} implies charge_method={expected!r}, "
+        f"got {e['charge_method']!r}"
+    )
+
+
 def test_unknown_class_falls_back_without_raising():
-    got = ff_routing.get_preferred_ff("UNKNOWN")
+    got = ff_routing.get_ff_accuracy_prior("UNKNOWN")
     assert got["preferred_builder"] is None
-    assert got["preferred_ff"] is None
+    assert got["ff_accuracy_prior"] is None
     assert got["ff_confidence"] == "uncited"

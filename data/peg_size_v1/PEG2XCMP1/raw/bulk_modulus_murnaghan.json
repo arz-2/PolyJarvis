@@ -1,0 +1,150 @@
+{
+  "status": "success",
+  "method": "murnaghan",
+  "fit_converged": true,
+  "bm_gate_verdict": "BM_REPORTABLE",
+  "bm_gate_reasons": [],
+  "bm_reportable": true,
+  "B0_GPa": 2.7528,
+  "bulk_modulus_GPa": 2.7528,
+  "B0_sem_GPa": 0.0939,
+  "bulk_modulus_sem_GPa": 0.0939,
+  "B0_prime": 9.752,
+  "V0_A3": 129960.28,
+  "r_squared": 0.99993,
+  "n_points": 5,
+  "pressures_atm": [
+    -1000.0,
+    0.0,
+    3000.0,
+    7000.0,
+    15000.0
+  ],
+  "pressures_GPa": [
+    -0.101325,
+    0.0,
+    0.303975,
+    0.709275,
+    1.519875
+  ],
+  "volumes_A3": [
+    136349.14,
+    129814.69,
+    120440.87,
+    114334.25,
+    107451.41
+  ],
+  "vol_stds_A3": [
+    673.31,
+    459.12,
+    278.74,
+    220.43,
+    161.98
+  ],
+  "n_prod_rows": [
+    2501,
+    2501,
+    2501,
+    2501,
+    2501
+  ],
+  "log_files": [
+    "/home/arz2/PolyJarvis/data/PEG2XCMP1/lammps/mechanical/bm_series/bm_P-1000/bm_P-1000.log",
+    "/home/arz2/PolyJarvis/data/PEG2XCMP1/lammps/mechanical/bm_series/bm_P0/bm_P0.log",
+    "/home/arz2/PolyJarvis/data/PEG2XCMP1/lammps/mechanical/bm_series/bm_P3000/bm_P3000.log",
+    "/home/arz2/PolyJarvis/data/PEG2XCMP1/lammps/mechanical/bm_series/bm_P7000/bm_P7000.log",
+    "/home/arz2/PolyJarvis/data/PEG2XCMP1/lammps/mechanical/bm_series/bm_P15000/bm_P15000.log"
+  ],
+  "eq_fraction": 0.5,
+  "output_dir": "/home/arz2/PolyJarvis/data/PEG2XCMP1/raw",
+  "volume_monotonic": true,
+  "loo_results": [
+    {
+      "dropped_pressure_atm": -1000.0,
+      "is_tension_point": true,
+      "converged": true,
+      "B0_GPa": 2.8731,
+      "B0_prime": 9.5815,
+      "r_squared": 0.999948,
+      "dB0_GPa_vs_baseline": 0.1202,
+      "dB0_prime_vs_baseline": -0.1705
+    },
+    {
+      "dropped_pressure_atm": 0.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 2.7276,
+      "B0_prime": 9.7678,
+      "r_squared": 0.999926,
+      "dB0_GPa_vs_baseline": -0.0252,
+      "dB0_prime_vs_baseline": 0.0158
+    },
+    {
+      "dropped_pressure_atm": 3000.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 2.7731,
+      "B0_prime": 9.6157,
+      "r_squared": 0.999972,
+      "dB0_GPa_vs_baseline": 0.0202,
+      "dB0_prime_vs_baseline": -0.1362
+    },
+    {
+      "dropped_pressure_atm": 7000.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 2.6773,
+      "B0_prime": 10.0034,
+      "r_squared": 0.999996,
+      "dB0_GPa_vs_baseline": -0.0755,
+      "dB0_prime_vs_baseline": 0.2514
+    },
+    {
+      "dropped_pressure_atm": 15000.0,
+      "is_tension_point": false,
+      "converged": true,
+      "B0_GPa": 2.6543,
+      "B0_prime": 10.5309,
+      "r_squared": 0.999999,
+      "dB0_GPa_vs_baseline": -0.0985,
+      "dB0_prime_vs_baseline": 0.7789
+    }
+  ],
+  "loo_n_converged": 5,
+  "fluctuation_bulk_modulus_GPa": 2.6985,
+  "fluctuation_divergence_pct": 1.97,
+  "anomalous_points": {
+    "0": [
+      "|dV/dP| between points 0 and 1 is 6.534, >3x the other intervals' median (1.527) -- possible cavitation/discontinuity in this interval."
+    ],
+    "1": [
+      "|dV/dP| between points 0 and 1 is 6.534, >3x the other intervals' median (1.527) -- possible cavitation/discontinuity in this interval."
+    ]
+  },
+  "excluded_points": [],
+  "selected_window": {
+    "trim_total": 0,
+    "n_points": 5,
+    "plateau_confirmed": true,
+    "selection_note": "Untrimmed fit already has r_squared=0.99993 >= 0.999 -- no trimming applied even though point(s) [0, 1] were flagged (a genuinely curved EOS can trip the interval heuristic without a real problem)."
+  },
+  "all_points_fit": {
+    "method": "murnaghan",
+    "fit_converged": true,
+    "B0_GPa": 2.7528,
+    "B0_prime": 9.752,
+    "V0_A3": 129960.28,
+    "r_squared": 0.99993,
+    "volume_monotonic": true,
+    "n_points": 5,
+    "pressures_atm": [
+      -1000.0,
+      0.0,
+      3000.0,
+      7000.0,
+      15000.0
+    ]
+  },
+  "warnings": [],
+  "murnaghan_eos_fig": "/home/arz2/PolyJarvis/data/PEG2XCMP1/graphs/murnaghan_eos.png"
+}

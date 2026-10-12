@@ -1,0 +1,351 @@
+units real
+atom_style full
+boundary f f f
+
+pair_style lj/charmm/coul/charmm 8.0 12.0
+dielectric 1.000000
+bond_style harmonic
+angle_style harmonic
+dihedral_style fourier
+improper_style cvff
+special_bonds amber
+pair_modify mix arithmetic
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+read_data radon_md_lmp.data
+Reading data file ...
+  orthogonal box = (-6.332679 -6.332679 -6.332679) to (6.332679 6.332679 6.332679)
+  7 by 1 by 2 MPI processor grid
+  reading atoms ...
+  8 atoms
+  scanning bonds ...
+  3 = max bonds/atom
+  scanning angles ...
+  6 = max angles/atom
+  scanning dihedrals ...
+  9 = max dihedrals/atom
+  orthogonal box = (-6.332679 -6.332679 -6.332679) to (6.332679 6.332679 6.332679)
+  7 by 1 by 2 MPI processor grid
+  reading bonds ...
+  7 bonds
+  reading angles ...
+  12 angles
+  reading dihedrals ...
+  9 dihedrals
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0.5     
+  special bond factors coul:  0        0        0.8333333333333334
+     4 = max # of 1-2 neighbors
+     3 = max # of 1-3 neighbors
+     6 = max # of 1-4 neighbors
+     7 = max # of special neighbors
+  special bonds CPU = 0.001 seconds
+  read_data CPU = 0.011 seconds
+
+
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz
+thermo_modify flush yes
+thermo 1000
+
+min_style cg
+minimize 0.000100 0.000001 10000 100000
+Generated 3 of 3 mixed pair_coeff terms from arithmetic mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 14
+  ghost atom cutoff = 14
+  binsize = 7, bins = 2 2 2
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/charmm/coul/charmm, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+WARNING: Proc sub-domain size < neighbor skin, could lead to lost atoms (src/domain.cpp:1204)
+Per MPI rank memory allocation (min/avg/max) = 12.09 | 12.15 | 12.55 Mbytes
+   Step          Time           Temp          Press         Enthalpy        TotEng         KinEng         PotEng         E_bond        E_angle        E_dihed        E_impro         E_vdwl         E_coul         E_long         E_tail         Volume           Lx             Ly             Lz          Density          Pxx            Pyy            Pzz            Pxy            Pxz            Pyz      
+         0   0              0             -869.40025     -14.734366      11.025766      0              11.025766      1.5318138      2.3497686      0.013584796    0              0.50950149     6.621097       0              0              2031.6665      12.665358      12.665358      12.665358      0.083392026    897.22356     -3722.1932      216.7689      -252.09782      359.11654     -327.0087     
+        10   10             0             -6.4888632      6.6267236      6.8189871      0              6.8189871      0.026534531    0.12927254     0.0040208339   0              0.22849092     6.4306683      0              0              2031.6665      12.665358      12.665358      12.665358      0.083392026   -9.9182901     -0.68970117    -8.8585982      0.79793858    -0.78420496     1.2101603    
+Loop time of 0.00072345 on 14 procs for 10 steps with 8 atoms
+
+100.1% CPU use with 14 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+       11.025765583214    6.8193812449928   6.81898712060154
+  Force two-norm initial, final = 73.77357 0.40176265
+  Force max component initial, final = 35.280691 0.19217197
+  Final line search alpha, max atom move = 0.16925887 0.032526811
+  Iterations, force evaluations = 10 20
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 1.887e-06  | 4.3095e-06 | 9.328e-06  |   0.0 |  0.60
+Bond    | 4.357e-06  | 1.1051e-05 | 4.7338e-05 |   0.0 |  1.53
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.00014128 | 0.00019985 | 0.00024718 |   0.0 | 27.62
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.0005082  |            |       | 70.25
+
+Nlocal:       0.571429 ave           2 max           0 min
+Histogram: 8 0 0 0 0 4 0 0 0 2
+Nghost:        7.42857 ave           8 max           6 min
+Histogram: 2 0 0 0 0 4 0 0 0 8
+Neighs:       0.642857 ave           4 max           0 min
+Histogram: 11 0 0 0 0 1 0 1 0 1
+
+Total # of neighbors = 9
+Ave neighs/atom = 1.125
+Ave special neighs/atom = 7
+Neighbor list builds = 0
+Dangerous builds = 0
+reset_timestep 0
+
+write_dump all custom radon_md_last.dump id x y z xu yu zu vx vy vz fx fy fz modify sort id
+
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz
+WARNING: New thermo_style command, previous thermo_modify settings will be lost (src/output.cpp:912)
+thermo_modify flush yes
+write_data radon_md_last.data
+System init for write_data ...
+Generated 3 of 3 mixed pair_coeff terms from arithmetic mixing rule
+WARNING: Proc sub-domain size < neighbor skin, could lead to lost atoms (src/domain.cpp:1204)
+quit
+units real
+atom_style full
+boundary f f f
+
+pair_style lj/charmm/coul/charmm 8.0 12.0
+dielectric 1.000000
+bond_style harmonic
+angle_style harmonic
+dihedral_style fourier
+improper_style cvff
+special_bonds amber
+pair_modify mix arithmetic
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+read_data radon_md_lmp.data
+Reading data file ...
+  orthogonal box = (-6.3695135 -6.3695135 -6.3695135) to (6.3695135 6.3695135 6.3695135)
+  1 by 2 by 7 MPI processor grid
+  reading atoms ...
+  8 atoms
+  scanning bonds ...
+  3 = max bonds/atom
+  scanning angles ...
+  6 = max angles/atom
+  scanning dihedrals ...
+  9 = max dihedrals/atom
+  orthogonal box = (-6.3695135 -6.3695135 -6.3695135) to (6.3695135 6.3695135 6.3695135)
+  1 by 2 by 7 MPI processor grid
+  reading bonds ...
+  7 bonds
+  reading angles ...
+  12 angles
+  reading dihedrals ...
+  9 dihedrals
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0.5     
+  special bond factors coul:  0        0        0.8333333333333334
+     4 = max # of 1-2 neighbors
+     3 = max # of 1-3 neighbors
+     6 = max # of 1-4 neighbors
+     7 = max # of special neighbors
+  special bonds CPU = 0.001 seconds
+  read_data CPU = 0.008 seconds
+
+
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz
+thermo_modify flush yes
+thermo 1000
+
+min_style cg
+minimize 0.000100 0.000001 10000 100000
+Generated 3 of 3 mixed pair_coeff terms from arithmetic mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 14
+  ghost atom cutoff = 14
+  binsize = 7, bins = 2 2 2
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/charmm/coul/charmm, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+WARNING: Proc sub-domain size < neighbor skin, could lead to lost atoms (src/domain.cpp:1204)
+Per MPI rank memory allocation (min/avg/max) = 12.09 | 12.15 | 12.55 Mbytes
+   Step          Time           Temp          Press         Enthalpy        TotEng         KinEng         PotEng         E_bond        E_angle        E_dihed        E_impro         E_vdwl         E_coul         E_long         E_tail         Volume           Lx             Ly             Lz          Density          Pxx            Pyy            Pzz            Pxy            Pxz            Pyz      
+         0   0              0             -745.34763     -10.734169      11.737925      0              11.737925      0.90292504     2.0961353      0.025860542    0              0.37195574     8.3410482      0              0              2067.3251      12.739027      12.739027      12.739027      0.081953625    542.9494      -1588.3157     -1190.6766      214.68295     -295.6946      -437.13801    
+        19   19             0             -16.60099       8.4766903      8.9772072      0              8.9772072      0.051592289    0.25249072     0.071163998    0              0.33556671     8.2663934      0              0              2067.3251      12.739027      12.739027      12.739027      0.081953625   -12.077237     -17.418853     -20.306881      3.5829659      3.9925433     -6.9342919    
+Loop time of 0.00123128 on 14 procs for 19 steps with 8 atoms
+
+100.0% CPU use with 14 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      11.7379249091238   8.97793321919643   8.97720715085191
+  Force two-norm initial, final = 62.379906 0.94739352
+  Force max component initial, final = 32.334348 0.37135934
+  Final line search alpha, max atom move = 0.19879682 0.073825054
+  Iterations, force evaluations = 19 38
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 2.646e-06  | 8.9755e-06 | 2.8001e-05 |   0.0 |  0.73
+Bond    | 5.229e-06  | 2.0326e-05 | 0.00010258 |   0.0 |  1.65
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.00022145 | 0.00034239 | 0.00048125 |   0.0 | 27.81
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.0008596  |            |       | 69.81
+
+Nlocal:       0.571429 ave           2 max           0 min
+Histogram: 8 0 0 0 0 4 0 0 0 2
+Nghost:        7.42857 ave           8 max           6 min
+Histogram: 2 0 0 0 0 4 0 0 0 8
+Neighs:       0.642857 ave           3 max           0 min
+Histogram: 9 0 0 2 0 0 2 0 0 1
+
+Total # of neighbors = 9
+Ave neighs/atom = 1.125
+Ave special neighs/atom = 7
+Neighbor list builds = 0
+Dangerous builds = 0
+reset_timestep 0
+
+write_dump all custom radon_md_last.dump id x y z xu yu zu vx vy vz fx fy fz modify sort id
+
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz
+WARNING: New thermo_style command, previous thermo_modify settings will be lost (src/output.cpp:912)
+thermo_modify flush yes
+write_data radon_md_last.data
+System init for write_data ...
+Generated 3 of 3 mixed pair_coeff terms from arithmetic mixing rule
+WARNING: Proc sub-domain size < neighbor skin, could lead to lost atoms (src/domain.cpp:1204)
+quit
+units real
+atom_style full
+boundary f f f
+
+pair_style lj/charmm/coul/charmm 8.0 12.0
+dielectric 1.000000
+bond_style harmonic
+angle_style harmonic
+dihedral_style fourier
+improper_style cvff
+special_bonds amber
+pair_modify mix arithmetic
+neighbor 2.0 bin
+neigh_modify delay 0 every 1 check yes
+read_data radon_md_lmp.data
+Reading data file ...
+  orthogonal box = (-6.3378347 -6.3378347 -6.3378347) to (6.3378347 6.3378347 6.3378347)
+  2 by 1 by 7 MPI processor grid
+  reading atoms ...
+  8 atoms
+  scanning bonds ...
+  3 = max bonds/atom
+  scanning angles ...
+  6 = max angles/atom
+  scanning dihedrals ...
+  9 = max dihedrals/atom
+  orthogonal box = (-6.3378347 -6.3378347 -6.3378347) to (6.3378347 6.3378347 6.3378347)
+  2 by 1 by 7 MPI processor grid
+  reading bonds ...
+  7 bonds
+  reading angles ...
+  12 angles
+  reading dihedrals ...
+  9 dihedrals
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0.5     
+  special bond factors coul:  0        0        0.8333333333333334
+     4 = max # of 1-2 neighbors
+     3 = max # of 1-3 neighbors
+     6 = max # of 1-4 neighbors
+     7 = max # of special neighbors
+  special bonds CPU = 0.001 seconds
+  read_data CPU = 0.011 seconds
+
+
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz
+thermo_modify flush yes
+thermo 1000
+
+min_style cg
+minimize 0.000100 0.000001 10000 100000
+Generated 3 of 3 mixed pair_coeff terms from arithmetic mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 14
+  ghost atom cutoff = 14
+  binsize = 7, bins = 2 2 2
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/charmm/coul/charmm, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+WARNING: Proc sub-domain size < neighbor skin, could lead to lost atoms (src/domain.cpp:1204)
+Per MPI rank memory allocation (min/avg/max) = 12.09 | 12.14 | 12.55 Mbytes
+   Step          Time           Temp          Press         Enthalpy        TotEng         KinEng         PotEng         E_bond        E_angle        E_dihed        E_impro         E_vdwl         E_coul         E_long         E_tail         Volume           Lx             Ly             Lz          Density          Pxx            Pyy            Pzz            Pxy            Pxz            Pyz      
+         0   0              0             -505.58511     -0.8459832      14.171006      0              14.171006      0.72676612     3.6375743      0.009330136    0              0.96638172     8.830954       0              0              2036.6327      12.675669      12.675669      12.675669      0.08318868     1338.0575     -2366.7994     -488.01345      407.58728     -929.75178      822.33948    
+        21   21             0             -4.6830355      8.8316128      8.9707093      0              8.9707093      0.04729419     0.2468512      0.10219494     0              0.34178687     8.2325821      0              0              2036.6327      12.675669      12.675669      12.675669      0.08318868     15.040498     -15.044798     -14.044806      3.3594541      0.56408072    -0.21866292   
+Loop time of 0.00126143 on 14 procs for 21 steps with 8 atoms
+
+81.9% CPU use with 14 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+      14.1710063244525   8.97112314727506   8.97070930190931
+  Force two-norm initial, final = 65.017617 0.65065348
+  Force max component initial, final = 26.273948 0.3877576
+  Final line search alpha, max atom move = 0.1967159 0.076278083
+  Iterations, force evaluations = 21 42
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 4.175e-06  | 7.5561e-06 | 1.6414e-05 |   0.0 |  0.60
+Bond    | 8.011e-06  | 2.0635e-05 | 8.8449e-05 |   0.0 |  1.64
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.00025492 | 0.00036729 | 0.00051843 |   0.0 | 29.12
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.000866   |            |       | 68.65
+
+Nlocal:       0.571429 ave           3 max           0 min
+Histogram: 10 0 0 2 0 0 0 0 0 2
+Nghost:        7.42857 ave           8 max           5 min
+Histogram: 2 0 0 0 0 0 2 0 0 10
+Neighs:       0.642857 ave           4 max           0 min
+Histogram: 11 0 0 0 0 1 0 1 0 1
+
+Total # of neighbors = 9
+Ave neighs/atom = 1.125
+Ave special neighs/atom = 7
+Neighbor list builds = 0
+Dangerous builds = 0
+reset_timestep 0
+
+write_dump all custom radon_md_last.dump id x y z xu yu zu vx vy vz fx fy fz modify sort id
+
+thermo_style custom step time temp press enthalpy etotal ke pe ebond eangle edihed eimp evdwl ecoul elong etail vol lx ly lz density pxx pyy pzz pxy pxz pyz
+WARNING: New thermo_style command, previous thermo_modify settings will be lost (src/output.cpp:912)
+thermo_modify flush yes
+write_data radon_md_last.data
+System init for write_data ...
+Generated 3 of 3 mixed pair_coeff terms from arithmetic mixing rule
+WARNING: Proc sub-domain size < neighbor skin, could lead to lost atoms (src/domain.cpp:1204)
+quit

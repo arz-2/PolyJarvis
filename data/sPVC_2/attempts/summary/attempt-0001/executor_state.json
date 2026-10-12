@@ -1,0 +1,78 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/summary/attempt-0001/raw/byproducts_spec.json",
+      "sha256": "b19a70382a928682ceed94e0dd8b5096c0c955fac9608417cb5f4182fd89a4c4",
+      "size": 638
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/summary/attempt-0001/raw/exp_lookup.json",
+      "sha256": "a156f7b2a14d06f5932ac27766a15c4aea5dcc4fc5b304c3ad93d4f4429be9e1",
+      "size": 2841
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/summary/attempt-0001/raw/run_summary.json",
+      "sha256": "05d2096adeb1f7fab24b5a175070c3a17b793a2393329f0e8888fe2745162c0f",
+      "size": 2673
+    }
+  ],
+  "attempt_id": "attempt-0001",
+  "findings": [],
+  "finished_at": "2026-09-11T17:12:49.229623+00:00",
+  "input_hash": "e0eb1aadc588cb1248db71a5a36d780b9edb339bfb6a78d25da59a61e85126c4",
+  "outputs": {
+    "artifacts_missing": [
+      {
+        "file": "bulk_modulus_deform.json",
+        "found_in": null
+      }
+    ],
+    "run_summary_path": "/home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/summary/attempt-0001/raw/run_summary.json",
+    "status": "success",
+    "summary_json": "/home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/summary/attempt-0001/raw/run_summary.json"
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 530.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 530.0,
+    "annealing_T_high_K": 610.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.55,
+    "dp_typical": 41,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 604339280,
+    "experimental_density_gcm3": 1.391,
+    "experimental_tg_K": 371.0,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 550,
+    "melt_hold_min_steps": 4000000,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 150,
+    "tg_t_step_K": 20,
+    "velocity_seed": 438801734
+  },
+  "reanalysis": {
+    "at": "2026-09-11T18:28:57.679727+00:00",
+    "no_re_execution": true,
+    "original": "run_summary.json.pre_refit_20260911",
+    "what": "run_summary.json regenerated: (a) Tg refit installed upstream, (b) density now read from cooling.json (300 K glass) instead of the melt equilibration.json -- the original summary fell through `cooling_path or melt_equilibration_path` because cool_result was None on the resume path, so it reported the melt density as the run density and the melt convergence block as the run convergence. Every other completed run reports the 300 K value."
+  },
+  "stage": "summary",
+  "status": "accepted"
+}

@@ -1,0 +1,152 @@
+{
+  "agent_escalations": [],
+  "created_at": "2026-09-15T01:06:49.188305+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 500.0,
+    "T_melt_hold_K": 500.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 625.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      3000,
+      7000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.61,
+    "dp_typical": 114,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 798838,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "compass",
+    "stage8_min_steps": 2000000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 316927
+  },
+  "engine_version": "workflow-engine-v3",
+  "plan_hash": "7c3f224af69d758969e6c42dab8334c7019d7d05ce96e91ce0ea1b31f47ae402",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {},
+    "total": 12
+  },
+  "replicate_protocol_lock": {
+    "at": "2026-09-15T01:06:49.188678+00:00",
+    "consequence": "A process failure is not retried: _apply_remedy declines at the total cap and _escalate returns escalation_required (no_recovery_agent_configured).",
+    "mechanism": {
+      "MAX_AUTOMATIC_REMEDIES": 12,
+      "env": {
+        "POLYJARVIS_GATES_ADVISORY": "1"
+      },
+      "launch": "agent_api.py resume PEG_COMPASS_2 (no --recovery-agent-command)",
+      "recovery_agent": null,
+      "remedy_counters.total": 12
+    },
+    "only_change": {
+      "preferred_ff": [
+        "pcff",
+        "compass"
+      ]
+    },
+    "paired_with": "PEG_2",
+    "pinned_seeds": {
+      "emc_seed": 798838,
+      "source": "PEG_2 emc_build.log -seed= and equilibration 'velocity all create'",
+      "velocity_seed": 316927
+    },
+    "why": "Controlled force-field comparison (reviewer comment 4): PEG_COMPASS_2 must execute PEG_2's frozen PCFF protocol with preferred_ff=compass as the ONLY change. Any automatic remedy or agent decision would alter the executed protocol (extra continuations, changed parameters) and break the pairing, so the run is locked exactly like the rev2 replicates: every automatic remedy is refused and gate verdicts are recorded, not acted on."
+  },
+  "run_name": "PEG_COMPASS_2",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T01:10:00.336780+00:00",
+          "input_hash": "f7c6c67fe588976b0d32eedea9ad140f5b2114990cf87a1bc10f2fe565dd231f",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T01:07:29.628533+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "f7c6c67fe588976b0d32eedea9ad140f5b2114990cf87a1bc10f2fe565dd231f",
+      "status": "accepted"
+    },
+    "cooling": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T09:42:32.164833+00:00",
+          "input_hash": "198c47f4759ee5efb2da415516119f110e076a7d3cd5aa2ee6ccc8ee195a5ef6",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/cooling/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T07:12:03.547597+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "198c47f4759ee5efb2da415516119f110e076a7d3cd5aa2ee6ccc8ee195a5ef6",
+      "status": "accepted"
+    },
+    "equilibration": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T07:11:59.881883+00:00",
+          "input_hash": "c0f2298820575a06f8b679eac3ded5b36f6ffbcbdfb86e9abd67ceaeb7d3c6a4",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T01:10:00.340309+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "c0f2298820575a06f8b679eac3ded5b36f6ffbcbdfb86e9abd67ceaeb7d3c6a4",
+      "status": "accepted"
+    },
+    "mechanical": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T11:20:44.844622+00:00",
+          "input_hash": "23d79a2d4229f45429942c2ef9dd1091ce13427afd6606e06d8939d664e436cd",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/mechanical/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T09:42:33.609971+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "23d79a2d4229f45429942c2ef9dd1091ce13427afd6606e06d8939d664e436cd",
+      "status": "accepted"
+    },
+    "summary": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T11:20:58.952203+00:00",
+          "input_hash": "f7b5f7b52c549a46f984a277f1422453ee40bde873b28b25a61491d5f4f58704",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_2/attempts/summary/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T11:20:50.906026+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "f7b5f7b52c549a46f984a277f1422453ee40bde873b28b25a61491d5f4f58704",
+      "status": "accepted"
+    }
+  },
+  "status": "accepted",
+  "updated_at": "2026-09-15T11:20:58.953632+00:00"
+}

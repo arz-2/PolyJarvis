@@ -1,0 +1,211 @@
+{
+  "agent_escalations": [],
+  "created_at": "2026-09-11T21:24:54.218245+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 530.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 530.0,
+    "annealing_T_high_K": 610.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.55,
+    "dp_typical": 41,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 492680472,
+    "experimental_density_gcm3": 1.391,
+    "experimental_tg_K": 371.0,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 550,
+    "melt_hold_min_steps": 4000000,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 150,
+    "tg_t_step_K": 20,
+    "velocity_seed": 585758416
+  },
+  "engine_version": "workflow-engine-v3",
+  "input_hash_restamp": [
+    {
+      "at": "2026-09-12T23:04:20.321621+00:00",
+      "reason": "trajectory dumps of accepted attempts recompressed to .dump.gz (no re-execution, no re-analysis); artifact paths and sha256 changed, so dependency_checksums and every dependent stage input hash shifted",
+      "stages": {
+        "cooling": {
+          "after": "bcaa6b69ffa579a5bb3b56f480d878bf61c7330e584e0831023036e8da0608ee",
+          "before": "0d878615afbdfb2686327ce49b9bade329cb9a1e23e75dfa472f66642c9efc0e"
+        },
+        "mechanical": {
+          "after": "da9c7f127f30ba1086bf5263b6f57813fa23b05075fcaa7c8c5c1ec254e37fcc",
+          "before": "6119280753efc80cb6167c18af0990ef6cab5f65adfb642544374dc1dcc5bf69"
+        },
+        "summary": {
+          "after": "3d21520d801dac6e1977e8a0692841ede8f0fbbe5bfc5dc1465bc05d4a944c43",
+          "before": "899411c88aac80a273225765899faa8521f18de922c19c638be665c9f090864c"
+        },
+        "thermal": {
+          "after": "c42a090a771af266ce9d5ce0ad6fc8fefa89a6d2d8efb805b48174775bf338b3",
+          "before": "69d571b786c986799b1bd3b29438c12c2d39c8a3c0ae8c671c07102d4e60549a"
+        }
+      }
+    }
+  ],
+  "plan_decided_params": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 530.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 530.0,
+    "annealing_T_high_K": 610.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.55,
+    "dp_typical": 41,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 492680472,
+    "experimental_density_gcm3": 1.391,
+    "experimental_tg_K": 371.0,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 550,
+    "melt_hold_min_steps": 4000000,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 150,
+    "tg_t_step_K": 20,
+    "velocity_seed": 585758416
+  },
+  "plan_hash": "fb5ba1b82ca52eaa25b8bfdac7b1d91fd24ccfaeb1943b4e95b5a226f6d7490d",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {},
+    "total": 12
+  },
+  "replicate_protocol_lock": {
+    "agent_escalation": "disabled by launching without --recovery-agent-command",
+    "auto_remedies": "disabled by pre-seeding remedy_counters.total = 12",
+    "locked_at": "2026-09-11",
+    "on_gate_failure": "the run HALTS with the verdict recorded; it does not adapt",
+    "protocol_source": "materialized from data/sPVC_2/raw/run_plan.json (the validated locked replay of pilot sPVC_1); only run_name, emc_seed and velocity_seed differ. derived_inputs stripped so sPVC_3 derives backbone_types from its OWN cell (sPVC_1 and sPVC_2 both derived [1,2,3] independently).",
+    "why": "fixed-protocol replicate: seeds are the only permitted variable"
+  },
+  "run_name": "sPVC_3",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-11T21:26:30.198712+00:00",
+          "input_hash": "08ec262d857090c9c883b5e6b3d3371d2811ed2c2a31825c90f1cc7e14a21562",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-11T21:24:59.906636+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "08ec262d857090c9c883b5e6b3d3371d2811ed2c2a31825c90f1cc7e14a21562",
+      "status": "accepted"
+    },
+    "cooling": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T08:05:31.330593+00:00",
+          "input_hash": "bcaa6b69ffa579a5bb3b56f480d878bf61c7330e584e0831023036e8da0608ee",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/cooling/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T05:32:40.414076+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "bcaa6b69ffa579a5bb3b56f480d878bf61c7330e584e0831023036e8da0608ee",
+      "status": "accepted"
+    },
+    "equilibration": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T05:32:32.185698+00:00",
+          "input_hash": "20b31256077fa5ccb7a1521adf56201392080f6f0204ee46beb6b85a69d72a7a",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-11T21:26:30.205802+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "20b31256077fa5ccb7a1521adf56201392080f6f0204ee46beb6b85a69d72a7a",
+      "status": "accepted"
+    },
+    "mechanical": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T14:06:53.398650+00:00",
+          "input_hash": "da9c7f127f30ba1086bf5263b6f57813fa23b05075fcaa7c8c5c1ec254e37fcc",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/mechanical/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T11:57:40.568036+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "da9c7f127f30ba1086bf5263b6f57813fa23b05075fcaa7c8c5c1ec254e37fcc",
+      "status": "accepted"
+    },
+    "summary": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T14:07:22.827762+00:00",
+          "input_hash": "3d21520d801dac6e1977e8a0692841ede8f0fbbe5bfc5dc1465bc05d4a944c43",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/summary/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T14:07:07.822723+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "3d21520d801dac6e1977e8a0692841ede8f0fbbe5bfc5dc1465bc05d4a944c43",
+      "status": "accepted"
+    },
+    "thermal": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T11:57:36.323529+00:00",
+          "input_hash": "c42a090a771af266ce9d5ce0ad6fc8fefa89a6d2d8efb805b48174775bf338b3",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/sPVC_3/attempts/thermal/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T08:05:40.621108+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "c42a090a771af266ce9d5ce0ad6fc8fefa89a6d2d8efb805b48174775bf338b3",
+      "status": "accepted"
+    }
+  },
+  "status": "accepted",
+  "updated_at": "2026-09-12T23:04:20.448631+00:00"
+}

@@ -1,0 +1,168 @@
+{
+  "log": "/home/arz2/PolyJarvis/data/PEG2XCMP1/lammps/equil/npt_production/npt_production.log",
+  "units": "real",
+  "rows_in_log": 2001,
+  "rows_graded": 2001,
+  "tail_rows": 2001,
+  "width": 800,
+  "window_fully_defined": true,
+  "criteria": {
+    "totene": {
+      "status": "FAIL",
+      "value": 43.034173562816854,
+      "threshold": 35.62375693661501,
+      "column": "TotEng",
+      "mean": 71247.51387323001,
+      "crit": 0.0005,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "kinene": {
+      "status": "PASS",
+      "value": 7.276606398745201,
+      "threshold": 26.268355425615,
+      "column": "KinEng",
+      "mean": 52536.71085123,
+      "crit": 0.0005,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "ebond": {
+      "status": "PASS",
+      "value": 4.994040372581566,
+      "threshold": 19.33198280998,
+      "column": "E_bond",
+      "mean": 19331.98280998,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "eangle": {
+      "status": "PASS",
+      "value": 17.777044448149027,
+      "threshold": 41.355476328638005,
+      "column": "E_angle",
+      "mean": 41355.476328638004,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "edihed": {
+      "status": "PASS",
+      "value": 15.34404563584754,
+      "threshold": 102.37162835668002,
+      "column": "E_dihed",
+      "mean": -51185.814178340006,
+      "crit": 0.002,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "evdw": {
+      "status": "PASS",
+      "value": 13.644821306501315,
+      "threshold": 30.0,
+      "column": "E_vdwl",
+      "mean": -26555.761821629,
+      "crit": 30.0,
+      "rule": "sma_sd > crit"
+    },
+    "ecoul": {
+      "status": "NOT_GATED",
+      "value": 27.369376189176265,
+      "threshold": null,
+      "column": "E_coul",
+      "mean": 94526.66378993,
+      "crit": null,
+      "rule": "sma_sd > crit"
+    },
+    "elong": {
+      "status": "PASS",
+      "value": 3.060918370891325,
+      "threshold": 58.315262345719994,
+      "column": "E_long",
+      "mean": -58315.262345719995,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "dens": {
+      "status": "PASS",
+      "value": 0.0003912746505214025,
+      "threshold": 0.001125741372625,
+      "column": "Density",
+      "mean": 1.125741372625,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit"
+    },
+    "rg": {
+      "status": "FAIL",
+      "value": 0.35063145313113586,
+      "threshold": 0.19133444588429996,
+      "source": "calc_rg on rg.profile",
+      "n_profile_outputs": 2001,
+      "per_chain_sd": [
+        0.16700276623635568,
+        0.21688658272089142,
+        0.25906460333932574,
+        0.2262310372877623,
+        0.18071853962862475,
+        0.1415221470727418,
+        0.22448187011793055,
+        0.1697822871586163,
+        0.26121756522965733,
+        0.18146641503531294,
+        0.28261356735793536,
+        0.17606776832388865,
+        0.29999821887750505,
+        0.20950077442347712,
+        0.35063145313113586,
+        0.22790552010772114,
+        0.12491050860410456,
+        0.13932819185276446,
+        0.10873504959115908,
+        0.1999661430371357
+      ],
+      "per_chain_mean": [
+        17.435296424700013,
+        22.50055414614998,
+        28.261396955137485,
+        17.431665707137498,
+        18.251780523624998,
+        24.905821772849993,
+        22.80386108455,
+        17.283511776837507,
+        21.56083404306254,
+        14.43424573290001,
+        17.770114906362505,
+        13.666478541387495,
+        20.355430300787464,
+        26.526511175062506,
+        18.43862874274998,
+        17.99929279324998,
+        13.944633223112477,
+        17.18023356782499,
+        12.632095521699997,
+        19.286504829412486
+      ],
+      "crit": 0.01,
+      "rule": "sd_max > mean_mean*crit",
+      "sd_max_over_mean_pct": 1.8325579145490767
+    }
+  },
+  "verdict": "FAIL",
+  "failing": [
+    "rg",
+    "totene"
+  ],
+  "not_evaluated": [],
+  "radonpy_check_eq_returned": false,
+  "radonpy_check_eq_passes_an_unevaluable_window": false,
+  "radonpy_check_eq_agrees": true,
+  "radonpy_check_eq_skipped_rg": false,
+  "radonpy_warnings": [
+    "RadonPy warning: Total energy does not converge. mean = 71247.513873, sma_sd = 43.034174",
+    "RadonPy warning: Radius of gyration does not converge. mean = 19.133445, sd = 0.350631"
+  ],
+  "rg_roundtrip": {
+    "numpy": {
+      "sd_max": 0.35063145319135414,
+      "mean_mean": 19.13344458839878,
+      "n_frames": 800
+    },
+    "abs_diff_A": 6.021827481106357e-11
+  }
+}

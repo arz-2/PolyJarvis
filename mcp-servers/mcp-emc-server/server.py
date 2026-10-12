@@ -25,7 +25,6 @@ import json
 import logging
 import os
 import random
-import sys
 import threading
 import time
 import uuid
@@ -34,7 +33,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-from smiles_to_emc import build_cell
+from smiles_to_emc import build_cell, strip_bond_stereo
 
 from mcp.server.fastmcp import FastMCP
 
@@ -52,7 +51,12 @@ logger = logging.getLogger("emc_server")
 # Job storage root
 # ---------------------------------------------------------------------------
 
-JOBS_ROOT = Path(os.environ.get("EMC_JOBS_DIR", Path.home() / "polyjarvis_emc_jobs"))
+# Inside the repo, never $HOME: a build writes ~5 MB of .esh/build.emc/.data/.params per
+# cell, and those are simulation artifacts that belong with the run that produced them.
+# do_build passes an explicit output_dir (the build attempt's own cell directory), so this
+# root is only the fallback for a direct tool call with no run to attach to.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+JOBS_ROOT = Path(os.environ.get("EMC_JOBS_DIR", REPO_ROOT / "data" / "_emc_jobs"))
 JOBS_ROOT.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------------
@@ -115,57 +119,17 @@ class JobManager:
                 self._jobs[job_id]["completed_at"]  = datetime.now().isoformat()
             logger.error(f"Job {job_id} failed after {elapsed:.1f}s: {exc}")
 
-    def _resolve_sentinel(self, job_id: str) -> None:
-        """If status is 'running' but the .data output file exists, mark completed."""
-        with self._lock:
-            j = self._jobs.get(job_id)
-            if j is None or j["status"] != JobStatus.RUNNING.value:
-                return
-            output_dir = j.get("kwargs", {}).get("output_dir")
-        if not output_dir:
-            return
-        try:
-            data_files = sorted(
-                Path(output_dir).glob("*.data"),
-                key=lambda p: p.stat().st_mtime,
-                reverse=True,
-            )
-        except Exception:
-            return
-        if not data_files:
-            return
-        data_path = str(data_files[0])
-        field = j["kwargs"].get("field", "")
-        natoms = None
-        try:
-            with open(data_path) as fh:
-                for line in fh:
-                    if "atoms" in line and not line.strip().startswith("#"):
-                        natoms = int(line.split()[0])
-                        break
-        except Exception:
-            pass
-        result = {
-            "status":       "success",
-            "data_path":    data_path,
-            "output_dir":   output_dir,
-            "smiles":       j["kwargs"].get("smiles", ""),
-            "field":        field,
-            "dp":           j["kwargs"].get("dp"),
-            "density":      j["kwargs"].get("density"),
-            "natoms":       natoms,
-            "lammps_flags": _lammps_flags(field) if field else {},
-            "message":      f"LAMMPS .data file written: {data_path} [recovered via sentinel]",
-        }
-        with self._lock:
-            if self._jobs[job_id]["status"] == JobStatus.RUNNING.value:
-                self._jobs[job_id]["status"]       = JobStatus.COMPLETED.value
-                self._jobs[job_id]["result"]        = result
-                self._jobs[job_id]["completed_at"]  = datetime.now().isoformat()
-                logger.info(f"Job {job_id} recovered via .data sentinel: {data_path}")
+    # _resolve_sentinel REMOVED 2026-09-02. It flipped a job from "running" to "completed"
+    # whenever ANY *.data existed in output_dir, which is true from the moment EMC writes
+    # the file -- before run_emc_build() has stripped pair_style/kspace_style out of the
+    # emitted .params. A 30 s poll landing in that window handed the campaign a .params that
+    # then overrode the equilibration template's own coul/long-vs-coul/cut choice, and a
+    # result dict with no resolved_seed. It existed to recover a job whose MCP server had
+    # restarted under it; run_campaign.py imports this module in-process (see
+    # _load_server_module), so the worker thread and the poller live or die together and
+    # there is nothing to recover. A job is complete when its thread says so.
 
     def status(self, job_id: str) -> dict:
-        self._resolve_sentinel(job_id)
         with self._lock:
             if job_id not in self._jobs:
                 return {"error": f"Job {job_id} not found"}
@@ -182,7 +146,6 @@ class JobManager:
             }
 
     def output(self, job_id: str) -> dict:
-        self._resolve_sentinel(job_id)
         with self._lock:
             if job_id not in self._jobs:
                 return {"error": f"Job {job_id} not found"}
@@ -292,15 +255,20 @@ def _lammps_flags(field: str) -> dict:
 def _build_emc_cell(
     smiles: str,
     output_dir: str,
-    output_name: str,
     field: str,
     density: float,
-    ntotal: int,
     dp: int,
     nchains: int,
     temperature: float,
     seed: int,
 ) -> dict:
+    # EMC discards SMILES double-bond stereo, and "/" additionally breaks the .esh parser.
+    # Record the drop here so the run's provenance says the cell is cis/trans-mixed by
+    # construction rather than leaving it to be inferred from a silent success.
+    _, stereo_stripped = strip_bond_stereo(smiles)
+    if stereo_stripped:
+        logger.warning("cis/trans bond stereo stripped from %s: EMC packs a mixed cell", smiles)
+
     # Resolve seed before calling EMC so the cell is reproducible.
     if seed == -1:
         seed = random.randint(1, 2**31 - 1)
@@ -309,10 +277,8 @@ def _build_emc_cell(
     data_path = build_cell(
         smiles=smiles,
         output_dir=output_dir,
-        output_name=output_name,
         field=field,
         density=density,
-        ntotal=ntotal,
         dp=dp,
         nchains=nchains,
         temperature=temperature,
@@ -328,6 +294,7 @@ def _build_emc_cell(
             "dp": dp,
             "density": density,
             "smiles": smiles,
+            "stereo_stripped": stereo_stripped,
         }
         (Path(output_dir) / "emc_metadata.json").write_text(
             json.dumps(meta, indent=2)
@@ -356,6 +323,7 @@ def _build_emc_cell(
         "density":       density,
         "natoms":        natoms,
         "resolved_seed": seed,
+        "stereo_stripped": stereo_stripped,
         "lammps_flags":  _lammps_flags(field),
         "message":       f"LAMMPS .data file written: {data_path}",
     }
@@ -428,10 +396,9 @@ def submit_emc_cell_job(
     nchains: int,
     density_initial: float,
     seed: int,
-    ntotal: int = 3000,
     temperature: float = 300.0,
-    output_name: str = "polymer",
     field_override: str = "",
+    output_dir: str = "",
 ) -> dict:
     """
     Build an amorphous polymer cell with EMC and return a LAMMPS .data file.
@@ -455,23 +422,23 @@ def submit_emc_cell_job(
         dp:              REQUIRED. Degree of polymerization (repeat units per chain) —
                          the class's own dp_typical, commonly 50.
         nchains:         REQUIRED. Exact number of polymer chains to build (EMC "number"
-                         mode). When > 0 this sets the chain count precisely and
-                         ntotal is ignored; pass 0 to size from ntotal instead.
+                         mode), >= 1. The chain count is always explicit: the
+                         atom-count-driven sizing path was removed 2026-09-02 so that
+                         D-04_system_size is the only thing that decides a cell.
         density_initial: REQUIRED. Target packing density in g/cm³. Use ~0.5× experimental
                          to avoid steric clashes during initial build; LAMMPS
                          equilibration will compress to target density.
-        ntotal:          Fallback target total atom count — used ONLY when nchains <= 0
-                         (EMC sets chain count ≈ ntotal/sites). With the usual nchains > 0
-                         this argument is a no-op. [3000]
-        temperature:     Build temperature in K (used for velocity assignment in
-                         generated LAMMPS run script). [300.0]
+        temperature:     Build temperature in K. Feeds EMC's `build.system.temperature`,
+                         which its `grow -> {method -> energetic}` chain growth accepts
+                         moves against, so it shapes the packed configuration — not only
+                         the velocities of the run script EMC generates (that script is
+                         unused; PolyJarvis generates its own decks). [300.0]
         seed:            REQUIRED. Random seed pinning the packing RNG. Pass -1 only when
                          you deliberately want a fresh cell: EMC then draws one and reports
                          it, and that drawn value is what must reach the run log's Seeds
                          line. Omitting the argument used to do the same draw silently,
                          which produced an unreproducible cell under a run log claiming a
                          pinned seed.
-        output_name:     Prefix for all generated files. [polymer]
         field_override:  FOR FORCE-FIELD COMPARISON RUNS ONLY — leave empty for
                          normal builds, which must use the class default above.
                          Accepts compass / pcff_ore / trappe-eh / opls/2012/opls-aa
@@ -479,6 +446,12 @@ def submit_emc_cell_job(
                          no F, no Cl, and 96 typing templates against pcff's 422, so
                          it silently fails to type many chemistries — always check
                          the build log rather than assuming a fallback. [""]
+
+        output_dir:     Absolute directory for every file this build writes -- the .esh, the
+                        generated build.emc and emc_build.in, the EMC log, the .data and the
+                        .params. Pass the run's own build-attempt directory so the inputs stay
+                        with the cell they produced. Defaults to a scratch directory under the
+                        repo's data/_emc_jobs/ when there is no run to attach to. [""]
 
     Returns:
         {"status": "submitted", "job_id": ..., "output_dir": ..., "field": ...}
@@ -489,15 +462,18 @@ def submit_emc_cell_job(
         return {"error": str(exc)}
 
     job_id = str(uuid.uuid4())[:8]
-    output_dir = str(JOBS_ROOT / job_id)
+    if output_dir:
+        if not os.path.isabs(output_dir):
+            return {"error": f"output_dir must be absolute, got {output_dir!r}"}
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+    else:
+        output_dir = str(JOBS_ROOT / job_id)
 
     kwargs = dict(
         smiles=smiles,
         output_dir=output_dir,
-        output_name=output_name,
         field=field,
         density=density_initial,
-        ntotal=ntotal,
         dp=dp,
         nchains=nchains,
         temperature=temperature,

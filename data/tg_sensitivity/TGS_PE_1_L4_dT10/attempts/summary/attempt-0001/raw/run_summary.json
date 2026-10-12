@@ -1,0 +1,124 @@
+{
+  "run": {
+    "name": "tg_sensitivity/TGS_PE_1_L4_dT10",
+    "smiles": "*CC*",
+    "polymer_class": "PHYC",
+    "ff": "trappe-ua",
+    "charge_method": "embedded",
+    "dp": 179,
+    "n_chains": 10,
+    "n_atoms": null,
+    "date_start": "",
+    "date_end": ""
+  },
+  "decisions": {
+    "D-01_ff": "trappe-ua",
+    "D-02_charges": "embedded",
+    "D-03_electrostatics": "lj_cut",
+    "D-04_system_size": "DP=179, 10 chains",
+    "D-05_convergence": "PASS",
+    "D-06_tg_fit_quality": "EXCELLENT"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 253.0,
+      "grading_basis": "raw_MD",
+      "r_squared": 0.9972,
+      "fit_quality": "EXCELLENT",
+      "primary_fit_invalid": false,
+      "n_replicates": 1
+    },
+    "density": {
+      "value_g_cm3": 0.718891,
+      "temperature_K": 549.72
+    },
+    "melt_density": {
+      "value_g_cm3": 0.718891,
+      "temperature_K": 549.72
+    },
+    "bulk_modulus": {
+      "value_GPa": null,
+      "sem_GPa": null,
+      "method": null,
+      "temperature_K": null
+    }
+  },
+  "byproducts": {
+    "cte_glass": {
+      "value": 0.000276783,
+      "unit": "1/K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:cte_glassy_per_K",
+      "gate": {
+        "field": "slope_signs_valid",
+        "verdict": true
+      },
+      "blocking": false
+    },
+    "cte_rubber": {
+      "value": 0.000718069,
+      "unit": "1/K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:cte_rubbery_per_K",
+      "gate": {
+        "field": "slope_ordering_valid",
+        "verdict": true
+      },
+      "blocking": false
+    },
+    "tg_transition_width": {
+      "value": 10.2,
+      "unit": "K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:transition_width_c_K",
+      "gate": {
+        "field": "fit_quality",
+        "verdict": "EXCELLENT"
+      },
+      "blocking": false
+    }
+  },
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": true,
+    "energy_equilibrated": true,
+    "density_drift_pct": 0.2812,
+    "caveats": []
+  },
+  "structural_checks": {
+    "rg_cv": 0.2344,
+    "rg_spread_flag": false,
+    "kinetic_trap_flag": false,
+    "diffusion_regime": "strongly sub-diffusive (see kinetic_trap_flag for trap verdict)",
+    "msid_slope": 1.117,
+    "msid_large_s_slope": 1.053,
+    "msid_large_s_gaussian_pass": true,
+    "ordered_flag": false,
+    "p2_mean": 0.0268,
+    "heterogeneous_flag": false,
+    "density_cv_mean": 0.147
+  },
+  "artifacts": {
+    "tg_fit_fig": "graphs/tg_fit.png"
+  },
+  "artifacts_missing": [
+    {
+      "file": "bulk_modulus_deform.json",
+      "found_in": null
+    },
+    {
+      "file": "mechanical.json",
+      "found_in": null
+    }
+  ],
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "baa71cd",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-09-13T22:28:08.652092+00:00"
+  }
+}

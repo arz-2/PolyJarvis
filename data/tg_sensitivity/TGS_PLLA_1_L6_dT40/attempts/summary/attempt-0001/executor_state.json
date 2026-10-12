@@ -1,0 +1,83 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/summary/attempt-0001/raw/byproducts_spec.json",
+      "sha256": "b19a70382a928682ceed94e0dd8b5096c0c955fac9608417cb5f4182fd89a4c4",
+      "size": 638
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/summary/attempt-0001/raw/exp_lookup.json",
+      "sha256": "ca4c80f19e0997bb73ad0053f7df0b51814eab2c310f0f6f1dd49b11f3e6fd3d",
+      "size": 848
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/summary/attempt-0001/raw/run_summary.json",
+      "sha256": "ae16bba932ce0f37a6fd1fba91c2fbab1dbcd106d91e7866475838ee97d4c601",
+      "size": 3330
+    }
+  ],
+  "attempt_id": "attempt-0001",
+  "findings": [],
+  "finished_at": "2026-09-13T10:33:34.668829+00:00",
+  "input_hash": "5a1ce75265f9c9a09701b10699b95fd3922c9b3d16bbf209d4a442ff702f7a4e",
+  "outputs": {
+    "artifacts_missing": [
+      {
+        "file": "bulk_modulus_deform.json",
+        "found_in": null
+      },
+      {
+        "file": "mechanical.json",
+        "found_in": null
+      }
+    ],
+    "run_summary_path": "/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/summary/attempt-0001/raw/run_summary.json",
+    "status": "success",
+    "summary_json": "/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/summary/attempt-0001/raw/run_summary.json"
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 620.0,
+    "T_melt_hold_K": 620.0,
+    "T_workflow_K": 620.0,
+    "annealing_T_high_K": 700.0,
+    "backbone_types": [
+      1,
+      2,
+      3,
+      6,
+      7
+    ],
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.15,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.63,
+    "dp_typical": 70,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 686928993,
+    "experimental_density_gcm3": 1.248,
+    "experimental_tg_K": 331.0,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_min_steps_per_T": 200000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 40,
+    "velocity_seed": 561359054
+  },
+  "stage": "summary",
+  "status": "accepted"
+}

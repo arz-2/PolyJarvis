@@ -450,8 +450,11 @@ def parse_page(text: str, polymer_id: int, source_id: int, conn, stats: dict) ->
 # ---------------------------------------------------------------------------
 
 def is_entry_start(text: str) -> bool:
+    # Singular "MAJOR APPLICATION" also opens entries (e.g. Poly(ethylene sulfide), PDH p. 552).
+    # Matching only the plural carried the previous entry forward, so PES Tg/density/modulus
+    # rows were filed under Poly(ethylene oxide).
     return "CLASS" in text and (
-        "MAJOR APPLICATIONS" in text or "MAJORAPPLICATIONS" in text
+        "MAJOR APPLICATION" in text or "MAJORAPPLICATION" in text
     )
 
 

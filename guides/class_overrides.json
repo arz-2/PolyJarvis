@@ -1,0 +1,29 @@
+{
+  "_metadata": {
+    "description": "Deliberate, documented departures from RadonPy poly.polyinfo_classifier's label, keyed by isomeric canonical SMILES. A small reviewed allowlist -- NOT a second taxonomy. rdkit_cli.py's `classify` applies these after the classifier and always reports both labels plus class_source, so a substitution is never silent.",
+    "why_this_exists": "polymer_class is load-bearing far beyond naming: get_class_entry supplies charge_method, electrostatics, cutoff_A, dt_fs, T_equil_K, density_initial_gcm3, the per-member experimental bands and the tacticity default. Where this repo's own guides/polymer_rules.json member_smiles curation and RadonPy's priority ladder disagree, polymer_rules.json wins -- it is the file the protocol is actually built from.",
+    "measured": "2026-09-07. Against all 43 member_smiles entries in guides/polymer_rules.json, polyinfo_classifier agrees on 40 and disagrees on the 3 recorded here. Against PoLyInfo's own curated polymer_class column across all 1077 rows of RadonPy's PI1070, it agrees on 981 (91.1%); those remaining disagreements are NOT overridden here, because PoLyInfo curation and this repo's protocol taxonomy are different questions (PoLyInfo calls poly(aryl ether sulfone) POXI; polymer_rules.json puts PSU under PSFO, and PSFO is what the protocol wants).",
+    "regenerate": "tests/test_class_agreement.py enumerates the full disagreement set and fails when it changes.",
+    "scope": "Only add an entry when guides/polymer_rules.json member_smiles states a different class for that exact molecule. Anything else belongs in the run plan's overrides, not here."
+  },
+  "overrides": {
+    "*CC(*)Cl": {
+      "polymer_class": "PVNL",
+      "reason": "PVC. RadonPy's element-count tier ranks PHAL above PVNL on the presence of a halogen alone, but a single backbone chlorine on a vinyl backbone is a polyvinyl, and polymer_rules.json lists PVC under PVNL. The routing consequence is the point: PHAL builds with OPLS-AA, PVNL with PCFF. PVF appears under BOTH classes' examples in polymer_rules.json, so the overlap is acknowledged there.",
+      "displaces": "PHAL",
+      "evidence": "guides/polymer_rules.json classes.PVNL.member_smiles.PVC"
+    },
+    "*CC(*)OC": {
+      "polymer_class": "POXI",
+      "reason": "PVME. The methoxy is a PENDANT ether on a vinyl backbone -- `classify`'s own group profile reports POXI:pendant, PVNL:backbone -- so polyinfo_classifier's ether SMARTS, which matches on extract_mainchain only, never sees it and falls through to PVNL. polymer_rules.json curates PVME as POXI and its POXI protocol constants are the ones this repo has validated for it.",
+      "displaces": "PVNL",
+      "evidence": "guides/polymer_rules.json classes.POXI.member_smiles.PVME"
+    },
+    "*Oc1cc(C)c(*)c(C)c1": {
+      "polymer_class": "PPNL",
+      "reason": "PPO/PPE. A backbone aryl ether is genuinely both, and RadonPy's ladder ranks POXI (12) above PPNL (15), so the ether wins. polymer_rules.json curates PPO_PPE under PPNL with the conjugated-backbone protocol; the group profile records POXI:backbone alongside PPNL:backbone, so nothing is hidden by taking PPNL.",
+      "displaces": "POXI",
+      "evidence": "guides/polymer_rules.json classes.PPNL.member_smiles.PPO_PPE"
+    }
+  }
+}

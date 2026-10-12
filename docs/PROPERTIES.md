@@ -2,7 +2,7 @@
 
 PolyJarvis reports three properties — **density**, **Tg**, and **bulk modulus** — each validated against experimental ranges from `guides/polymer_rules.json`.
 
-To request a subset, pass `--properties density,tg` (or `all`) to `gen_prompt.py`, or set `TARGET_PROPERTIES` in the task. Omitting the field runs all three.
+To request a subset, pass `--properties density,tg` to `run_campaign.py`. Omitting the field uses the properties recorded in `run_plan.json`.
 
 ---
 
@@ -11,7 +11,7 @@ To request a subset, pass `--properties density,tg` (or `all`) to `gen_prompt.py
 | Field | Value |
 |-------|-------|
 | Units | g/cm³ at 300 K |
-| Source log | Rubbery: `npt_production.log` (melt NPT production); Glassy: `npt_prod300.log` (NPT 300 K production) |
+| Source log | `cool/npt_final/npt_final.log` (the assessment cell at `final_T_K`, default 300 K). The melt density at `T_melt_hold_K` is a separate observable, read from `equil/npt_melt_hold/npt_melt_hold.log` — the two are reported under different names and are not interchangeable. |
 | Tool | `extract_equilibrated_density` |
 | Method | Discard first 50 % of log as burn-in; mean ± SEM over production window; linear drift check |
 | Validation | `experimental_density_gcm3` from polymer_rules.json; OK if within ±5 % |
@@ -21,31 +21,34 @@ To request a subset, pass `--properties density,tg` (or `all`) to `gen_prompt.py
 
 ## 2. Glass Transition Temperature (Tg)
 
-Tg is measured **multirate**: one stepped cooling sweep is run per cooling rate, each sweep yields a per-rate Tg, and the per-rate Tg values are extrapolated to the experimental (DSC-equivalent) rate.
+Tg is measured **single-rate**: one stepped cooling sweep runs at the class's configured
+`tg_rate_K_per_ns`. That was a `tg_rates_K_per_ns` LIST with a
+`tg_slope_gate_fallback` selecting an entry until 2026-09-04; only one entry was ever swept, so
+the list and the fallback were retired. The remedy for a class whose fit will not resolve is to
+LOWER `tg_rate_K_per_ns`, which `_assert_tg_rate_feasible` bounds against
+`tg_min_steps_per_T`.
 
-### Per-rate sweep
+PKTN and PSFO carried the fallback until 2026-09-01: their staircase reheated
+the finished 300 K cell, so the top plateaus under-equilibrated and a faster sweep, spending
+less time contaminated there, read a *lower* Tg — an inverted rate dependence. The sweep now
+starts from the gated melt hold and runs the whole descent to `tg_t_low_K`, so both returned to
+the fast rate. (PEST then carried the key with an unrecognised `"highest_rate"` value until it
+was retired — see `tests/test_polymer_rules_schema.py`'s `tg_slope_gate_fallback` guard, which
+records that history.) There is no reheat probe and no mid-ramp
+waypoint to select between: the staircase's first point is the cell the melt gate certified.
+
+### Sweep
 
 | Field | Value |
 |-------|-------|
 | Units | K (MD value) |
-| Source log | `thermal/tg_sweep_r<rate>/tg_sweep.log` (one per rate in `tg_rates_K_per_ns`, e.g. [25, 50, 100]) |
+| Source log | `thermal/tg_sweep/tg_sweep.log` |
 | Tool | `extract_thermal` |
-| Method | Stepped cooling sweep from high T to ≤200 K; bilinear fit of density vs T; breakpoint = Tg_MD at that rate. CTE (α_g, α_r) and ΔCp come from the same fit's branch slopes |
+| Method | Stepped cooling sweep from high T to ≤200 K; bilinear fit of density vs T; breakpoint = Tg_MD. CTE (α_g, α_r) and ΔCp come from the same fit's branch slopes |
 | Fit quality | PASS / WARN / ABORT; R² and segment slopes reported |
-| Outputs | per-rate `tg_summary.json`, `tg_density_vs_T.png` |
-
-### Multirate aggregation → DSC-equivalent Tg
-
-| Field | Value |
-|-------|-------|
-| Tool | `extract_tg_multirate` |
-| Method | Fit Tg vs ln(cooling rate); extrapolate to `dsc_equiv_rate_K_per_ns` (~1.67e-10 K/ns) → headline DSC-equivalent Tg |
-| Inputs | This run's three per-rate (rate, Tg) pairs, filtered to fit_quality ≥ ACCEPTABLE (single-run protocol — no cross-run pooling) |
-| Slope gate (glassy) | Tg must rise with rate (slope > 0); a non-positive slope marks the per-rate data contaminated → re-run with a new seed |
-| Rubbery regime | When T_workflow ≫ Tg the rate-dependence is ~flat: `is_flat_rate_regime=True`, `tg_method=flat_rate_mean` reports the mean across rates (not an extrapolation), slope gate exempted |
-| Validation | `experimental_tg_K` from polymer_rules.json; MD Tg overestimates experiment by ~80–120 K (fast cooling rate artifact — Patrone 2016, Webb 2024) |
-| Outputs | `tg_multirate_result.json` |
-| Side effect | `is_glassy` selects the bulk modulus path — decided from the **highest-rate** MD Tg (`is_glassy = Tg_highest_rate > 300`); on a degenerate highest-rate fit it falls back to `experimental_tg_K > 300` |
+| Outputs | `thermal.json`, `tg_density_vs_T.png` |
+| Validation | `experimental_tg_K` from polymer_rules.json, graded strictly (no offset in the band); MD Tg overestimates experiment by ~80–120 K (fast cooling rate artifact — Patrone 2016, Webb 2024), reported as an annotation only (`tg_offset_corrected_K`), never folded into PASS/FAIL |
+| Side effect | `is_glassy` is decided from this sweep's MD Tg (`is_glassy = Tg_MD > 300`) when it ran at the class's highest configured rate; a degenerate fit or a deliberately slowest-rate sweep (PKTN, PSFO) falls back to `experimental_tg_K > 300` |
 
 **If Tg is not requested:** `is_glassy` is inferred from `experimental_tg_K` in polymer_rules.json (glassy_hint). Tg_K is reported as N/A.
 
@@ -69,12 +72,12 @@ Fit parameters: B0 (GPa) = K_T, B0' (pressure derivative), V0 (reference volume 
 
 | Field | Value |
 |-------|-------|
-| Worker | murnaghan-worker: `run_bulk_modulus_series` submits N NPT runs at each pressure from `npt_prod300_out.data` (the 300 K cell), then fits |
+| Worker | murnaghan-worker: `run_bulk_modulus_series` submits N NPT runs at each pressure from `cool/npt_final/npt_final_out.data` (the assessment cell), then fits |
 | Tool | `extract_bulk_modulus_murnaghan` |
 | Acceptance | `fit_converged=True`; otherwise fall back to Path C (deformation). `B0_prime` outside [4, 20] is a WARNING annotation only, not a fallback trigger |
 | Cross-check | Volume-fluctuation K, computed inside the same `extract_bulk_modulus_murnaghan` call via its `npt_prod_log` argument — a diagnostic, not the reported value |
 | Method label | `murnaghan` |
-| Outputs | `bulk_modulus_murnaghan.json`, `murnaghan_eos.png` |
+| Outputs | `mechanical.json`, `murnaghan_eos.png` |
 
 ---
 
@@ -86,12 +89,12 @@ Same Murnaghan EOS fit as Path A, run at T>Tg from the melt production cell over
 
 | Field | Value |
 |-------|-------|
-| Worker | murnaghan-worker: `run_bulk_modulus_series` over `bm_pressures_atm` (e.g. [1, 100, 300, 600, 1000] atm) from `npt_production_out.data` |
+| Worker | murnaghan-worker: `run_bulk_modulus_series` over `bm_pressures_atm` (e.g. [1, 100, 300, 600, 1000] atm) from `cool/npt_final/npt_final_out.data` |
 | Tool | `extract_bulk_modulus_murnaghan` |
 | Advantage over fluctuation | Barostat-independent (uses mean V per pressure, not variance); captures EOS nonlinearity |
 | Convergence fallback | If curve_fit fails → linear regression of P vs ln V (method label: `linear_fallback`) |
 | Method label | `murnaghan` |
-| Outputs | `bulk_modulus_murnaghan.json`, `murnaghan_eos.png` |
+| Outputs | `mechanical.json`, `murnaghan_eos.png` |
 
 ---
 
@@ -99,7 +102,7 @@ Same Murnaghan EOS fit as Path A, run at T>Tg from the melt production cell over
 
 Invoked when a Murnaghan fit fails acceptance (`fit_converged=False`).
 
-`extract_bulk_modulus_deform` reads three uniaxial-deformation logs (DEFORM_DIR x/y/z, run sequentially by deform-worker from `npt_prod300_out.data`) and derives the bulk modulus from the stress–strain response.
+`extract_bulk_modulus_deform` reads three uniaxial-deformation logs (DEFORM_DIR x/y/z, run sequentially from `cool/npt_final/npt_final_out.data`) and derives the bulk modulus from the stress–strain response.
 
 | Field | Value |
 |-------|-------|
@@ -122,7 +125,7 @@ K_T = kB·T·<V> / Var(V)
 
 | Field | Value |
 |-------|-------|
-| Source log | `npt_production.log` (no new simulations needed) |
+| Source log | `cool/npt_final/npt_final.log` (no new simulations needed) |
 | Tool | `extract_bulk_modulus` |
 | Caveat | Sensitive to barostat P_DAMP. Cross-checked against `B_def = −dP/d(ln V)` from P vs ln V regression; disagreement >20 % emits a warning |
 | Method label | `fluctuation` |
@@ -134,7 +137,7 @@ K_T = kB·T·<V> / Var(V)
 
 ## Future Tracks (Taxonomy — No Workers Implemented)
 
-These tracks are named for future development. No simulation workers or gen_prompt stages exist yet.
+These tracks are named for future deterministic workflow development and are not implemented yet.
 
 | Track | Properties | Simulation type |
 |-------|-----------|----------------|

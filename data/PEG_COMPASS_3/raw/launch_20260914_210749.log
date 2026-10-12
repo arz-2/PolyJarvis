@@ -1,0 +1,298 @@
+INFO: mpi_ranks not given — derived 1 from hardware_policy[pcff] (engine=kokkos)
+INFO: gpu_ids not given — derived "0" from hardware_policy[pcff]; claim free GPU(s) with orchestration/scripts/hardware_runtime.py
+2026-09-14 21:07:49,736 [LAMMPS-ENGINE] INFO Loaded 196 runs from /home/alexzhao/PolyJarvis/data/_engine/run_state.json
+2026-09-14 21:07:49,777 [LAMMPS-ENGINE] INFO EMC cell job 4737ce39 submitted — class=POXI dp=114
+2026-09-14 21:10:23,796 [LAMMPS-ENGINE] INFO Job 4737ce39 completed in 154.0s
+2026-09-14 21:10:51,940 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work && cat > /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+# PolyJarvis chain 9ec501f1 — auto-generated, do not edit (engine=kokkos)
+set -euo pipefail
+
+CHAIN_ID=9ec501f1
+LMP=/home/alexzhao/lammps-install-kokkos/bin/lmp
+OFFLOAD_FLAGS="-k on g 1 -sf kk -pk kokkos"
+MPI=1
+GPU_IDS=2
+N_GPU=1
+
+# Progress log — one JSON object per line
+PROGRESS=/home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl
+
+log_done()  { echo "{\"stage\":\"$1\",\"status\":\"done\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_fail()  { echo "{\"stage\":\"$1\",\"status\":\"failed\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_start() { echo "{\"stage\":\"$1\",\"status\":\"running\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+
+# Completion sentinel — written by THIS nohup'd script so it survives an
+# MCP-server restart (the in-process chain monitor is only a fast-path).
+mkdir -p /tmp/polyjarvis/sentinels
+SENTINEL=/tmp/polyjarvis/sentinels/done_9ec501f1.json
+PIDFILE=/tmp/polyjarvis/sentinels/pid_9ec501f1
+sentinel_ok()   { echo "{\"run_id\":\"9ec501f1\",\"status\":\"completed\"}" > "$SENTINEL"; }
+sentinel_fail() { echo "{\"run_id\":\"9ec501f1\",\"status\":\"failed\",\"stage\":\"$1\"}" > "$SENTINEL"; }
+
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).
+echo $$ > "$PIDFILE"
+LAMMPS_LAUNCH="env CUDA_VISIBLE_DEVICES=$GPU_IDS $LMP $OFFLOAD_FLAGS"
+
+# --- Stage 1/10: minimize ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/minimize
+cd /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/minimize
+log_start minimize
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/minimize/minimize.in >> /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/minimize/minimize_run.log 2>&1 \
+  && log_done minimize \
+  || { log_fail minimize; sentinel_fail minimize; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"minimize\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Minimization-convergence check (not itself a LAMMPS exit-code failure) ---
+if ! grep -Eq "Stopping criterion.*(tolerance|linesearch alpha is zero)" /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/minimize/minimize_run.log; then
+  log_fail minimize; sentinel_fail minimize_not_converged; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",""\"failed_at\":\"minimize\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1
+fi
+
+# --- Stage 2/10: nvt_warmup ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/nvt_warmup
+cd /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/nvt_warmup
+log_start nvt_warmup
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/nvt_warmup/nvt_warmup.in >> /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/nvt_warmup/nvt_warmup_run.log 2>&1 \
+  && log_done nvt_warmup \
+  || { log_fail nvt_warmup; sentinel_fail nvt_warmup; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"nvt_warmup\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 3/10: npt_densify ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_densify
+cd /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_densify
+log_start npt_densify
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_densify/npt_densify.in >> /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_densify/npt_densify_run.log 2>&1 \
+  && log_done npt_densify \
+  || { log_fail npt_densify; sentinel_fail npt_densify; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"npt_densify\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 4/10: npt_ff_activate ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_ff_activate
+cd /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_ff_activate
+log_start npt_ff_activate
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_ff_activate/npt_ff_activate.in >> /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_ff_activate/npt_ff_activate_run.log 2>&1 \
+  && log_done npt_ff_activate \
+  || { log_fail npt_ff_activate; sentinel_fail npt_ff_activate; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"npt_ff_activate\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 5/10: npt_densify_hold ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_densify_hold
+cd /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_densify_hold
+log_start npt_densify_hold
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_densify_hold/npt_densify_hold.in >> /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_densify_hold/npt_densify_hold_run.log 2>&1 \
+  && log_done npt_densify_hold \
+  || { log_fail npt_densify_hold; sentinel_fail npt_densify_hold; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"npt_densify_hold\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 6/10: anneal_heat ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/anneal_heat
+cd /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/anneal_heat
+log_start anneal_heat
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/anneal_heat/anneal_heat.in >> /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/anneal_heat/anneal_heat_run.log 2>&1 \
+  && log_done anneal_heat \
+  || { log_fail anneal_heat; sentinel_fail anneal_heat; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"anneal_heat\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 7/10: anneal_hold ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/anneal_hold
+cd /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/anneal_hold
+log_start anneal_hold
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/anneal_hold/anneal_hold.in >> /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/anneal_hold/anneal_hold_run.log 2>&1 \
+  && log_done anneal_hold \
+  || { log_fail anneal_hold; sentinel_fail anneal_hold; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"anneal_hold\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 8/10: npt_melt_ramp ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_melt_ramp
+cd /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_melt_ramp
+log_start npt_melt_ramp
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_melt_ramp/npt_melt_ramp.in >> /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_melt_ramp/npt_melt_ramp_run.log 2>&1 \
+  && log_done npt_melt_ramp \
+  || { log_fail npt_melt_ramp; sentinel_fail npt_melt_ramp; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"npt_melt_ramp\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 9/10: nvt_melt_hold ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/nvt_melt_hold
+cd /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/nvt_melt_hold
+log_start nvt_melt_hold
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_melt_hold.in >> /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/nvt_melt_hold/nvt_melt_hold_run.log 2>&1 \
+  && log_done nvt_melt_hold \
+  || { log_fail nvt_melt_hold; sentinel_fail nvt_melt_hold; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"nvt_melt_hold\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 10/10: npt_melt_hold ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_melt_hold
+cd /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_melt_hold
+log_start npt_melt_hold
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold.in >> /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_run.log 2>&1 \
+  && log_done npt_melt_hold \
+  || { log_fail npt_melt_hold; sentinel_fail npt_melt_hold; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"npt_melt_hold\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+echo "{\"stage\":\"__chain__\",\"status\":\"completed\",\"n_stages\":10,\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"
+sentinel_ok
+rm -f "$PIDFILE"
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1.sh > /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1.log 2>&1 </dev/null & disown; echo $!
+2026-09-14 21:11:21,976 [LAMMPS-ENGINE] INFO [9ec501f1] Chain monitor started (polling every 60s)
+[wait] equilibration chain: watching 9ec501f1
+2026-09-14 21:12:21,977 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:13:22,193 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:14:22,410 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:15:22,625 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:16:22,840 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:17:23,060 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:18:23,276 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:19:23,494 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:20:23,720 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:21:23,935 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:22:24,152 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:23:24,371 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:24:24,604 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:25:24,821 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:26:25,036 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:27:25,253 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:28:25,470 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:29:25,685 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:30:25,898 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:31:26,113 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:32:26,334 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:33:26,547 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:34:26,761 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:35:26,980 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:36:27,195 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:37:27,409 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:38:27,626 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:39:27,840 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:40:28,053 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:41:28,270 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:42:28,485 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:43:28,701 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:44:28,922 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:45:29,136 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:46:29,351 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:47:29,567 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:48:29,783 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:49:29,997 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:50:30,215 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:51:30,432 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:52:30,648 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:53:30,862 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:54:31,076 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:55:31,294 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:56:31,516 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:57:31,732 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:58:31,948 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 21:59:32,163 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:00:32,381 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:01:32,597 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:02:32,816 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:03:33,030 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:04:33,249 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:05:33,466 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:06:33,684 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:07:33,901 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:08:34,120 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:09:34,350 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:10:34,574 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:11:34,791 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:12:35,008 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:13:35,225 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:14:35,446 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:15:35,667 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:16:35,882 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:17:36,095 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:18:36,312 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:19:36,536 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:20:36,757 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:21:36,969 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:22:37,190 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:23:37,404 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:24:37,620 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:25:37,840 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:26:38,059 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:27:38,273 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:28:38,491 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:29:38,707 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:30:38,920 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:31:39,134 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:32:39,349 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:33:39,565 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:34:39,780 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:35:39,993 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:36:40,208 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:37:40,443 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:38:40,660 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:39:40,874 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:40:41,092 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:41:41,307 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:42:41,532 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:43:41,752 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:44:41,967 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:45:42,181 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:46:42,399 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:47:42,613 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:48:42,829 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:49:43,041 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:50:43,257 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:51:43,472 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:52:43,687 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:53:43,901 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:54:44,118 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:55:44,349 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:56:44,566 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:57:44,782 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:58:44,995 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 22:59:45,208 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:00:45,421 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:01:45,640 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:02:45,858 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:03:46,073 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:04:46,293 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:05:46,514 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:06:46,730 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:07:46,948 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:08:47,162 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:09:47,378 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:10:47,595 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:11:47,809 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:12:48,028 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:13:48,243 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:14:48,461 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:15:48,673 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:16:48,892 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:17:49,111 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:18:49,326 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:19:49,540 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:20:49,757 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:21:49,977 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:22:50,193 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:23:50,407 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:24:50,623 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:25:50,837 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:26:51,051 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:27:51,266 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:28:51,486 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:29:51,705 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:30:51,926 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:31:52,144 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:32:52,356 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:33:52,574 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:34:52,791 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:35:53,003 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:36:53,215 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:37:53,428 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:38:53,643 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:39:53,858 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:40:54,071 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+2026-09-14 23:41:54,284 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/attempts/equilibration/attempt-0001/work/chain_9ec501f1_progress.jsonl 2>/dev/null || echo ''
+{
+  "status": "escalation_required",
+  "stage": "equilibration",
+  "finding": {
+    "code": "PROCESS_FAILED",
+    "stage": "equilibration",
+    "severity": "blocking",
+    "confidence": "high",
+    "details": {
+      "error": "Equilibration chain did not complete: {'run_id': '9ec501f1', 'status': 'failed', 'stage': 'nvt_melt_hold'}"
+    },
+    "remedy_id": null
+  },
+  "state_path": "/home/alexzhao/PolyJarvis/data/PEG_COMPASS_3/workflow_state.json"
+}

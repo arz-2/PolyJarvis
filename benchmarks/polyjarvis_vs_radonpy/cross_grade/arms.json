@@ -1,0 +1,69 @@
+{
+  "system": "PEG1",
+  "smiles": "*CCO*",
+  "graded_at_K": 300,
+  "windows": {
+    "native": {"width": 2000, "tail_rows": null,
+               "why": "RadonPy's own default: width=2000 thermo rows on the full sampling log."},
+    "matched": {"width": 800, "tail_rows": 2001,
+                "why": "Both arms truncated to their last 2001 rows (2 ns at 1 row/ps), width 800 = the same 40% of the window RadonPy's 2000/5001 uses. PolyJarvis production logs hold 2001 rows, where width 2000 leaves every sma_sd NaN and check_eq passes vacuously. A shorter rolling mean fluctuates more, so the matched window is stricter than native on BOTH arms equally."}
+  },
+  "path_roots": {
+    "repo:": "this checkout",
+    "v1:": "$POLYJARVIS_V1_ROOT, default ~/PolyJarvis -- the round-1 checkout that holds the PEG runs"
+  },
+  "radonpy_arms": [
+    {
+      "id": "radonpy_stock",
+      "field": "gaff2_mod", "charges": "RESP (psi4, wB97M-D3BJ)", "nchain": 10,
+      "atoms_note": "10 chains x 1002 atoms", "cutoff_A": 12.0, "shake": true,
+      "retries": 0,
+      "log": "repo:benchmarks/polyjarvis_vs_radonpy/preserved_artifacts/PEG1/radonpy/PEG1/eq3.log",
+      "stored_conv_csv": "repo:benchmarks/polyjarvis_vs_radonpy/preserved_artifacts/PEG1/radonpy/PEG1/analyze/eq_conv_data.csv",
+      "stored_prop_csv": "repo:benchmarks/polyjarvis_vs_radonpy/preserved_artifacts/PEG1/radonpy/PEG1/analyze/eq_prop_data.csv"
+    },
+    {
+      "id": "radonpy_retry9",
+      "field": "gaff2_mod", "charges": "RESP (psi4, wB97M-D3BJ)", "nchain": 10,
+      "atoms_note": "10 chains x 1002 atoms", "cutoff_A": 12.0, "shake": true,
+      "retries": 9,
+      "log": "repo:benchmarks/polyjarvis_vs_radonpy/preserved_artifacts/PEG1_retry9/radonpy/PEG1_retry9/eq12.log",
+      "stored_conv_csv": "repo:benchmarks/polyjarvis_vs_radonpy/preserved_artifacts/PEG1_retry9/radonpy/PEG1_retry9/analyze/eq_conv_data.csv",
+      "stored_prop_csv": "repo:benchmarks/polyjarvis_vs_radonpy/preserved_artifacts/PEG1_retry9/radonpy/PEG1_retry9/analyze/eq_prop_data.csv"
+    }
+  ],
+  "polyjarvis_arms": [
+    {
+      "id": "PEGCMP1", "role": "primary", "field": "compass", "charges": "force-field bond increments",
+      "nchain": 10, "dp": 100, "atoms": 7020, "cutoff_A": 9.5, "shake": false,
+      "backbone_types": [1, 2, 5],
+      "log": "v1:data/PEGCMP1/lammps/equil/npt_production/npt_production.log",
+      "dump": "v1:data/PEGCMP1/lammps/equil/npt_production/npt_production.dump",
+      "data": "v1:data/PEGCMP1/lammps/equil/npt_production/npt_production_out.data"
+    },
+    {
+      "id": "PEGORE1", "role": "primary", "field": "pcff_ore", "charges": "force-field bond increments",
+      "nchain": 10, "dp": 100, "atoms": 7020, "cutoff_A": 9.5, "shake": false,
+      "backbone_types": [1, 4],
+      "log": "v1:data/PEGORE1/lammps/equil/npt_production/npt_production.log",
+      "dump": "v1:data/PEGORE1/lammps/equil/npt_production/npt_production.dump",
+      "data": "v1:data/PEGORE1/lammps/equil/npt_production/npt_production_out.data"
+    },
+    {
+      "id": "PEG2XCMP1", "role": "size check", "field": "compass", "charges": "force-field bond increments",
+      "nchain": 20, "dp": 100, "atoms": 14040, "cutoff_A": 9.5, "shake": false,
+      "backbone_types": [1, 2, 5],
+      "log": "v1:data/PEG2XCMP1/lammps/equil/npt_production/npt_production.log",
+      "dump": "v1:data/PEG2XCMP1/lammps/equil/npt_production/npt_production.dump",
+      "data": "v1:data/PEG2XCMP1/lammps/equil/npt_production/npt_production_out.data"
+    },
+    {
+      "id": "PEG2XPCF1", "role": "size check", "field": "pcff", "charges": "force-field bond increments",
+      "nchain": 20, "dp": 100, "atoms": 14040, "cutoff_A": 9.5, "shake": false,
+      "backbone_types": [1, 4],
+      "log": "v1:data/PEG2XPCF1/lammps/equil/npt_production/npt_production.log",
+      "dump": "v1:data/PEG2XPCF1/lammps/equil/npt_production/npt_production.dump",
+      "data": "v1:data/PEG2XPCF1/lammps/equil/npt_production/npt_production_out.data"
+    }
+  ]
+}

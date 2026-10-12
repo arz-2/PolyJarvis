@@ -1,0 +1,186 @@
+{
+  "critique": {
+    "D-01_ff": {
+      "autofilled_choice": "pcff",
+      "verdict": "agrees",
+      "confidence": "high",
+      "reason": "The plan's own D-01_ff evidence explicitly flags this as an open gap: 'no class-specific PCFF MD validation paper for polysulfone has been located.' A fresh search closes that gap. A peer-reviewed MD study (Ahmad et al., Polymers 2021, 10.3390/polym13132199), full-text-verified via PMC, builds polysulfone cells with the COMPASS force field (a Class-II potential of the same lineage/functional form as PCFF) and Ewald electrostatics, citing experimental PSU density 1.24 g/cm3 as its validation target. This converges with two independent Class-II precedents already in the evidence store: a polysulfone/PSMA-blend preprint (COMPASS) and a peer-reviewed PPESK analog study whose authors describe COMPASS itself as 'a typical PCFF type force field.' COMPASS is not a runnable field in this codebase (forcefield.RUNNABLE_FIELDS / ENUM_OVERRIDES['preferred_ff'] has no 'compass' entry per orchestration/scripts/scientific_control.py), so PCFF is the correct available Class-II implementation and no field override is warranted. The plan's own internally-measured -4.0 to -4.3% density deficit and +2-8% Tg overestimate are neither corroborated nor contradicted by anything found here -- these three sources report FF choice and methodology, not a signed simulated-vs-experimental error for PCFF specifically on this chemistry.",
+      "supporting_dois": [
+        "10.3390/polym13132199",
+        "10.21203/rs.3.rs-1109742/v1",
+        "10.1016/j.commatsci.2018.05.039"
+      ],
+      "suggested_override": null
+    }
+  },
+  "dominant_uncertainty": "Force-field/electrostatics choice for PSFO now has convergent literature support (3 independent Class-II/COMPASS studies), but no MD-simulated Tg number for polysulfone itself was found anywhere -- only broad DSC-consensus values (~458 K, out of MD scope) and one paper's mention that annealing occurs 'above Tg' at 508.15 K without stating Tg itself.",
+  "notes": "The sulfone-typing build risk flagged in classification.json (23% EMC trial-build failure, 1.6x baseline) is a separate concern from this force-field literature critique -- it argues for --with-ff-probe at build time, not a force-field family change; none of the sources found here bear on EMC atom-typing coverage.",
+  "polymer_class": "PSFO",
+  "polymer_name": "Polysulfone (PSU / Udel-type bisphenol-A polysulfone, representative member of the PSFO class)",
+  "smiles": "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1",
+  "forcefield": {
+    "recommendation": "pcff",
+    "confidence": "high",
+    "sources": [
+      {
+        "doi": "10.3390/polym13132199",
+        "claim": "Employed the COMPASS force field for all interactions among gas molecules, polymer (polysulfone), and silica filler; simulation density was set at 1.20 g/cm3 against a cited experimental PSF density of 1.24 g/cm3.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true
+      },
+      {
+        "doi": "10.21203/rs.3.rs-1109742/v1",
+        "claim": "MD study of polysulfone (PSU) / polystyrene-co-maleic-anhydride (PSMA) blends used the COMPASS (condensed-phase-optimized molecular potentials for atomistic simulation studies) force field in an amorphous-cell model to compute the Flory-Huggins chi interaction parameter and solubility parameters across blend compositions (including 40% and 60% PSMA), finding predicted miscibility above 400 K. The paper compares its miscibility predictions against an experimental DSC-observed shift in glass transition temperature (Tg) between the individual blend components, but reports no explicit simulated or experimental density/Tg numeric value for pure PSU recoverable from the abstract. doi.org resolves (302 redirect to researchsquare.com); full text 403'd on WebFetch, so this claim rests on the Crossref/Semantic Scholar API abstract record rather than a directly fetched full-text page -- flagged accordingly.",
+        "trust_tier": "preprint",
+        "verified": true,
+        "origin_record_id": "9fc7a63a45e9"
+      },
+      {
+        "doi": "10.1016/j.commatsci.2018.05.039",
+        "claim": "MD study on five novel designed poly(phthalazinone ether sulfone ketone) (PPESK) polymers -- an aromatic ether-sulfone-ketone backbone chemically adjacent to polysulfone/PSFO (shares the diaryl sulfone and diaryl ether linkages) -- used the COMPASS force field (explicitly described by the authors as 'a typical PCFF type force field... proved suitable for polymer and energetic materials') to predict Tg, density, cohesive energy density, solubility parameter, and mechanical moduli (E, K, G, Poisson's ratio) for five newly designed (not previously synthesized) PPESK variants. Predicted Tg values were above 500 K for all five, with the -NH2-substituted variant near 600 K.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "8bb29c7537b6"
+      }
+    ]
+  },
+  "electrostatics": {
+    "recommendation": "pppm",
+    "confidence": "medium",
+    "sources": [
+      {
+        "doi": "10.3390/polym13132199",
+        "claim": "The summation method used to calculate the electrostatic interactions was supported by the Ewald method with an accuracy of 0.001 kcal/mol.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true
+      },
+      {
+        "doi": "10.1021/acsami.3c01307",
+        "claim": "Long-range Coulombic interactions for a PEEK(-CNT) system were computed with a particle-particle particle-mesh (pppm) solver (LJ cutoff 20 A), using PCFF+ intramolecular parameters and MedeA forcefield-assign partial charges -- confirmed by direct fetch of the PMC full-text mirror.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "f098e19bc08f"
+      }
+    ]
+  },
+  "tg_target_K": {
+    "range": null,
+    "confidence": "low",
+    "sources": []
+  },
+  "md_studies": [
+    {
+      "doi": "10.3390/polym13132199",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC8271399/",
+      "title": "A Molecular Simulation Study of Silica/Polysulfone Mixed Matrix Membrane for Mixed Gas Separation",
+      "year": 2021,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "websearch",
+      "force_field": "COMPASS",
+      "force_field_type": "All Atom",
+      "electrostatics": "ewald",
+      "ensemble": "Canonical (NVT) and Isothermal-Isobaric (NPT), Nose-Hoover-Langevin (NHL) thermostat, Andersen barostat; annealing cycles up to 508.15 K (stated to be above PSF's Tg) before equilibrating at production conditions",
+      "T_K": 308.15,
+      "P_atm": 1,
+      "system_type": "nanocomposite",
+      "material_morphology": "bulk",
+      "chain_length_or_mw": null,
+      "number_of_chains": null,
+      "reported_properties": [
+        {
+          "property": "density",
+          "value": 1.24,
+          "unit": "g/cm3"
+        }
+      ],
+      "note": "Silica-filled PSF mixed-matrix-membrane study, not a neat-polymer paper -- the 1.24 g/cm3 figure is the experimental PSF reference density the authors cite to justify their 1.20 g/cm3 initial simulation-cell density, not a final relaxed simulated density; still the strongest direct, full-text-verified confirmation found that COMPASS + Ewald is standard practice for this exact chemistry."
+    },
+    {
+      "doi": "10.21203/rs.3.rs-1109742/v1",
+      "url": "https://doi.org/10.21203/rs.3.rs-1109742/v1",
+      "title": "Molecular Dynamics Simulation of Polysulfone and Polystyrene-co-maleic Anhydride Blends Compatibility: A mesoscopic, Ewald Approach and Experimental Comparison",
+      "year": 2021,
+      "trust_tier": "preprint",
+      "verified": true,
+      "lead_source": "evidence_store",
+      "force_field": "COMPASS",
+      "force_field_type": "All Atom",
+      "electrostatics": null,
+      "ensemble": null,
+      "T_K": null,
+      "P_atm": null,
+      "system_type": "blend",
+      "material_morphology": "bulk",
+      "chain_length_or_mw": null,
+      "number_of_chains": null,
+      "reported_properties": [],
+      "note": "Exact-SMILES match in the evidence store (record 9fc7a63a45e9); DOI verified to resolve but full text 403'd, so the FF claim rests on the Crossref/Semantic Scholar abstract record, and no numeric pure-PSU density/Tg is recoverable from it."
+    },
+    {
+      "doi": "10.1016/j.commatsci.2018.05.039",
+      "url": "https://doi.org/10.1016/j.commatsci.2018.05.039",
+      "title": "Molecular dynamics simulation on the physical properties of the novel designed poly-(phthalazinone ether sulfone ketone) (PPESK)",
+      "year": 2018,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "evidence_store",
+      "force_field": "COMPASS",
+      "force_field_type": "All Atom",
+      "electrostatics": null,
+      "ensemble": null,
+      "T_K": null,
+      "P_atm": null,
+      "system_type": "other",
+      "material_morphology": "bulk",
+      "chain_length_or_mw": null,
+      "number_of_chains": null,
+      "reported_properties": [],
+      "note": "Exact-class match in the evidence store (record 8bb29c7537b6); closest identified aromatic diaryl-sulfone/ether-ketone chemical family to PSFO. Five simulated PPESK variants are novel designs with no prior experimental Tg/density, so this validates COMPASS/PCFF-type internal consistency rather than a signed error against experiment for this chemistry."
+    },
+    {
+      "doi": "10.1016/0032-3861(96)00241-8",
+      "url": "https://doi.org/10.1016/0032-3861(96)00241-8",
+      "title": "Structural effects on free volume distribution in glassy polysulfones: molecular modelling of gas permeability",
+      "year": 1996,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": false,
+      "lead_source": "websearch",
+      "force_field": null,
+      "force_field_type": null,
+      "electrostatics": null,
+      "ensemble": null,
+      "T_K": null,
+      "P_atm": null,
+      "system_type": "neat_polymer",
+      "material_morphology": "bulk",
+      "chain_length_or_mw": null,
+      "number_of_chains": null,
+      "reported_properties": [],
+      "note": "DOI confirmed real via Semantic Scholar (title matches exactly) but content is fully paywalled -- ScienceDirect and Elsevier linkinghub both 403'd, no abstract available via the API, so no claim from it could be verified. Directly on-chemistry (13 aromatic polysulfones incl. PSU) and worth a follow-up fetch on a future run, but excluded from this run's recommendation per the verify-before-citing rule."
+    },
+    {
+      "doi": "10.1039/D0RA05836J",
+      "url": "https://pubs.rsc.org/ra/article/10/54/32370-32392/702734",
+      "title": "Physical property and gas transport studies of ultrathin polysulfone membrane from 298.15 to 328.15 K and 2 to 50 bar: atomistic molecular simulation and empirical modelling",
+      "year": 2020,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": false,
+      "lead_source": "websearch",
+      "force_field": "COMPASS",
+      "force_field_type": null,
+      "electrostatics": null,
+      "ensemble": null,
+      "T_K": null,
+      "P_atm": null,
+      "system_type": "thin_film",
+      "material_morphology": "confined_polymer",
+      "chain_length_or_mw": null,
+      "number_of_chains": null,
+      "reported_properties": [],
+      "note": "RSC Advances full text 403'd on WebFetch; only a WebSearch AI-generated summary states COMPASS was chosen because it 'has been reported to be able to generate a PSF membrane that exhibits physical properties with close agreement to experimental values.' Not a direct-fetch quote, so kept unverified; also an ultrathin/confined-film study, not a bulk cell, so would need flagging even if verified."
+    }
+  ],
+  "generated_at": "2026-09-11T20:50:47.780999+00:00",
+  "plan_reviewed": "/home/alexzhao/PolyJarvis/data/PSU_1/raw/run_plan.json"
+}

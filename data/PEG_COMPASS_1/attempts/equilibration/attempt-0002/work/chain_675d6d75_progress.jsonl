@@ -1,0 +1,17 @@
+{"stage":"minimize","status":"running","ts":"2026-09-14T22:12:42-04:00"}
+{"stage":"minimize","status":"done","ts":"2026-09-14T22:13:04-04:00"}
+{"stage":"nvt_warmup","status":"running","ts":"2026-09-14T22:13:04-04:00"}
+{"stage":"nvt_warmup","status":"done","ts":"2026-09-14T22:15:31-04:00"}
+{"stage":"npt_densify","status":"running","ts":"2026-09-14T22:15:31-04:00"}
+{"stage":"npt_densify","status":"done","ts":"2026-09-14T22:22:25-04:00"}
+{"stage":"npt_ff_activate","status":"running","ts":"2026-09-14T22:22:25-04:00"}
+{"stage":"npt_ff_activate","status":"done","ts":"2026-09-14T22:25:46-04:00"}
+{"stage":"npt_densify_hold","status":"running","ts":"2026-09-14T22:25:46-04:00"}
+{"stage":"npt_densify_hold","status":"done","ts":"2026-09-14T22:42:14-04:00"}
+{"stage":"anneal_heat","status":"running","ts":"2026-09-14T22:42:14-04:00"}
+{"stage":"anneal_heat","status":"done","ts":"2026-09-14T23:10:21-04:00"}
+{"stage":"anneal_hold","status":"running","ts":"2026-09-14T23:10:21-04:00"}
+{"stage":"anneal_hold","status":"done","ts":"2026-09-14T23:40:01-04:00"}
+{"stage":"npt_melt_ramp","status":"running","ts":"2026-09-14T23:40:01-04:00"}
+{"stage":"npt_melt_ramp","status":"failed","ts":"2026-09-14T23:50:06-04:00"}
+{"stage":"__chain__","status":"failed","failed_at":"npt_melt_ramp","ts":"2026-09-14T23:50:06-04:00"}

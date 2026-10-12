@@ -1,0 +1,89 @@
+{
+ "campaign": "tg_sensitivity",
+ "anchor": "PE_1",
+ "machine": "A800 host (this box)",
+ "recorded": "2026-09-14",
+ "baseline": {
+  "run": "PE_1",
+  "tg_rate_K_per_ns": 40,
+  "tg_t_step_K": 20,
+  "Tg_K": 234.2,
+  "tg_uncertainty_K": 13.3,
+  "fit_quality": "EXCELLENT"
+ },
+ "legs": {
+  "TGS_PE_1_L1_r20": {
+   "axis": "rate (also dT=20 grid member)",
+   "tg_rate_K_per_ns": 20,
+   "tg_t_step_K": 20,
+   "Tg_K": 213.4,
+   "tg_uncertainty_K": 13.2,
+   "dTg_vs_PE_1_K": -20.8,
+   "fit_quality": "EXCELLENT",
+   "r_squared": 0.9977,
+   "tg_gate_verdict": "TG_REPORTABLE",
+   "wall_clock_h_engine_utc": 1.83,
+   "extensions_used": 0,
+   "partial_final_step_K": 10,
+   "n_T_steps_p2_flag": 0,
+   "n_T_steps_rg_cv_flag": 0
+  },
+  "TGS_PE_1_L2_r10": {
+   "axis": "rate",
+   "tg_rate_K_per_ns": 10,
+   "tg_t_step_K": 20,
+   "Tg_K": 223.1,
+   "tg_uncertainty_K": 19.7,
+   "dTg_vs_PE_1_K": -11.1,
+   "fit_quality": "EXCELLENT",
+   "r_squared": 0.9963,
+   "tg_gate_verdict": "TG_REPORTABLE",
+   "wall_clock_h_engine_utc": 3.59,
+   "extensions_used": 0,
+   "partial_final_step_K": 10,
+   "n_T_steps_p2_flag": 0,
+   "n_T_steps_rg_cv_flag": 0
+  },
+  "TGS_PE_1_L4_dT10": {
+   "axis": "t_grid",
+   "tg_rate_K_per_ns": 20,
+   "tg_t_step_K": 10,
+   "Tg_K": 253.0,
+   "tg_uncertainty_K": 10.7,
+   "dTg_vs_PE_1_K": 18.8,
+   "fit_quality": "EXCELLENT",
+   "r_squared": 0.9972,
+   "tg_gate_verdict": "TG_REPORTABLE",
+   "wall_clock_h_engine_utc": 1.94,
+   "extensions_used": 0,
+   "partial_final_step_K": null,
+   "n_T_steps_p2_flag": 0,
+   "n_T_steps_rg_cv_flag": 1
+  },
+  "TGS_PE_1_L5_dT40": {
+   "axis": "t_grid",
+   "tg_rate_K_per_ns": 20,
+   "tg_t_step_K": 40,
+   "Tg_K": 208.4,
+   "tg_uncertainty_K": 19.1,
+   "dTg_vs_PE_1_K": -25.8,
+   "fit_quality": "EXCELLENT",
+   "r_squared": 0.9975,
+   "tg_gate_verdict": "TG_REPORTABLE",
+   "wall_clock_h_engine_utc": 1.94,
+   "extensions_used": 0,
+   "partial_final_step_K": 10,
+   "n_T_steps_p2_flag": 0,
+   "n_T_steps_rg_cv_flag": 0
+  }
+ },
+ "no_verdict": "Deltas only. The predeclared rule compares |dTg| to the POOLED within-system SD across all completed stereo_r2 replicates, which is not yet available.",
+ "notes": [
+  "L2 at PHYC's 10 K/ns floor raised no P2 ordering flag (n_T_steps_p2_flag=0): it measured Tg, not ordering.",
+  "L4 raised n_T_steps_rg_cv_flag on one temperature step.",
+  "Actual step totals on the grid axis are 11.5 / 12.0 / 13.0 M for dT = 10/20/40 (inclusive window plus the appended 10 K partial step), not the README's identical 12 M.",
+  "Legs forked PE_1's accepted melt cell in place; every first deck read data/PE_1/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data.",
+  "Leg seeds differ from PE_1's at runtime (derived from run_name) but are inert: no tg_step deck contains a velocity command.",
+  "Wall-clock ran 0.9-1.05x priced on this host, not the 1.7x measured on the other machine."
+ ]
+}

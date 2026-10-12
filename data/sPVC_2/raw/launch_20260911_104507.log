@@ -1,0 +1,159 @@
+INFO: mpi_ranks not given — derived 1 from hardware_policy[pcff] (engine=kokkos)
+INFO: gpu_ids not given — derived "0" from hardware_policy[pcff]; claim free GPU(s) with orchestration/scripts/hardware_runtime.py
+/home/arz2/PolyJarvis_v2/mcp-servers/.venv/lib/python3.12/site-packages/pydantic_settings/sources/utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+  warnings.warn(
+2026-09-11 10:45:08,685 [LAMMPS-ENGINE] INFO Loaded 193 runs from /home/arz2/PolyJarvis_v2/data/_engine/run_state.json
+2026-09-11 10:45:38,997 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work && cat > /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+# PolyJarvis chain c55032ab — auto-generated, do not edit (engine=kokkos)
+set -euo pipefail
+
+CHAIN_ID=c55032ab
+LMP=/home/arz2/lammps-install-kokkos/bin/lmp
+OFFLOAD_FLAGS="-k on g 1 -sf kk -pk kokkos"
+MPI=1
+GPU_IDS=2
+N_GPU=1
+
+# Progress log — one JSON object per line
+PROGRESS=/home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl
+
+log_done()  { echo "{\"stage\":\"$1\",\"status\":\"done\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_fail()  { echo "{\"stage\":\"$1\",\"status\":\"failed\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_start() { echo "{\"stage\":\"$1\",\"status\":\"running\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+
+# Completion sentinel — written by THIS nohup'd script so it survives an
+# MCP-server restart (the in-process chain monitor is only a fast-path).
+mkdir -p /tmp/polyjarvis/sentinels
+SENTINEL=/tmp/polyjarvis/sentinels/done_c55032ab.json
+PIDFILE=/tmp/polyjarvis/sentinels/pid_c55032ab
+sentinel_ok()   { echo "{\"run_id\":\"c55032ab\",\"status\":\"completed\"}" > "$SENTINEL"; }
+sentinel_fail() { echo "{\"run_id\":\"c55032ab\",\"status\":\"failed\",\"stage\":\"$1\"}" > "$SENTINEL"; }
+
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).
+echo $$ > "$PIDFILE"
+LAMMPS_LAUNCH="env CUDA_VISIBLE_DEVICES=$GPU_IDS $LMP $OFFLOAD_FLAGS"
+
+# --- Stage 1/12: cool_block_01 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_01
+cd /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_01
+log_start cool_block_01
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_01/cool_block_01.in >> /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_01/cool_block_01_run.log 2>&1 \
+  && log_done cool_block_01 \
+  || { log_fail cool_block_01; sentinel_fail cool_block_01; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_01\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 2/12: cool_block_02 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_02
+cd /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_02
+log_start cool_block_02
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_02/cool_block_02.in >> /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_02/cool_block_02_run.log 2>&1 \
+  && log_done cool_block_02 \
+  || { log_fail cool_block_02; sentinel_fail cool_block_02; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_02\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 3/12: cool_block_03 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_03
+cd /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_03
+log_start cool_block_03
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_03/cool_block_03.in >> /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_03/cool_block_03_run.log 2>&1 \
+  && log_done cool_block_03 \
+  || { log_fail cool_block_03; sentinel_fail cool_block_03; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_03\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 4/12: cool_block_04 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_04
+cd /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_04
+log_start cool_block_04
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_04/cool_block_04.in >> /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_04/cool_block_04_run.log 2>&1 \
+  && log_done cool_block_04 \
+  || { log_fail cool_block_04; sentinel_fail cool_block_04; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_04\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 5/12: cool_block_05 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_05
+cd /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_05
+log_start cool_block_05
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_05/cool_block_05.in >> /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_05/cool_block_05_run.log 2>&1 \
+  && log_done cool_block_05 \
+  || { log_fail cool_block_05; sentinel_fail cool_block_05; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_05\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 6/12: cool_block_06 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_06
+cd /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_06
+log_start cool_block_06
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_06/cool_block_06.in >> /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_06/cool_block_06_run.log 2>&1 \
+  && log_done cool_block_06 \
+  || { log_fail cool_block_06; sentinel_fail cool_block_06; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_06\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 7/12: cool_block_07 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_07
+cd /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_07
+log_start cool_block_07
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_07/cool_block_07.in >> /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_07/cool_block_07_run.log 2>&1 \
+  && log_done cool_block_07 \
+  || { log_fail cool_block_07; sentinel_fail cool_block_07; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_07\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 8/12: cool_block_08 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_08
+cd /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_08
+log_start cool_block_08
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_08/cool_block_08.in >> /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_08/cool_block_08_run.log 2>&1 \
+  && log_done cool_block_08 \
+  || { log_fail cool_block_08; sentinel_fail cool_block_08; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_08\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 9/12: cool_block_09 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_09
+cd /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_09
+log_start cool_block_09
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_09/cool_block_09.in >> /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_09/cool_block_09_run.log 2>&1 \
+  && log_done cool_block_09 \
+  || { log_fail cool_block_09; sentinel_fail cool_block_09; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_09\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 10/12: cool_block_10 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_10
+cd /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_10
+log_start cool_block_10
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_10/cool_block_10.in >> /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_10/cool_block_10_run.log 2>&1 \
+  && log_done cool_block_10 \
+  || { log_fail cool_block_10; sentinel_fail cool_block_10; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_10\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 11/12: cool_block_11 ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_11
+cd /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_11
+log_start cool_block_11
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_11/cool_block_11.in >> /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/cool_block_11/cool_block_11_run.log 2>&1 \
+  && log_done cool_block_11 \
+  || { log_fail cool_block_11; sentinel_fail cool_block_11; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"cool_block_11\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+# --- Stage 12/12: npt_final ---
+mkdir -p /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/npt_final
+cd /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/npt_final
+log_start npt_final
+$LAMMPS_LAUNCH -in /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/npt_final/npt_final.in >> /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/npt_final/npt_final_run.log 2>&1 \
+  && log_done npt_final \
+  || { log_fail npt_final; sentinel_fail npt_final; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"npt_final\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+echo "{\"stage\":\"__chain__\",\"status\":\"completed\",\"n_stages\":12,\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"
+sentinel_ok
+rm -f "$PIDFILE"
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab.sh > /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab.log 2>&1 </dev/null & disown; echo $!
+2026-09-11 10:46:09,086 [LAMMPS-ENGINE] INFO [c55032ab] Chain monitor started (polling every 60s)
+[wait] cooling chain: watching c55032ab
+2026-09-11 10:47:09,086 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''
+2026-09-11 10:48:09,352 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''
+2026-09-11 10:49:09,623 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''
+2026-09-11 10:50:09,892 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''
+2026-09-11 10:51:10,158 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''
+2026-09-11 10:52:10,476 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''
+2026-09-11 10:53:10,730 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''
+2026-09-11 10:54:10,996 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''
+2026-09-11 10:55:11,269 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''
+2026-09-11 10:56:11,538 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''
+2026-09-11 10:57:11,811 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''
+2026-09-11 10:58:12,078 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''
+2026-09-11 10:59:12,341 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''
+2026-09-11 11:00:12,608 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''
+2026-09-11 11:01:12,873 [LAMMPS-ENGINE] INFO Running: tail -5 /home/arz2/PolyJarvis_v2/data/sPVC_2/attempts/cooling/attempt-0002/work/chain_c55032ab_progress.jsonl 2>/dev/null || echo ''

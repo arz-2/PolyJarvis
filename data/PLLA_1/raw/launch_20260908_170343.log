@@ -1,0 +1,21 @@
+INFO: mpi_ranks not given — derived 1 from hardware_policy[pcff] (engine=kokkos)
+INFO: gpu_ids not given — derived "0" from hardware_policy[pcff]; claim free GPU(s) with orchestration/scripts/hardware_runtime.py
+Traceback (most recent call last):
+  File "/home/arz2/PolyJarvis_v2/orchestration/scripts/agent_api.py", line 167, in <module>
+    main()
+  File "/home/arz2/PolyJarvis_v2/orchestration/scripts/agent_api.py", line 149, in main
+    result = resume_campaign(args.run_name, recovery, args.dry_run)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/arz2/PolyJarvis_v2/orchestration/scripts/agent_api.py", line 69, in resume_campaign
+    return run_campaign_workflow(plan_path, dry_run=dry_run, repo_root=repo_root,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/arz2/PolyJarvis_v2/orchestration/scripts/run_campaign.py", line 2452, in run_campaign_workflow
+    lammps = _load_server_module("lammps_engine_server", LAMMPS_ENGINE_DIR / "server.py",
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/arz2/PolyJarvis_v2/orchestration/scripts/run_campaign.py", line 99, in _load_server_module
+    spec.loader.exec_module(mod)
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/server.py", line 61, in <module>
+    from mcp.server.fastmcp import FastMCP
+ModuleNotFoundError: No module named 'mcp'

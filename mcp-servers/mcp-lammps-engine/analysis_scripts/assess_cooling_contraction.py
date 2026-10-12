@@ -1,38 +1,36 @@
 #!/usr/bin/env python3
 """
-assess_cooling_contraction.py — melt-vs-glass density decomposition for the equil gate.
+assess_cooling_contraction.py — self-consistency check for melt-to-glass cooling.
 
-A converged 300 K density tells you the cell stopped moving — NOT that it stopped at the
-right value. A kinetically trapped (under-annealed) glass converges at a too-low density
-because free volume is frozen in during cooling. This script separates the two failure
-modes the convergence checks cannot:
+A converged density tells you the cell stopped moving — NOT that it stopped at a
+physically reasonable value. A kinetically trapped (under-annealed) glass converges at a
+too-low density because free volume is frozen in during cooling. This script detects that
+purely from the run's OWN data: does the observed melt-to-glass density contraction match
+what the system's own thermal-expansion coefficients predict?
 
-    glass-density deficit  =  melt-stage deficit  +  cooling-stage deficit
+    contraction_shortfall = actual_contraction / expected_contraction
 
-  - melt-stage deficit  : the equilibrated MELT density (at T_equil, chains mobile) is
-                          already low vs experiment-extrapolated melt. Mechanism is force-field
-                          underbinding OR melt-stage under-annealing (NkepsuMbitou-style 10-TAC
-                          melt annealing fixes the latter). NOT fixed by re-cooling.
-  - cooling-stage deficit: the melt is fine but the glass gained less density on cooling than
-                          the system's own thermal expansion predicts -> free volume frozen in
-                          = under-annealed at the COOLING stage. Fixed by slower re-cool /
-                          longer sub-Tg anneal (re-melt + slow re-cool), NOT by NPT-at-300K EXTEND.
+where actual_contraction = rho_glass / rho_melt and expected_contraction is the volumetric
+contraction implied by cooling from T_equil through Tg to final_T_K along alpha_glass (below Tg)
+and alpha_melt (above Tg). shortfall < 1 means the cell densified less on cooling than its
+own thermal-expansion physics predicts -- i.e. free volume got frozen in.
 
-The verdict ROUTES THE REMEDY; the hard pass/fail stays on the absolute glass-vs-experiment
-density (caller's job). The alpha-based expected contraction is only a routing heuristic and
-is flagged unreliable for large cooling spans (e.g. PEEK, 474 K).
+This is deliberately NOT a comparison to any experimental/curated density or thermal-
+expansion value -- a novel system may have neither. alpha_glass/alpha_melt default to
+literature-typical-polymer constants (not specific to any one material) and the production
+caller never overrides them from a class-curated value, so every system is assessed the
+same way regardless of what (if anything) is known about it.
 
 Usage:
     python assess_cooling_contraction.py \
-        --melt_data  /path/npt_production_out.data \
-        --glass_data /path/npt_prod300_out.data \
-        --exp_density_gcm3 1.19 --tg_K 378 --t_equil_K 550 \
-        [--alpha_glass 2.5e-4] [--alpha_melt 6e-4] \
-        [--band_pct 5.0]
+        --melt_data  /path/equil/npt_melt_hold/npt_melt_hold_out.data \
+        --glass_data /path/cool/npt_final/npt_final_out.data \
+        --tg_K 378 --t_equil_K 550 \
+        [--alpha_glass 2.5e-4] [--alpha_melt 6e-4]
 
 Emits JSON to stdout: rho_melt, rho_glass, expected_contraction, actual_contraction,
-contraction_shortfall, melt_density_gap_pct, glass_density_gap_pct, under_annealed_cooling,
-verdict, remedy, extrapolation_reliable, markdown.
+contraction_shortfall, under_annealed_cooling, verdict, remedy, extrapolation_reliable,
+markdown.
 """
 
 import argparse
@@ -115,101 +113,98 @@ def density_from_data(path):
     return M / (NA * V)
 
 
-def assess(rho_melt, rho_glass, exp_density, tg_K, t_equil_K,
-           alpha_glass=2.5e-4, alpha_melt=6e-4, band_pct=5.0):
-    """Decompose the glass-density deficit and route a remedy. Pure function (testable)."""
-    out = {
-        'rho_melt': rho_melt, 'rho_glass': rho_glass, 'exp_density_gcm3': exp_density,
-        'tg_K': tg_K, 't_equil_K': t_equil_K,
-    }
+def assess(rho_melt, rho_glass, tg_K, t_equil_K, alpha_glass=2.5e-4, alpha_melt=6e-4,
+           final_T_K=300.0):
+    """Self-consistency check: does the observed melt->glass contraction match the system's
+    own thermal-expansion prediction? Pure function (testable). Never reads or needs an
+    experimental/curated reference value -- see module docstring."""
+    out = {'rho_melt': rho_melt, 'rho_glass': rho_glass, 'tg_K': tg_K, 't_equil_K': t_equil_K,
+           'final_T_K': final_T_K}
     if rho_glass is None:
         out['verdict'] = 'INSUFFICIENT_DATA'
-        out['remedy'] = 'glass-state density (300 K) not found; cannot assess.'
+        out['remedy'] = f'glass-state density ({final_T_K:g} K) not found; cannot assess.'
         return out
 
-    glass_gap = (rho_glass / exp_density - 1.0) * 100.0
-    out['glass_density_gap_pct'] = round(glass_gap, 2)
-
-    # Rubbery case: T_equil <= Tg means 300 K is at/above the production T (no glass).
-    # There is no cooling stage to under-anneal; the 300 K density is an equilibrium property.
-    if t_equil_K is None or tg_K is None or tg_K <= 300.0:
+    # Rubbery case: Tg at or below the ASSESSMENT temperature means the cell is never a glass
+    # at the temperature it is graded at, so there is no cooling stage to under-anneal and
+    # nothing self-referentially checkable. final_T_K, not a hardcoded 300: 300 K is only the
+    # default assessment temperature, and comparing against it would call a 350 K-assessed
+    # rubbery cell glassy (the same trap stage_params._regime documents).
+    if t_equil_K is None or tg_K is None or tg_K <= final_T_K:
         out['regime'] = 'rubbery_or_equilibrium'
-        out['verdict'] = 'OK' if glass_gap >= -band_pct else 'MELT_STAGE_DEFICIT'
-        out['remedy'] = ('within band' if glass_gap >= -band_pct else
-                         'equilibrium density low: force-field underbinding OR melt-stage '
-                         'under-annealing. No cooling stage. Probe with a heavy melt anneal '
-                         '(NkepsuMbitou 10-TAC); if it plateaus low, it is FF.')
+        out['verdict'] = 'OK'
+        out['remedy'] = 'no cooling stage to assess (rubbery/equilibrium regime).'
         out['under_annealed_cooling'] = False
         return out
 
-    # Expected volumetric contraction V(T_equil)/V(300) along the system's own thermal path:
-    # glassy segment (300 -> Tg) at alpha_glass, melt segment (Tg -> T_equil) at alpha_melt.
-    expected_contraction = 1.0 + alpha_glass * (tg_K - 300.0) + alpha_melt * (t_equil_K - tg_K)
-    exp_melt = exp_density / expected_contraction
-    span = t_equil_K - 300.0
+    if not rho_melt:
+        out['verdict'] = 'OK'
+        out['remedy'] = 'melt-state density not available; nothing to diagnose without both endpoints.'
+        out['under_annealed_cooling'] = False
+        return out
+
+    # Expected volumetric contraction V(T_equil)/V(final_T_K) along the system's own thermal
+    # path: glassy segment (final_T_K -> Tg) at alpha_glass, melt segment (Tg -> T_equil) at
+    # alpha_melt. Both endpoints are the temperatures the two structures were actually written
+    # at -- rho_glass comes from npt_final, which runs at final_T_K, not at 300 K.
+    #
+    # ALPHA CALIBRATION. alpha_glass=2.5e-4 / alpha_melt=6e-4 are literature-typical amorphous
+    # polymer volumetric expansivities, deliberately generic (a novel system has no curated
+    # value, and this check must never consult an experimental one). The verdict is genuinely
+    # sensitive to them: +-1e-4 on alpha_melt over a 300 K melt span moves the shortfall by
+    # ~3%, which is the whole width of the 0.97 threshold. So the threshold cannot be tightened
+    # without better alphas, and `extrapolation_reliable` below is what keeps a long-span
+    # verdict honest.
+    #
+    # The run measures its own alpha_glass/alpha_melt in the thermal stage
+    # (extract_thermal's cte_glassy_per_K / cte_rubbery_per_K), which is the natural long-term
+    # source -- but NOT yet usable. Across the 8 archived runs that have them, cte_rubbery lands
+    # at 2.8-4.7e-4 against a literature range of ~5-7e-4, biased low in exactly the direction
+    # the pre-2026-09-01 cold-start Tg sweep would bias it (top plateaus read too dense ->
+    # flattened rubbery branch). Substituting them today un-flags 13 of 16 archived runs that an
+    # independent investigation had already diagnosed as genuinely under-annealed (melt density
+    # correct, glass 4.5-6.2% low) -- circular self-exoneration, using a contaminated
+    # measurement to excuse the contamination.
+    #
+    # PREDICTION, and the test that unlocks this: after the melt-start sweep (2026-09-01), a
+    # fresh PEEK/PSU cte_rubbery should rise from ~3.9/4.7e-4 toward ~5-6e-4. That one number
+    # jointly validates the melt-start fix and these defaults, and only then should the
+    # per-run alphas replace them here.
+    expected_contraction = 1.0 + alpha_glass * (tg_K - final_T_K) + alpha_melt * (t_equil_K - tg_K)
+    actual_contraction = rho_glass / rho_melt
+    shortfall = actual_contraction / expected_contraction  # <1 => under-contracted on cooling
+    span = t_equil_K - final_T_K
     reliable = span < 300.0  # alpha-extrapolation degrades over large cooling spans
 
     out['expected_contraction'] = round(expected_contraction, 4)
-    out['exp_extrapolated_melt_gcm3'] = round(exp_melt, 4)
+    out['actual_contraction'] = round(actual_contraction, 4)
+    out['contraction_shortfall'] = round(shortfall, 4)
     out['extrapolation_reliable'] = reliable
 
-    if rho_melt:
-        melt_gap = (rho_melt / exp_melt - 1.0) * 100.0
-        actual_contraction = rho_glass / rho_melt
-        shortfall = actual_contraction / expected_contraction  # <1 => under-contracted on cooling
-        out['melt_density_gap_pct'] = round(melt_gap, 2)
-        out['actual_contraction'] = round(actual_contraction, 4)
-        out['contraction_shortfall'] = round(shortfall, 4)
-    else:
-        melt_gap = None
-        shortfall = None
-        out['melt_density_gap_pct'] = None
-
-    # --- verdict / remedy routing ---
-    if glass_gap >= -band_pct:
-        out['verdict'] = 'OK'
-        out['remedy'] = 'glass density within band; no action.'
-        out['under_annealed_cooling'] = False
-    elif melt_gap is not None and melt_gap > -1.5 and shortfall is not None and shortfall < 0.97:
-        # melt density is right, but the cell under-contracted on cooling -> trapped free volume
+    if shortfall < 0.97:
         out['verdict'] = 'UNDER_ANNEALED_COOLING'
-        out['remedy'] = ('Melt density matches experiment but the cell gained too little density '
-                         'on cooling (free volume frozen in). REMEDY: re-melt + slow re-cool '
-                         '(reheat >Tg, re-equilibrate, cool at a lower rate / more anneal cycles). '
-                         'Do NOT EXTEND at 300 K — a glass cannot densify below Tg.')
+        out['remedy'] = ('The cell gained too little density on cooling relative to its own '
+                         'thermal-expansion prediction (free volume frozen in). REMEDY: re-melt '
+                         '+ slow re-cool (reheat >Tg, re-equilibrate, cool at a lower rate / more '
+                         f'anneal cycles). Do NOT EXTEND at {final_T_K:g} K — a glass cannot '
+                         'densify below Tg.')
         out['under_annealed_cooling'] = True
-    elif melt_gap is not None and melt_gap <= -1.5:
-        out['verdict'] = 'MELT_STAGE_DEFICIT'
-        out['remedy'] = ('Deficit is in the equilibrated melt (low melt density), not the cooling '
-                         'stage. Mechanism is force-field underbinding OR melt-stage under-annealing '
-                         '— not separable here. Probe with a heavy melt anneal (NkepsuMbitou 10-TAC '
-                         'from low density); if melt density plateaus low it is FF, else it was '
-                         'under-annealed. Re-cooling will NOT fix it.')
-        out['under_annealed_cooling'] = False
     else:
-        out['verdict'] = 'AMBIGUOUS'
-        out['remedy'] = ('Glass density below band but melt/cooling split is inconclusive '
-                         '(missing melt density or borderline). Recover via re-melt + slow re-cool '
-                         'first; if unchanged, treat as melt-stage/FF.')
+        out['verdict'] = 'OK'
+        out['remedy'] = 'cooling contraction is self-consistent with its own thermal-expansion prediction.'
         out['under_annealed_cooling'] = False
 
     if not reliable:
         out['remedy'] += (f' CAVEAT: cooling span {span:.0f} K is large; the alpha-based '
-                          'expected contraction is unreliable here — treat the melt/cooling split '
-                          'as indicative, and lean on the absolute glass-vs-exp density as the gate.')
+                          'expected contraction is unreliable here — treat this verdict as indicative.')
     return out
 
 
 def make_markdown(a):
-    g = a.get('glass_density_gap_pct')
-    lines = ['### Cooling-contraction decomposition (under-anneal check)',
-             '',
-             f"- Glass ρ(300 K) gap vs exp: **{g:+.1f}%**" if g is not None else "- Glass ρ: n/a",
-             ]
+    lines = ['### Cooling-contraction self-consistency check', '']
     if a.get('rho_melt') is not None:
-        lines.append(f"- Melt ρ(T_equil)={a['rho_melt']:.4f}, glass ρ(300K)={a['rho_glass']:.4f}")
-    if 'melt_density_gap_pct' in a and a['melt_density_gap_pct'] is not None:
-        lines.append(f"- Melt-density gap vs exp-extrapolated melt: {a['melt_density_gap_pct']:+.1f}%")
+        lines.append(f"- Melt ρ(T_equil)={a['rho_melt']:.4f}, "
+                     f"glass ρ({a.get('final_T_K', 300.0):g}K)={a.get('rho_glass'):.4f}")
     if 'actual_contraction' in a:
         lines.append(f"- Cooling contraction: actual ×{a['actual_contraction']:.3f} vs "
                      f"expected ×{a['expected_contraction']:.3f} "
@@ -220,20 +215,22 @@ def make_markdown(a):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--melt_data', help='npt_production_out.data at T_equil (melt). Optional but needed for the split.')
-    ap.add_argument('--glass_data', required=True, help='npt_prod300_out.data at 300 K (glass).')
+    ap.add_argument('--melt_data', help='npt_melt_hold_out.data at T_melt_hold_K (the gated melt). Optional but needed for the split.')
+    ap.add_argument('--glass_data', required=True,
+                    help='npt_final_out.data at final_T_K (the assessed/glass state).')
+    ap.add_argument('--final_T_K', type=float, default=300.0,
+                    help='Assessment temperature (K) -- where glass_data was written. '
+                         'Default 300 is the default assessment T, not its definition.')
     ap.add_argument('--rho_melt', type=float, help='Override: melt density g/cm^3 (skip --melt_data parse).')
     ap.add_argument('--rho_glass', type=float, help='Override: glass density g/cm^3 (skip --glass_data parse).')
-    ap.add_argument('--melt_log', help='npt_production.log — plateau-averaged melt density. '
+    ap.add_argument('--melt_log', help='npt_melt_hold.log — plateau-averaged melt density. '
                                        'Preferred over --melt_data (single fluctuating frame).')
-    ap.add_argument('--glass_log', help='npt_prod300.log — plateau-averaged glass density. '
+    ap.add_argument('--glass_log', help='npt_final.log — plateau-averaged glass density. '
                                         'Preferred over --glass_data (single fluctuating frame).')
-    ap.add_argument('--exp_density_gcm3', type=float, required=True)
     ap.add_argument('--tg_K', type=float, required=True)
     ap.add_argument('--t_equil_K', type=float, required=True)
     ap.add_argument('--alpha_glass', type=float, default=2.5e-4)
     ap.add_argument('--alpha_melt', type=float, default=6e-4)
-    ap.add_argument('--band_pct', type=float, default=5.0)
     args = ap.parse_args()
 
     # Precedence: explicit override > plateau mean from the stage log > single final frame.
@@ -253,8 +250,8 @@ def main():
     rho_melt, melt_sd = _resolve(args.rho_melt, args.melt_log, args.melt_data, 'rho_melt')
     rho_glass, glass_sd = _resolve(args.rho_glass, args.glass_log, args.glass_data, 'rho_glass')
 
-    res = assess(rho_melt, rho_glass, args.exp_density_gcm3, args.tg_K, args.t_equil_K,
-                 args.alpha_glass, args.alpha_melt, args.band_pct)
+    res = assess(rho_melt, rho_glass, args.tg_K, args.t_equil_K, args.alpha_glass,
+                 args.alpha_melt, final_T_K=args.final_T_K)
     res['density_provenance'] = provenance
     res['rho_melt_sd'] = melt_sd
     res['rho_glass_sd'] = glass_sd

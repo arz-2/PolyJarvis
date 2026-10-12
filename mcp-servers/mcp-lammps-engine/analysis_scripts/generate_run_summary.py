@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 generate_run_summary.py — Aggregate all Stage 4 analysis outputs into a single
-canonical run_summary.json that mirrors the run_log.md sections.
+canonical run_summary.json.
 
 Reads all JSON files in output_dir, assembles the summary, fills provenance
 from git and version strings already present in analysis JSON outputs, and
-writes run_summary.json to output_dir. Only tg_summary.json is searched
+writes run_summary.json to output_dir. Only thermal.json is searched
 recursively; anything else an extractor wrote into a subdirectory is reported
 in artifacts_missing rather than silently dropped.
 
@@ -22,16 +22,17 @@ Usage:
         [--date_start 2026-06-02] [--date_end 2026-06-03] \
         [--d01 "TraPPE-UA"] [--d02 "embedded in FF"] \
         [--d03 "lj/cut 12 Å"] [--d04 "DP=50, 10 chains, 5320 atoms"] \
-        [--d05 "PASS"] [--d06 "ACCEPTABLE"] \
-        [--exp_tg_min 370] [--exp_tg_max 380] \
-        [--exp_density_min 1.04] [--exp_density_max 1.06]
+        [--d05 "PASS"] [--d06 "ACCEPTABLE"]
+
+Reports measured values only -- no experimental comparison. Most runs are novel systems with no
+curated experimental reference, so a PASS/FAIL grading column would be blank far more often than
+not; compare a run's results.tg/density/bulk_modulus values against literature by hand (or via
+exp_lookup.json, written separately for provenance) when a reference happens to exist.
 """
 
 import argparse
 import json
-import math
 import subprocess
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -70,6 +71,129 @@ def _not(v):
     return (not v) if v is not None else None
 
 
+def _density_temperature(density_block):
+    """The temperature a gated density was measured at.
+
+    Prefers the MEASURED mean (`actual_T_mean`) over the requested setpoint
+    (`target_temp_K`), so a cell that did not hold its temperature reports what it actually
+    did. Both keys come from extract_equilibrated_density; it writes neither when no
+    --target_temp was passed, in which case there is no temperature to report.
+
+    NB the key is `target_temp_K`, not `target_temp`. This was read as `target_temp` from the
+    day melt_density gained a temperature, so results.melt_density.temperature_K was silently
+    null on every run ever produced.
+    """
+    if not density_block:
+        return None
+    measured = density_block.get("actual_T_mean")
+    return measured if measured is not None else density_block.get("target_temp_K")
+
+
+def _collect_byproducts(spec_path, loaded):
+    """Surface free measurements with their own gate verdicts. Never raises: a byproduct that
+    cannot be read is simply absent, because nothing here may affect the run's own verdict."""
+    if not spec_path:
+        return {}
+    try:
+        spec = json.loads(Path(spec_path).read_text())
+    except Exception:
+        return {}
+    out = {}
+    for entry in spec if isinstance(spec, list) else []:
+        source = loaded.get(entry.get("source_json"))
+        if not isinstance(source, dict):
+            continue
+        value = source.get(entry.get("field"))
+        if value is None:
+            continue
+        gate_field = entry.get("gate_field")
+        verdict = source.get(gate_field) if gate_field else None
+        out[entry["name"]] = {
+            "value": value,
+            "unit": entry.get("unit") or "",
+            "produced_by": entry.get("produced_by"),
+            "track": entry.get("track"),
+            "source": f"{entry.get('source_json')}:{entry.get('field')}",
+            "gate": {"field": gate_field, "verdict": verdict},
+            "blocking": False,
+        }
+    return out
+
+
+def _convergence_caveats(eq_comp):
+    """Surface accepted-but-suspect chain-relaxation conditions that convergence.verdict alone
+    hides. kinetic_trap_flag/ct/msid_gaussian are deliberately advisory (never gated), per
+    enforce_gate.py's ALWAYS_ADVISORY set and decision_policy.json's documented rationale (full
+    chain relaxation is often unattainable within MD timescales for rubbery/high-DP systems, so
+    binding on it would make overall_pass unsatisfiable by construction) -- but "advisory" should
+    not mean "invisible". Without this, a reader sees convergence.verdict=PASS and would have to
+    separately notice structural_checks fields (a different section) to connect the two.
+    """
+    caveats = []
+
+    # kinetic_trap_flag/C(t): only meaningful in the rubbery/melt regime. Below Tg, limited chain
+    # diffusion is EXPECTED (chains are arrested by design), not a red flag -- see PEG1's own
+    # warning text, "expected below Tg, problematic in melt state." A glassy run's own
+    # kinetic_trap_flag=True is therefore NOT surfaced.
+    if _dig(eq_comp, "gate", "regime") == "rubbery":
+        if _dig(eq_comp, "chain", "msd", "kinetic_trap_flag") is True:
+            regime_note = _dig(eq_comp, "chain", "msd", "diffusion_regime") or "sub-diffusive"
+            caveats.append(
+                f"kinetic_trap_flag=True ({regime_note}) in a rubbery/melt run -- chains have not "
+                "displaced their own size (MSD_max < Rg^2). density/Tg/bulk_modulus were measured on "
+                "a structure whose chain-scale conformation may not represent true equilibrium."
+            )
+        ct_decay = _dig(eq_comp, "chain", "ct", "decay_fraction_at_end")
+        if ct_decay is not None and ct_decay < 0.1:
+            tau = _dig(eq_comp, "chain", "ct", "tau_relax_ps")
+            traj = _dig(eq_comp, "chain", "ct", "trajectory_ps")
+            gap_note = f" (tau_relax={tau:.3g} ps vs trajectory={traj:.0f} ps)" if tau and traj else ""
+            caveats.append(
+                f"C(t) only {ct_decay * 100:.0f}% decayed by end of trajectory{gap_note} -- "
+                "whole-chain conformational relaxation is far from complete."
+            )
+
+    # GLOBAL_CHAIN_CONFIGURATION_NOT_RELAXED (Auhl et al., cond-mat/0306026): a large-s MSID
+    # distortion riding on top of otherwise-healthy small/intermediate-s statistics -- the
+    # signature of a long-wavelength chain conformation that was never correct (most likely
+    # inherited from the build) and that ordinary MD, bounded by reachable timescales, cannot
+    # repair. Named/anticipated in check_equilibration_comprehensive.py's own MSID regime-split
+    # code and test_msid_regime_split.py, but never actually wired into a visible signal until
+    # now. Unlike kinetic_trap_flag, this is NOT regime-gated: a glassy run's conformation is
+    # whatever the melt phase produced before cooling froze it in, so the defect (if present)
+    # matters just as much there -- arguably more, since cooling can never fix it either.
+    large_s = _dig(eq_comp, "chain", "msid", "large_s")
+    if large_s and large_s.get("gaussian_pass") is False:
+        slope = large_s.get("slope")
+        s_range = large_s.get("s_range")
+        s_note = f" (s={s_range[0]}-{s_range[1]})" if s_range else ""
+        caveats.append(
+            f"GLOBAL_CHAIN_CONFIGURATION_NOT_RELAXED: large-s MSID slope={slope}{s_note}, "
+            "expected 1.0 +/-20% for melt-screened (ideal-chain) statistics -- long-wavelength "
+            "chain shape has not relaxed to equilibrium. Local packing/short-range structure can "
+            "still be sound; whole-chain conformation may not represent true equilibrium."
+        )
+
+    # anneal_hold_msid_gate (opt-in, per-class): the gate stopped without confirming large-s
+    # MSID actually converged -- either its extension cap was reached first (EXHAUSTED) or an
+    # extension run itself crashed (EXTENSION_FAILED, PROBE_FAILED). Advisory, same as the
+    # GLOBAL_CHAIN_CONFIGURATION_NOT_RELAXED caveat above -- cool_block_01 still ran from
+    # whatever anneal_hold data existed at that point, not a hard failure.
+    ahc = eq_comp.get("anneal_hold_convergence") if isinstance(eq_comp, dict) else None
+    if ahc and ahc.get("outcome") in ("EXHAUSTED", "EXTENSION_FAILED", "PROBE_FAILED"):
+        slope_history = ahc.get("slope_history") or []
+        last_slope = slope_history[-1] if slope_history else None
+        caveats.append(
+            f"ANNEAL_HOLD_MSID_GATE_{ahc['outcome']}: the anneal_hold MSID-convergence gate "
+            f"stopped after {ahc.get('extensions_used', 0)} extension(s) "
+            f"({ahc.get('cumulative_hold_ns', '?')} ns cumulative hold) without confirming "
+            f"large-s MSID reached the +-20% gaussian_pass band (last measured slope="
+            f"{last_slope}). Cooling proceeded from anneal_hold's best available structure "
+            "rather than a confirmed-converged one."
+        )
+    return caveats
+
+
 def main():
     p = argparse.ArgumentParser(description="Aggregate Stage 4 outputs into run_summary.json")
     p.add_argument("--output_dir",      required=True)
@@ -91,18 +215,6 @@ def main():
     p.add_argument("--d04", default=None, help="D-04 System size choice")
     p.add_argument("--d05", default=None, help="D-05 Convergence verdict")
     p.add_argument("--d06", default=None, help="D-06 Tg fit quality")
-    # Experimental references
-    p.add_argument("--exp_tg_min",      type=float, default=None)
-    p.add_argument("--exp_tg_max",      type=float, default=None)
-    p.add_argument("--tg_md_offset_K",  type=float, default=100.0,
-                   help="MD cooling-rate Tg overestimate (K) added to the exp upper bound when "
-                        "grading a RAW single-rate MD Tg (documented 80-120 K, default 100). NOT "
-                        "applied to a rate-extrapolated Tg, which already removes the bias. Set 0 "
-                        "to grade strictly.")
-    p.add_argument("--exp_density_min", type=float, default=None)
-    p.add_argument("--exp_density_max", type=float, default=None)
-    p.add_argument("--exp_K_min",       type=float, default=None)
-    p.add_argument("--exp_K_max",       type=float, default=None)
     p.add_argument("--graphs_dir",      default=None,
                    help="Directory where PNG figures were saved (default: <output_dir>/figures/)")
     p.add_argument("--run_plan",        default=None,
@@ -113,9 +225,34 @@ def main():
                    help="Number of replicates contributing to the multi-rate Tg registry "
                         "(distinct replicate rows). Reported in results.tg for the DSC extrapolation.")
     p.add_argument("--tg_path",         default=None,
-                   help="Explicit path to the canonical tg_summary.json (e.g. the slowest-rate "
+                   help="Explicit path to the canonical thermal.json (e.g. the slowest-rate "
                         "folder). When supplied, skips rglob discovery and uses this file directly. "
                         "Prevents alphabetical-order bugs when multiple rate folders coexist.")
+    p.add_argument("--melt_equilibration_path", default=None,
+                   help="The MELT gate's own equilibration.json (the equilibration attempt's "
+                        "raw/). Distinct from --equilibration_path, which is the ASSESSMENT "
+                        "gate's file (cooling.json) whenever a cooldown ran: the two carry the "
+                        "same keys about two different cells, at T_melt_hold_K and final_T_K.")
+    p.add_argument("--equilibration_path", default=None,
+                   help="Explicit path to the accepted equilibration attempt's equilibration.json. "
+                        "Under the attempt-based run layout this file lives under a DIFFERENT "
+                        "stage's own attempt raw dir (data/<run>/attempts/equilibration/attempt-N/"
+                        "raw/), never under this summary attempt's own --output_dir, so the plain "
+                        "same-dir lookup below can never find it without this.")
+    p.add_argument("--mechanical_path", default=None,
+                   help="Explicit path to the accepted mechanical attempt's mechanical.json -- "
+                        "same cross-attempt-directory reasoning as --equilibration_path.")
+    p.add_argument("--bulk_modulus_deform_path", default=None,
+                   help="Explicit path to the accepted mechanical attempt's "
+                        "bulk_modulus_deform.json (deformation-fallback runs only) -- same "
+                        "cross-attempt-directory reasoning as --equilibration_path.")
+    p.add_argument("--byproducts_spec", default=None,
+                   help="Path to a JSON list of byproducts to surface, written by "
+                        "run_campaign.do_summary from orchestration/scripts/track_registry.py. "
+                        "Each entry: {name, produced_by, track, source_json, field, gate_field, "
+                        "unit}. Passed as a file rather than imported because track_registry "
+                        "lives in orchestration/ and these analysis scripts deploy separately "
+                        "(same reason --equilibration_path is a path and not a lookup).")
     args = p.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -143,36 +280,46 @@ def main():
         })
         return {}
 
-    tg           = _load("tg_summary.json")
-    tg_mr        = _load("tg_multirate_result.json")
-    eq_dens      = _load("equilibrated_density.json")
-    eq_chk       = _load("equilibration_check.json")
-    # check_equilibration_comprehensive actually writes equilibration_comprehensive.json
-    # with a nested schema (thermo.*/chain.*/spatial.*); prefer it when present.
-    eq_comp      = _load("equilibration_comprehensive.json")
-    bulk         = _load("bulk_modulus.json")
-    bulk_deform  = _load("bulk_modulus_deform.json")
-    bulk_murnaghan = _load("bulk_modulus_murnaghan.json")
-    e2e     = _load("end_to_end_summary.json")
-    rdf     = _load("rdf_summary.json")
-    rg      = _load("rg_summary.json")
-    msd     = _load("msd_summary.json")
-    orient  = _load("orientation_summary.json")
-    dh      = _load("density_summary.json")
+    def _load_cross_attempt(name, explicit_path, flag_name):
+        """Like _load, but for an artifact that lives under a DIFFERENT stage's own attempt raw
+        dir (equilibration.json/mechanical.json/bulk_modulus_deform.json under the attempt-based
+        run layout -- see --equilibration_path's help). explicit_path (already known from that
+        stage's own returned outputs, threaded through by the caller) is checked first; only
+        falls back to the plain same-dir lookup (which will not find a cross-attempt-directory
+        file, matching the historical bug this replaces) when no explicit path was given."""
+        if explicit_path:
+            path = Path(explicit_path)
+            if path.exists():
+                return _load_json(path)
+            artifacts_missing.append({"file": name, "found_in": None,
+                                       "note": f"--{flag_name} given but not found: {explicit_path}"})
+            return {}
+        return _load(name)
+
+    tg           = _load("thermal.json")
+    # equilibration.json holds check_equilibration_comprehensive's own nested schema
+    # (thermo.*/chain.*/spatial.*) at its top level, plus "density" (extract_equilibrated_
+    # density's result) and "gate" (enforce_equilibration_gate's verdict) as sibling keys.
+    eq_comp      = _load_cross_attempt("equilibration.json", args.equilibration_path, "equilibration_path")
+    eq_dens      = eq_comp.get("density") or {}
+    eq_gate      = eq_comp.get("gate") or {}
+    # The melt gate's own file. For a melt-only run this IS eq_comp (no cooldown ran, so
+    # --equilibration_path fell back to it); reading it separately keeps the melt density
+    # labelled as a melt rather than reported as the density at final_T_K.
+    melt_comp = (_load_cross_attempt("equilibration.json", args.melt_equilibration_path,
+                                     "melt_equilibration_path")
+                 if args.melt_equilibration_path else {})
+    melt_dens = melt_comp.get("density") or {}
+    bulk_deform  = _load_cross_attempt("bulk_modulus_deform.json", args.bulk_modulus_deform_path,
+                                        "bulk_modulus_deform_path")
+    bulk_murnaghan = _load_cross_attempt("mechanical.json", args.mechanical_path, "mechanical_path")
 
     # -----------------------------------------------------------------------
     # Results section
     # -----------------------------------------------------------------------
-    # Tg resolution: prefer the rate-extrapolated value (cooling-rate bias removed) over the raw
-    # single-rate MD Tg. Multi-rate runs may write per-rate tg_summary.json into subdirs, so search
-    # recursively when the top-level file is absent (else Tg silently drops from the summary).
-    tg_extrap = (tg_mr or {}).get("tg_at_slow_rate_K")
-    try:
-        tg_extrap = float(tg_extrap)
-        if not math.isfinite(tg_extrap):
-            tg_extrap = None
-    except (TypeError, ValueError):
-        tg_extrap = None
+    # Tg resolution: single-rate MD Tg. A run may write thermal.json into a per-rate
+    # subdir (tg_r<rate>/), so search recursively when the top-level file is absent (else
+    # Tg silently drops from the summary).
     Tg_raw = tg.get("Tg_K")
     if Tg_raw is None and not tg:
         # Explicit canonical path wins over rglob to avoid alphabetical-order bugs
@@ -182,7 +329,7 @@ def main():
             if j.get("Tg_K") is not None:
                 tg, Tg_raw = j, j.get("Tg_K")
         else:
-            for cand in sorted(output_dir.rglob("tg_summary.json")):
+            for cand in sorted(output_dir.rglob("thermal.json")):
                 j = _load_json(cand)
                 if j.get("Tg_K") is not None:
                     tg, Tg_raw = j, j.get("Tg_K")
@@ -190,79 +337,23 @@ def main():
         if tg:
             # Recovered from a per-rate subdir — the only artifact with its own discovery, so it
             # is not stranded and does not belong in artifacts_missing.
-            artifacts_missing[:] = [m for m in artifacts_missing if m["file"] != "tg_summary.json"]
+            artifacts_missing[:] = [m for m in artifacts_missing if m["file"] != "thermal.json"]
 
-    Tg_val = tg_extrap if tg_extrap is not None else Tg_raw
-    tg_basis = ("rate_extrapolated" if tg_extrap is not None
-                else ("raw_MD" if Tg_raw is not None else None))
-    # Fit-quality fields for the results dict: per-rate bilinear r²/quality for a raw single-rate
-    # headline, or the multirate log-linear r² when the rate-extrapolated value is reported.
+    # Measured values only -- no experimental comparison. Most runs are novel systems with no
+    # curated experimental reference, so a PASS/FAIL grading column would be blank far more often
+    # than not; compare against literature by hand (or via exp_lookup.json, written separately
+    # for provenance) when a reference happens to exist for a given polymer.
+    Tg_val = Tg_raw
+    tg_basis = "raw_MD" if Tg_raw is not None else None
     tg_r2 = tg.get("r_squared")
     tg_quality = tg.get("fit_quality")
-    if tg_extrap is not None:
-        tg_r2 = tg_mr.get("loglinear_r_squared")
-        # Per-rate bilinear fit quality (the D-06 metric) lives in any tg_r*/tg_summary.json.
-        for sub in sorted(output_dir.glob("tg_r*/tg_summary.json")):
-            tg_quality = _load_json(sub).get("fit_quality")
-            break
-    def _floor_band(band, *, min_abs=None, min_rel=None):
-        """Widen a too-narrow exp band symmetrically to a physical minimum width, so a
-        degenerate/single-point or hand-entered tight band can't cause a false FAIL
-        (PVC2 0.07% density; PSU4 0.1 K Tg). The floor is set BELOW MD/FF systematic
-        error, so it can never mask a genuine method failure. Returns (band, widened)."""
-        if not band or band[0] is None or band[1] is None:
-            return band, False
-        lo, hi = float(band[0]), float(band[1])
-        mid = 0.5 * (lo + hi)
-        floor = max(min_abs or 0.0, (min_rel or 0.0) * abs(mid))
-        if (hi - lo) >= floor or floor <= 0:
-            return [lo, hi], False
-        r = floor / 2.0
-        return [round(mid - r, 4), round(mid + r, 4)], True
-
-    exp_tg = ([args.exp_tg_min, args.exp_tg_max]
-              if args.exp_tg_min is not None and args.exp_tg_max is not None else None)
-    exp_tg, tg_band_widened = _floor_band(exp_tg, min_abs=10.0)   # >=10 K total (+/-5 K)
-    tg_err = None
-    tg_status = "no exp ref"
-    tg_offset_corrected_K = None
-    if Tg_val is not None and exp_tg:
-        # Grade the raw value against the REAL exp band, always — a raw single-rate MD Tg
-        # overestimates experiment by ~80-120 K (cooling-rate artifact, Patrone 2016), but that
-        # offset must NEVER be folded into the PASS/FAIL band: doing so manufactures a false PASS
-        # (a prior PLA run did exactly this — feedback_pla_glassy_md_offset_gamed_pass.md). The
-        # rate-extrapolated Tg already removes this bias by construction; the raw single-rate Tg
-        # is graded exactly as strictly, with the offset reported only as an annotation
-        # (tg_offset_corrected_K below), never applied to lo/hi/status/error_pct.
-        lo, hi = exp_tg[0], exp_tg[1]
-        tg_status = "PASS" if lo <= Tg_val <= hi else "FAIL"
-        if tg_status == "PASS":
-            tg_err = 0.0
-        else:
-            nearest = lo if Tg_val < lo else hi
-            tg_err = round((Tg_val - nearest) / nearest * 100, 1)
-        if tg_basis == "raw_MD":
-            tg_offset_corrected_K = round(Tg_val - float(args.tg_md_offset_K or 0.0), 1)
 
     rho_val = eq_dens.get("plateau_density_mean") or eq_dens.get("density_mean")
-    exp_rho = ([args.exp_density_min, args.exp_density_max]
-               if args.exp_density_min is not None and args.exp_density_max is not None else None)
-    exp_rho, rho_band_widened = _floor_band(exp_rho, min_rel=0.06)   # >=6% total (+/-3%)
-    rho_err = None
-    rho_status = "no exp ref"
-    if rho_val is not None and exp_rho:
-        rho_status = "PASS" if exp_rho[0] <= rho_val <= exp_rho[1] else "FAIL"
-        if rho_status == "PASS":
-            rho_err = 0.0
-        else:
-            nearest = exp_rho[0] if rho_val < exp_rho[0] else exp_rho[1]
-            rho_err = round((rho_val - nearest) / nearest * 100, 1)
 
-    # K-source precedence: murnaghan > deform > fluctuation
+    # K-source precedence: murnaghan > deform.
     # Murnaghan is the primary glassy (300 K) and rubbery (T>Tg) method.
     # Deform (3-direction) is the fallback when Murnaghan EOS fails.
     # Born+NVT has been removed (PCFF+PPPM virial incompatibility, 2026-06-21).
-    # Fluctuation (B_dyn) is a diagnostic cross-check for rubbery systems.
     if bulk_murnaghan.get("B0_GPa") is not None:
         K_val    = bulk_murnaghan.get("B0_GPa")
         K_sem    = bulk_murnaghan.get("B0_sem_GPa")
@@ -272,22 +363,32 @@ def main():
         K_sem    = bulk_deform.get("K_sem_GPa")
         K_method = "deformation"
     else:
-        K_val    = bulk.get("bulk_modulus_GPa")
-        K_sem    = bulk.get("bulk_modulus_sem_GPa")
-        K_method = "fluctuation" if K_val is not None else None
+        K_val = K_sem = K_method = None
+    K_temp = bulk_murnaghan.get("temperature_K") if K_method == "murnaghan" else None
 
-    exp_K = ([args.exp_K_min, args.exp_K_max]
-             if args.exp_K_min is not None and args.exp_K_max is not None else None)
-    exp_K, K_band_widened = _floor_band(exp_K, min_rel=0.20)   # >=20% total (+/-10%)
-    K_status = "no exp ref"
-    K_err = None
-    if K_val is not None and exp_K:
-        K_status = "PASS" if exp_K[0] <= K_val <= exp_K[1] else "FAIL"
-        if K_status == "PASS":
-            K_err = 0.0
-        else:
-            nearest = exp_K[0] if K_val < exp_K[0] else exp_K[1]
-            K_err = round((K_val - nearest) / nearest * 100, 1)
+    # A stage can be ACCEPTED while its property is not reportable: an advisory-gate replicate,
+    # an operator unblocking a downstream track, or the recovery agent's accept_with_caveat.
+    # value_K / value_GPa are read by path (track_registry summary_path, the characterization
+    # cache, the radonpy accuracy scorer) and none of them checks a verdict, so the number is
+    # withheld from the value field itself and carried under `withheld`. A missing verdict key
+    # is a pre-gate artifact and keeps its value.
+    tg_verdict = tg.get("tg_gate_verdict")
+    tg_withheld = None
+    if tg_verdict is not None and tg_verdict != "TG_REPORTABLE" and Tg_val is not None:
+        tg_withheld = {"value_K": Tg_val, "gate_verdict": tg_verdict}
+        Tg_val = None
+    if K_method == "murnaghan":
+        K_verdict = bulk_murnaghan.get("bm_gate_verdict")
+        K_ok = K_verdict in (None, "BM_REPORTABLE")
+    elif K_method == "deformation":
+        K_verdict = bulk_deform.get("deform_gate_verdict")
+        K_ok = K_verdict in (None, "DEFORM_REPORTABLE")
+    else:
+        K_verdict, K_ok = None, True
+    K_withheld = None
+    if not K_ok:
+        K_withheld = {"value_GPa": K_val, "gate_verdict": K_verdict}
+        K_val = None
 
     # -----------------------------------------------------------------------
     # Artifact pointers (relative to data/[RUN]/)
@@ -302,19 +403,13 @@ def main():
         return f"graphs/{fname}" if full.exists() else None
 
     artifacts = {
-        "tg_summary":              rel("tg_summary.json"),
+        "thermal":                 rel("thermal.json"),
         "tg_density_bins":         rel("tg_density_bins.csv"),
         "tg_fit_fig":              rel_fig("tg_fit.png"),
-        "tg_multirate_result":     rel("tg_multirate_result.json"),
-        "tg_multirate_d06":        rel("d06_multirate_block.md"),
-        "tg_multirate_fig":        rel("tg_multirate.png"),
-        "equilibrated_density":    rel("equilibrated_density.json"),
-        "equilibration_check":     rel("equilibration_check.json"),
-        "equilibration_comprehensive": rel("equilibration_comprehensive.json"),
+        "equilibration":           rel("equilibration.json"),
         "equilibration_fig":       rel_fig("equilibration_convergence.png"),
-        "bulk_modulus":            rel("bulk_modulus.json"),
         "bulk_modulus_deform":     rel("bulk_modulus_deform.json"),
-        "bulk_modulus_murnaghan":  rel("bulk_modulus_murnaghan.json"),
+        "mechanical":              rel("mechanical.json"),
         "volume_timeseries":       rel("volume_timeseries.csv"),
         "volume_fig":              rel_fig("volume_fluctuations.png"),
         "murnaghan_eos_fig":       rel_fig("murnaghan_eos.png"),
@@ -353,8 +448,9 @@ def main():
     # -----------------------------------------------------------------------
     # Provenance
     # -----------------------------------------------------------------------
-    mda_version = (e2e.get("mdanalysis_version") or rg.get("mdanalysis_version")
-                   or rdf.get("mdanalysis_version") or "unknown")
+    # No producer in the engine-driven path currently emits mdanalysis_version (the tools that
+    # once did -- end-to-end/RDF/Rg extraction -- are never invoked by run_campaign.py).
+    mda_version = "unknown"
 
     summary = {
         "run": {
@@ -374,7 +470,10 @@ def main():
             "D-02_charges":      args.d02,
             "D-03_electrostatics": args.d03,
             "D-04_system_size":  args.d04,
-            "D-05_convergence":  args.d05,
+            # eq_gate (equilibration.json's "gate" section, the enforce_equilibration_gate
+            # verdict) is the real record when present; --d05 is a caller-supplied fallback for
+            # runs where that section hasn't been written (e.g. no gate ever ran).
+            "D-05_convergence":  eq_gate.get("verdict") or args.d05,
             "D-06_tg_fit_quality": args.d06,
         },
         "plan": {
@@ -388,81 +487,99 @@ def main():
         "results": {
             "tg": {
                 "value_K":        Tg_val,
-                "grading_basis":  tg_basis,   # rate_extrapolated | raw_MD — both graded strictly, no offset in the band
-                "md_offset_K":    (0.0 if tg_basis == "rate_extrapolated" else args.tg_md_offset_K),
-                # Annotation only — the ~80-120 K cooling-rate-artifact-corrected value, for
-                # context. NEVER used for status/error_pct (feedback_pla_glassy_md_offset_gamed_pass.md).
-                "tg_offset_corrected_K": tg_offset_corrected_K,
-                "exp_range_K":    exp_tg,
-                "band_widened":   tg_band_widened,
-                "error_pct":      tg_err,
-                "status":         tg_status,
+                "grading_basis":  tg_basis,   # raw_MD, no rate-extrapolation applied
                 "r_squared":      tg_r2,
                 "fit_quality":    tg_quality,
                 # True when the headline raw-MD fit still violates a hard physics constraint
                 # (no valid alternative existed to swap in, per extract_thermal). Surfaced so the
                 # headline Tg is not graded silently — treat the value as unreliable when set.
-                "primary_fit_invalid": (tg.get("primary_fit_invalid", False)
-                                        if tg_basis == "raw_MD" else False),
-                # Multi-rate DSC extrapolation (log-linear Tg(Γ) → DSC-equivalent rate).
-                # tg_dsc_equiv_K is the reported "theoretical DSC-equivalent experimental Tg".
-                "tg_dsc_equiv_K":      tg_mr.get("tg_at_slow_rate_K"),
-                "loglinear_slope_K":   tg_mr.get("loglinear_slope_K"),
-                # Per e-fold above; the per-decade value is the one to grade against the
-                # 3-5 K/decade physical expectation. Older artifacts lack it -> None.
-                "loglinear_slope_K_per_decade": tg_mr.get("loglinear_slope_K_per_decade"),
-                "loglinear_r_squared": tg_mr.get("loglinear_r_squared"),
-                "vf_fit_quality":      tg_mr.get("vf_fit_quality"),
-                "n_rates":             tg_mr.get("n_points"),
+                "primary_fit_invalid": tg.get("primary_fit_invalid", False),
                 "n_replicates":        args.n_replicates,
-                "rates_span_decades":  tg_mr.get("rates_span_decades"),
-                "slow_rate_ref_K_per_ns": tg_mr.get("slow_rate_ref_K_per_ns"),
+                # Half-width of the fitted transition. A Tg quoted without this is missing its
+                # own resolution: the hyperbola model smears the transition over roughly +/- c,
+                # and when c is comparable to the Tg itself the single number is a crossover
+                # point on a broad curve rather than a sharp transition. iPMMA_1 (2026-09-11)
+                # fits c = 113.8 K, which is also why its two estimators disagree by 44 K and
+                # trip the fixed 20 K method_gap bar.
+                "transition_width_c_K": tg.get("transition_width_c_K"),
+                "tg_uncertainty_K":     tg.get("tg_uncertainty_K"),
+                "gate_verdict":         tg_verdict,
+                "withheld":             tg_withheld,
             },
             "density": {
                 "value_g_cm3":    rho_val,
-                "exp_range_g_cm3": exp_rho,
-                "band_widened":   rho_band_widened,
-                "error_pct":      rho_err,
-                "status":         rho_status,
+                # The assessment temperature (final_T_K), read from the cooling gate's own
+                # density block the same way melt_density reads the melt gate's. Without it a
+                # run assessed at 400 K and one assessed at 300 K produce indistinguishable
+                # summaries -- which is what makes "one assessment temperature per run"
+                # workable: the temperature travels with the number.
+                "temperature_K":  _density_temperature(eq_dens),
+            },
+            # The melt at T_melt_hold_K, from the equilibration stage's own gate file. A
+            # DIFFERENT measurement from "density" above, which is the assessment cell at
+            # final_T_K -- reported separately because they are not comparable and because a
+            # melt-only run has no assessment cell at all. Sparse: null when no melt gate file
+            # was passed.
+            "melt_density": {
+                "value_g_cm3":    (melt_dens.get("plateau_density_mean")
+                                   or melt_dens.get("density_mean")),
+                "temperature_K":  _density_temperature(melt_dens),
             },
             "bulk_modulus": {
                 "value_GPa":      K_val,
                 "sem_GPa":        K_sem,
-                "exp_range_GPa":  exp_K,
-                "band_widened":   K_band_widened,
-                "error_pct":      K_err,
-                "status":         K_status,
                 "method":         K_method,
+                # MEASURED from the series logs, not copied from the plan -- the point is to
+                # catch a modulus that ran at a different temperature than the cell was gated
+                # at. Only the Murnaghan extractor records it; the deform path has no
+                # equivalent yet, so this is None there.
+                "temperature_K":  K_temp,
+                "gate_verdict":   K_verdict,
+                "withheld":       K_withheld,
             },
         },
+        # Measurements this run produced without being asked for -- a Tg request already computes
+        # thermal expansion, a transition width and a density at every swept temperature. All are
+        # already in the extractor JSONs; only the surfacing is new.
+        #
+        # A SIBLING of results, deliberately not a key inside it: aggregate_replicates,
+        # and the polyjarvis_vs_radonpy scorer read results by field path
+        # and would break on an unexpected sub-dict. results keeps its exact three-key shape.
+        #
+        # Each entry carries its own gate verdict. A failing byproduct ANNOTATES -- it is never
+        # in binding_gate_failure's vocabulary, so it cannot fail a run that did not ask for it.
+        # Sparse: an entry appears only if its field actually resolved, so a reader can tell
+        # "measured and doubtful" from "not measured".
+        "byproducts": _collect_byproducts(args.byproducts_spec, {
+            "thermal.json": tg, "equilibration.json": eq_comp,
+        }),
         "convergence": {
             "verdict":            args.d05 or (("PASS" if eq_comp.get("overall_pass") else "FAIL")
                                               if eq_comp else None),
-            # Prefer the comprehensive nested schema; fall back to the legacy flat keys.
-            "density_equilibrated": _dig(eq_comp, "thermo", "density_drift", "pass",
-                                         default=eq_chk.get("density_equilibrated")),
-            "energy_equilibrated":  _dig(eq_comp, "thermo", "energy_drift", "pass",
-                                         default=eq_chk.get("energy_equilibrated")),
-            "density_drift_pct":    _dig(eq_comp, "thermo", "density_drift", "drift_pct",
-                                         default=_dig(eq_chk, "density", "drift", "drift_pct")),
+            "density_equilibrated": _dig(eq_comp, "thermo", "density_drift", "pass"),
+            "energy_equilibrated":  _dig(eq_comp, "thermo", "energy_drift", "pass"),
+            "density_drift_pct":    _dig(eq_comp, "thermo", "density_drift", "drift_pct"),
+            # Accepted-but-suspect chain-relaxation conditions verdict alone hides -- see
+            # _convergence_caveats. Empty list when none apply (including when eq_comp itself
+            # never loaded), never null, so a consumer can always safely do `if caveats:`.
+            "caveats":            _convergence_caveats(eq_comp),
         },
         "structural_checks": {
-            "rg_cv":              _dig(eq_comp, "chain", "rg", "cv",
-                                       default=rg.get("rg_cv_across_chains")),
-            "rg_spread_flag":     (_not(_dig(eq_comp, "chain", "rg", "pass"))
-                                   if eq_comp else rg.get("rg_spread_flag")),
-            "kinetic_trap_flag":  _dig(eq_comp, "chain", "msd", "kinetic_trap_flag",
-                                       default=msd.get("kinetic_trap_flag")),
-            "diffusion_regime":   _dig(eq_comp, "chain", "msd", "diffusion_regime",
-                                       default=msd.get("diffusion_regime")),
-            "ordered_flag":       (_not(_dig(eq_comp, "spatial", "p2", "pass"))
-                                   if eq_comp else orient.get("ordered_flag")),
-            "p2_mean":            _dig(eq_comp, "spatial", "p2", "p2_mean",
-                                       default=orient.get("p2_mean")),
+            "rg_cv":              _dig(eq_comp, "chain", "rg", "cv"),
+            "rg_spread_flag":     _not(_dig(eq_comp, "chain", "rg", "pass")) if eq_comp else None,
+            "kinetic_trap_flag":  _dig(eq_comp, "chain", "msd", "kinetic_trap_flag"),
+            "diffusion_regime":   _dig(eq_comp, "chain", "msd", "diffusion_regime"),
+            # msid_* previously had no home in run_summary.json at all -- see
+            # GLOBAL_CHAIN_CONFIGURATION_NOT_RELAXED in convergence.caveats for the plain-English
+            # flag; these are the raw numbers behind it.
+            "msid_slope":                _dig(eq_comp, "chain", "msid", "slope"),
+            "msid_large_s_slope":        _dig(eq_comp, "chain", "msid", "large_s", "slope"),
+            "msid_large_s_gaussian_pass": _dig(eq_comp, "chain", "msid", "large_s", "gaussian_pass"),
+            "ordered_flag":       _not(_dig(eq_comp, "spatial", "p2", "pass")) if eq_comp else None,
+            "p2_mean":            _dig(eq_comp, "spatial", "p2", "p2_mean"),
             "heterogeneous_flag": (_not(_dig(eq_comp, "spatial", "density_homogeneity", "pass"))
-                                   if eq_comp else dh.get("heterogeneous_flag")),
-            "density_cv_mean":    _dig(eq_comp, "spatial", "density_homogeneity", "cv_mean",
-                                       default=dh.get("cv_mean")),
+                                   if eq_comp else None),
+            "density_cv_mean":    _dig(eq_comp, "spatial", "density_homogeneity", "cv_mean"),
         },
         "artifacts":    artifacts,
         "artifacts_missing": artifacts_missing,

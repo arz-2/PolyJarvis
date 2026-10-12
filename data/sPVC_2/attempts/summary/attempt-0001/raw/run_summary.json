@@ -1,0 +1,111 @@
+{
+  "run": {
+    "name": "sPVC_2",
+    "smiles": "*C[C@H](Cl)C[C@@H](Cl)*",
+    "polymer_class": "PVNL",
+    "ff": "pcff",
+    "charge_method": "bond-increment",
+    "dp": 41,
+    "n_chains": 10,
+    "n_atoms": null,
+    "date_start": "",
+    "date_end": ""
+  },
+  "decisions": {
+    "D-01_ff": "pcff",
+    "D-02_charges": "bond-increment",
+    "D-03_electrostatics": "pppm",
+    "D-04_system_size": "DP=41, 10 chains",
+    "D-05_convergence": "EXTEND",
+    "D-06_tg_fit_quality": "GOOD"
+  },
+  "plan": null,
+  "results": {
+    "tg": {
+      "value_K": 314.3,
+      "grading_basis": "raw_MD",
+      "r_squared": 0.9937,
+      "fit_quality": "GOOD",
+      "primary_fit_invalid": false,
+      "n_replicates": 1,
+      "transition_width_c_K": null,
+      "tg_uncertainty_K": 16.8
+    },
+    "density": {
+      "value_g_cm3": 1.341333,
+      "temperature_K": 299.99
+    },
+    "melt_density": {
+      "value_g_cm3": 1.171309,
+      "temperature_K": 571.05
+    },
+    "bulk_modulus": {
+      "value_GPa": 3.3633,
+      "sem_GPa": 0.0029,
+      "method": "murnaghan",
+      "temperature_K": 300.06
+    }
+  },
+  "byproducts": {
+    "cte_glass": {
+      "value": 0.000247057,
+      "unit": "1/K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:cte_glassy_per_K",
+      "gate": {
+        "field": "slope_signs_valid",
+        "verdict": true
+      },
+      "blocking": false
+    },
+    "cte_rubber": {
+      "value": 0.000515411,
+      "unit": "1/K",
+      "produced_by": "tg",
+      "track": "thermal",
+      "source": "thermal.json:cte_rubbery_per_K",
+      "gate": {
+        "field": "slope_ordering_valid",
+        "verdict": true
+      },
+      "blocking": false
+    }
+  },
+  "convergence": {
+    "verdict": "PASS",
+    "density_equilibrated": true,
+    "energy_equilibrated": true,
+    "density_drift_pct": 0.3108,
+    "caveats": []
+  },
+  "structural_checks": {
+    "rg_cv": 0.172,
+    "rg_spread_flag": false,
+    "kinetic_trap_flag": true,
+    "diffusion_regime": "strongly sub-diffusive (see kinetic_trap_flag for trap verdict)",
+    "msid_slope": 1.284,
+    "msid_large_s_slope": 1.041,
+    "msid_large_s_gaussian_pass": true,
+    "ordered_flag": false,
+    "p2_mean": 0.0243,
+    "heterogeneous_flag": false,
+    "density_cv_mean": 0.1988
+  },
+  "artifacts": {
+    "tg_fit_fig": "graphs/tg_fit.png",
+    "murnaghan_eos_fig": "graphs/murnaghan_eos.png"
+  },
+  "artifacts_missing": [
+    {
+      "file": "bulk_modulus_deform.json",
+      "found_in": null
+    }
+  ],
+  "provenance": {
+    "simulation_dir": "",
+    "git_commit": "2876fc7",
+    "mdanalysis_version": "unknown",
+    "generated_at": "2026-09-11T18:28:57.633796+00:00"
+  }
+}

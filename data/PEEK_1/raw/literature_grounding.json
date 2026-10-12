@@ -1,0 +1,166 @@
+{
+  "critique": {
+    "D-01_ff": {
+      "autofilled_choice": "pcff",
+      "verdict": "agrees",
+      "confidence": "high",
+      "reason": "An exact-SMILES, peer-reviewed neat-bulk-PEEK MD study (Chen et al. 2023, 10.1021/acsami.3c01307) used PCFF+ with pppm electrostatics and reports density -3.9% vs experiment (1.22 vs 1.27 g/cm3) -- same sign and comparable magnitude to PolyJarvis's own measured PCFF density deficit (-5.1%). This resolves the sign ambiguity the plan's own D-01 evidence flagged against the PEEK2020 cyclic-oligomer/COMPASS-II result (+2.2%, opposite sign): that discrepancy is attributable to the cyclic-oligomer structural model, not to Class-II force fields underpredicting PEEK density in general. Combined with the same paper's pppm electrostatics and the PEEK2020 Class-II Tg validation (COMPASS II 424-429 K vs exp 418 K, +1.5-2.5%), the literature record now directly and consistently supports pcff for this exact SMILES.",
+      "autofilled_choice_matches_evidence": true,
+      "supporting_dois": [
+        "10.1021/acsami.3c01307",
+        "10.3390/polym12051054"
+      ],
+      "suggested_override": null
+    }
+  },
+  "dominant_uncertainty": "Both peer-reviewed density validations are on structural models that differ from this run's linear amorphous 10-chain/DP18 melt (one is a nanocomposite paper's neat-matrix baseline, the other a small cyclic oligomer), so the ~-4 to -5% PCFF density deficit is well-corroborated in sign but not tightly bounded in magnitude for this exact cell.",
+  "notes": "The evidence-store exact-SMILES hit for this SMILES (record 602a28517726, provenance source_run=PEEK_1) shows this polymer was literature-critiqued before under this same run name; this pass reused and extended that grounding rather than re-searching from scratch, per the skip-fresh-search rule for exact_smiles peer_reviewed_doi hits.",
+  "polymer_class": "PKTN",
+  "smiles": "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1",
+  "polymer_name": "PEEK (poly(ether ether ketone))",
+  "tg_target_K": {
+    "range": [
+      418,
+      418
+    ],
+    "confidence": "high",
+    "sources": [
+      {
+        "doi": "10.3390/polym12051054",
+        "claim": "This MD/DFT study on a catechol-based cyclic-oligomer PEEK model cites its own experimental Tg comparison target as 418.2 K, and reports its own COMPASS II MD-simulated Tg (424.4-428.6 K) as 'close to' this experimental value (+1.5 to +2.5%). This independently corroborates polymer_rules.json's existing experimental_tg_K.PEEK=418 entry.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "a00960ced1a8"
+      }
+    ]
+  },
+  "forcefield": {
+    "recommendation": "pcff",
+    "confidence": "high",
+    "sources": [
+      {
+        "doi": "10.1021/acsami.3c01307",
+        "claim": "Neat bulk-PEEK MD (PCFF+, pppm, 500 K/1 atm NPT production after an 800 atm/750 K anneal) gives density 1.22 g/cm3 vs experimental 1.27 g/cm3 for amorphous PEEK (-3.9%) -- same sign and comparable magnitude to PolyJarvis's own measured PCFF density deficit (-5.1%), a direct same-chemistry confirmation.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "602a28517726"
+      },
+      {
+        "doi": "10.3390/polym12051054",
+        "claim": "COMPASS II (Class II family, same lineage as PCFF) MD Tg for a PEEK cyclic-oligomer model: unit-cell 424.4 K, supercell 428.6 K vs exp 418 K (+1-3% error); density 1.364 vs exp 1.328 g/cm3 (+2.2%, opposite sign from the linear-chain PCFF result above, attributable to the cyclic-oligomer structural model rather than the force-field family).",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "0cf23c3f29b4"
+      },
+      {
+        "doi": "10.1016/j.commatsci.2018.05.039",
+        "claim": "MD study on five novel poly(phthalazinone ether sulfone ketone) (PPESK) polymers -- an aromatic ether-sulfone-ketone backbone chemically adjacent to PKTN/PSFO -- used COMPASS, described by the authors as 'a typical PCFF type force field ... proved suitable for polymer and energetic materials', for CED/solubility-parameter and mechanical-property predictions; no experimental Tg/density comparison was recoverable, so this only corroborates PCFF-family suitability for this backbone chemistry class, not a signed error.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "8bb29c7537b6"
+      }
+    ]
+  },
+  "electrostatics": {
+    "recommendation": "pppm",
+    "confidence": "high",
+    "sources": [
+      {
+        "doi": "10.1021/acsami.3c01307",
+        "claim": "Long-range Coulombic interactions for a PEEK(-CNT) system were computed with a particle-particle particle-mesh (pppm) solver (LJ cutoff 20 A), using PCFF+ intramolecular parameters and MedeA forcefield-assign partial charges.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "f098e19bc08f"
+      }
+    ]
+  },
+  "md_studies": [
+    {
+      "doi": "10.1021/acsami.3c01307",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10853907/",
+      "title": "Fundamentals of Crystalline Evolution and Properties of Carbon Nanotube-Reinforced Polyether Ether Ketone Nanocomposites in Fused Filament Fabrication",
+      "year": 2023,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "evidence_store",
+      "force_field": "PCFF+",
+      "force_field_type": "All Atom",
+      "electrostatics": "pppm",
+      "ensemble": "NPT production at 500 K / 1 atm after an 800 atm / 750 K anneal",
+      "T_K": 500,
+      "P_atm": 1,
+      "system_type": "neat_polymer",
+      "material_morphology": "bulk",
+      "chain_length_or_mw": null,
+      "number_of_chains": null,
+      "reported_properties": [
+        {
+          "property": "density",
+          "value": 1.22,
+          "unit": "g/cm3"
+        }
+      ],
+      "note": "Exact-SMILES peer-reviewed hit pulled from the neat-PEEK-matrix baseline within a CNT-nanocomposite study, not a nanocomposite cell itself; directly comparable to this run's neat bulk amorphous cell and same-sign as PolyJarvis's own PCFF density deficit."
+    },
+    {
+      "doi": "10.3390/polym12051054",
+      "url": "https://doi.org/10.3390/polym12051054",
+      "title": "Combined Molecular Dynamics and DFT Simulation Study of the Molecular and Polymer Properties of a Catechol-Based Cyclic Oligomer of Polyether Ether Ketone",
+      "year": 2020,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "evidence_store",
+      "force_field": "COMPASS II",
+      "force_field_type": "All Atom",
+      "electrostatics": null,
+      "ensemble": "Unit-cell and supercell amorphous models",
+      "T_K": null,
+      "P_atm": null,
+      "system_type": "neat_polymer",
+      "material_morphology": "bulk",
+      "chain_length_or_mw": "small cyclic oligomer, not a linear chain melt",
+      "number_of_chains": null,
+      "reported_properties": [
+        {
+          "property": "density",
+          "value": 1.364,
+          "unit": "g/cm3"
+        },
+        {
+          "property": "glass_transition_temp",
+          "value": 424.4,
+          "unit": "K"
+        },
+        {
+          "property": "glass_transition_temp",
+          "value": 428.6,
+          "unit": "K"
+        }
+      ],
+      "note": "Cyclic-oligomer structural model (not this run's linear 10-chain/DP18 melt); Class-II family (COMPASS II) same lineage as PCFF, valuable for the Tg comparison but its density sign should not be extrapolated to linear-chain PCFF cells."
+    },
+    {
+      "doi": "10.1016/j.commatsci.2018.05.039",
+      "url": "https://doi.org/10.1016/j.commatsci.2018.05.039",
+      "title": "Molecular dynamics simulation on the physical properties of the novel designed poly-(phthalazinone ether sulfone ketone) (PPESK)",
+      "year": 2018,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "evidence_store",
+      "force_field": "COMPASS",
+      "force_field_type": "All Atom",
+      "electrostatics": null,
+      "ensemble": null,
+      "T_K": null,
+      "P_atm": null,
+      "system_type": "other",
+      "material_morphology": "bulk",
+      "chain_length_or_mw": null,
+      "number_of_chains": null,
+      "reported_properties": [],
+      "note": "Adjacent-class analog (aromatic ether-sulfone-ketone, not PEEK itself); five novel designed polymers with no experimental Tg/density to compare against, so only corroborates PCFF-family suitability for this backbone chemistry, not a signed error."
+    }
+  ],
+  "generated_at": "2026-09-11T20:48:03.667163+00:00",
+  "plan_reviewed": "/home/alexzhao/PolyJarvis/data/PEEK_1/raw/run_plan.json"
+}

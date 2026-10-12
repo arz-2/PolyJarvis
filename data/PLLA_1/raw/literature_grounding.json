@@ -1,0 +1,155 @@
+{
+  "critique": {
+    "D-01_ff": {
+      "autofilled_choice": "pcff",
+      "verdict": "agrees",
+      "confidence": "medium",
+      "reason": "No PCFF-specific bulk-neat-PLA MD study was found, matching the tool's own admission ('No PCFF-specific ... density or Tg error for PLA ... has been found despite a dedicated search'). However, a peer-reviewed Class-II force field (COMPASS -- same lineage/functional form as PCFF) was applied to PLA and reported Tg=332 K and density=1.26 g/cm3, within 1 K and 0.9% of this run's experimental targets (331 K, 1.248 g/cm3). No literature was found favoring OPLS-AA, GAFF2, or TraPPE-UA over PCFF/Class-II for neat bulk PLA specifically. The plan's own Klajmon2023 citation, which the tool used as validation_data, appears on closer inspection to NOT use OPLS for its PLA component specifically (a WebSearch snippet of the methods indicates PLA used separate literature-sourced parameters, distinct from the OPLS parametrization explicitly used for the paper's PVP component) -- so this does not contradict PCFF either, it just isn't confirmable support for anything. Verdict is 'agrees' at medium (not high) confidence because the strongest direct support found is same-family (COMPASS), not an exact-FF PLA benchmark.",
+      "supporting_dois": [
+        "10.1007/s00894-020-04431-3"
+      ],
+      "autofilled_choice_confidence_note": null,
+      "suggested_override": null
+    }
+  },
+  "dominant_uncertainty": "No published PCFF-specific neat-bulk-PLA MD benchmark exists; the strongest support is same-family Class-II (COMPASS), and the plan's own OPLS-tagged PLA citation (Klajmon2023) appears mistagged on closer inspection.",
+  "electrostatics": {
+    "confidence": "high",
+    "recommendation": "pppm",
+    "sources": [
+      {
+        "doi": "10.1021/acs.macromol.4c02109",
+        "claim": "Electrostatic forces calculated beyond a 12 A real-space cutoff via Particle Mesh Ewald (PME), i.e. the Ewald/PPPM family, for both Drude-polarizable and CGenFF (nonpolarizable) PET models.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true,
+        "origin_record_id": "a19f7553c592"
+      }
+    ]
+  },
+  "forcefield": {
+    "confidence": "medium",
+    "recommendation": "pcff",
+    "sources": [
+      {
+        "doi": "10.1007/s00894-020-04431-3",
+        "claim": "COMPASS (Class-II) force field used for MD of PLA (within a PLA/natural-rubber/nanosilica nanocomposite study); reports a neat-PLA-tagged density of 1.26 g/cm3 and Tg of 332 K at 298.15 K.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true
+      }
+    ]
+  },
+  "md_studies": [
+    {
+      "doi": "10.1007/s00894-020-04431-3",
+      "url": "https://doi.org/10.1007/s00894-020-04431-3",
+      "title": "Investigation of nanoparticle-polymer interaction in bio-based nanosilica-filled PLA/NR nanocomposites: molecular dynamics simulation",
+      "year": 2020,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "polydatabase",
+      "force_field": "COMPASS",
+      "force_field_type": "All Atom",
+      "electrostatics": null,
+      "ensemble": null,
+      "T_K": 298.15,
+      "P_atm": null,
+      "system_type": "neat_polymer",
+      "material_morphology": "bulk",
+      "chain_length_or_mw": null,
+      "number_of_chains": null,
+      "reported_properties": [
+        {
+          "property": "density",
+          "value": 1.26,
+          "unit": "g/cm3"
+        },
+        {
+          "property": "glass_transition_temp",
+          "value": 332,
+          "unit": "K"
+        }
+      ],
+      "note": "DOI resolves; independently confirmed via WebSearch (PubMed/citing sources) that this paper's primary system is a PLA/natural-rubber/nanosilica nanocomposite using COMPASS -- full text is Springer-paywalled so could not confirm directly. polydatabase tags this specific density/Tg pair system_type=neat_polymer/bulk, consistent with a neat-PLA-matrix baseline commonly reported for validation in nanocomposite papers, but that specific attribution is unverified from full text. COMPASS is Class-II, same lineage/functional form as PCFF -- used here as same-family, not exact-FF, support for D-01."
+    },
+    {
+      "doi": "10.1021/acs.iecr.3c03038",
+      "url": "https://doi.org/10.1021/acs.iecr.3c03038",
+      "title": "Glass Transition and Structure of Organic Polymers from All-Atom Molecular Simulations",
+      "year": 2023,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "polydatabase",
+      "force_field": null,
+      "force_field_type": "All Atom",
+      "electrostatics": null,
+      "ensemble": null,
+      "T_K": 300,
+      "P_atm": null,
+      "system_type": "neat_polymer",
+      "material_morphology": "bulk",
+      "chain_length_or_mw": "molar mass closely above 10,000 g/mol (monodisperse PLA sample)",
+      "number_of_chains": null,
+      "reported_properties": [
+        {
+          "property": "density",
+          "value": 1.193,
+          "unit": "g/cm3"
+        },
+        {
+          "property": "glass_transition_temp",
+          "value": 351,
+          "unit": "K"
+        }
+      ],
+      "note": "Already cited by the tool itself as validation_data (Klajmon2023); full text remains ACS-paywall-blocked this session, same as the tool's own note. polydatabase tags force_field=OPLS for this PLA entry, but an independent WebSearch snippet of the paper's methods states the paper's OPLS parametrization was used explicitly for its PVP samples while 'PLA samples were modeled according to force-field parameters from literature' (i.e. a separate, unnamed source) -- so the OPLS tag on the PLA row looks like a polydatabase mistagging. Force field left null here rather than propagating an unconfirmed claim; Tg/density numbers are reported as-is since they are independent of which FF produced them."
+    },
+    {
+      "doi": "10.1021/acs.macromol.4c02109",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11741139/",
+      "title": "Structural and Electronic Properties of Poly(ethylene terephthalate) (PET) from Polarizable Molecular Dynamics Simulations",
+      "year": 2025,
+      "trust_tier": "peer_reviewed_doi",
+      "verified": true,
+      "lead_source": "evidence_store",
+      "force_field": null,
+      "force_field_type": "All Atom",
+      "electrostatics": "pppm",
+      "ensemble": null,
+      "T_K": null,
+      "P_atm": null,
+      "system_type": "neat_polymer",
+      "material_morphology": "bulk",
+      "chain_length_or_mw": null,
+      "number_of_chains": null,
+      "reported_properties": [],
+      "note": "PET (aromatic backbone ester), not PLA (aliphatic backbone ester) -- same PEST class, different chemistry; cited only to corroborate this run's decided electrostatics=pppm, not force-field choice. Pulled from the persistent evidence store (record a19f7553c592), exact_class tier."
+    }
+  ],
+  "notes": "Best available literature backs Class-II broadly (COMPASS on PLA lands within ~1 K / 0.9% of this run's own experimental Tg/density targets) rather than PCFF specifically -- treat as same-family confirmation of D-01_ff, not an exact-FF validation; no PCFF-on-PLA study, and no competing FF with better PLA-specific support, was found.",
+  "polymer_class": "PEST",
+  "polymer_name": "Poly(L-lactic acid) (PLLA)",
+  "smiles": "*[C@@H](C)C(=O)O*",
+  "tg_target_K": {
+    "range": [
+      325,
+      351
+    ],
+    "confidence": "medium",
+    "sources": [
+      {
+        "doi": "10.1007/s00894-020-04431-3",
+        "claim": "COMPASS MD of PLA reports glass transition temperature 332 K at 298.15 K/1 atm (neat-PLA-tagged data point).",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true
+      },
+      {
+        "doi": "10.1021/acs.iecr.3c03038",
+        "claim": "All-atom MD of a monodisperse PLA sample (MW just above 10,000 g/mol) reports glass transition temperature 351 K at 300 K.",
+        "trust_tier": "peer_reviewed_doi",
+        "verified": true
+      }
+    ]
+  },
+  "generated_at": "2026-09-08T23:29:54.805840+00:00",
+  "plan_reviewed": "/home/arz2/PolyJarvis_v2/data/PLLA_1/raw/run_plan.json"
+}

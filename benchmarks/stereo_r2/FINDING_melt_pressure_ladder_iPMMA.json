@@ -1,0 +1,71 @@
+{
+  "probe": "melt_pressure_ladder_20260910",
+  "run": "iPMMA_1",
+  "T_K": 600,
+  "provenance": "run by another session 2026-09-10, completed 14:24 EDT; wrote no summary of its own. Raw trajectories deleted 2026-09-10 for disk; this is the record.",
+  "design": "Larsen-style compression/decompression, but at the MELT temperature (600 K) rather than RadonPy EQ21step's 300 K placement.",
+  "rungs": [
+    {
+      "stage": "r1_p2000",
+      "pressure_atm": 2000,
+      "n_rows": 101,
+      "steps": [
+        0.0,
+        100000.0
+      ],
+      "plateau_density_mean": 1.101834,
+      "plateau_density_std": 0.005425
+    },
+    {
+      "stage": "r2_p10000",
+      "pressure_atm": 10000,
+      "n_rows": 201,
+      "steps": [
+        0.0,
+        200000.0
+      ],
+      "plateau_density_mean": 1.232844,
+      "plateau_density_std": 0.004122
+    },
+    {
+      "stage": "r3_p5000",
+      "pressure_atm": 5000,
+      "n_rows": 101,
+      "steps": [
+        0.0,
+        100000.0
+      ],
+      "plateau_density_mean": 1.176481,
+      "plateau_density_std": 0.004385
+    },
+    {
+      "stage": "r4_p1000",
+      "pressure_atm": 1000,
+      "n_rows": 101,
+      "steps": [
+        0.0,
+        100000.0
+      ],
+      "plateau_density_mean": 1.08379,
+      "plateau_density_std": 0.007156
+    },
+    {
+      "stage": "r5_hold",
+      "pressure_atm": 1,
+      "n_rows": 2001,
+      "steps": [
+        0.0,
+        2000000.0
+      ],
+      "plateau_density_mean": 1.039877,
+      "plateau_density_std": 0.007793
+    }
+  ],
+  "comparison": {
+    "ladder_from_above_gcm3": 1.039877,
+    "standard_from_below_gcm3": 1.039211,
+    "difference_pct": 0.064,
+    "standard_source": "iPMMA_1 equilibration attempt-0005 npt_melt_hold, last half",
+    "conclusion": "The two approach paths agree to 0.064%, inside a single window's fluctuation (sigma ~0.0078). iPMMA_1's melt density was already converged, and a compression-based equilibration would not have changed its answer. This closes the 'is the PMMA failure a missing Larsen protocol' question in the negative. It says nothing about aPS_1, whose density WAS still moving between attempts (+0.71%, 3.9 sigma) -- no ladder probe was run there."
+  }
+}

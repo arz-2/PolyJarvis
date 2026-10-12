@@ -1,0 +1,10 @@
+{"event": "resume", "at": "2026-09-13T14:29:09.993499+00:00", "at_node": "execute", "node": "entry_resolve"}
+{"event": "cost_admitted", "at": "2026-09-13T14:29:09.994076+00:00", "gpu_hours": 5.1215, "ceiling": 40.0, "unpriced": ["equil", "murnaghan"], "note": "total_gpu_hours is a LOWER bound; unpriced stages are excluded", "node": "cost_guard_post"}
+{"event": "stage_progress", "stage": "build", "status": "accepted", "attempts": 1, "at": "2026-09-13T14:29:29.980799+00:00"}
+{"event": "stage_progress", "stage": "cooling", "status": "accepted", "attempts": 1, "at": "2026-09-13T14:29:29.980862+00:00"}
+{"event": "stage_progress", "stage": "equilibration", "status": "accepted", "attempts": 1, "at": "2026-09-13T14:29:29.980878+00:00"}
+{"event": "stage_progress", "stage": "mechanical", "status": "accepted", "attempts": 1, "at": "2026-09-13T14:29:29.980889+00:00"}
+{"event": "stage_progress", "stage": "summary", "status": "accepted", "attempts": 1, "at": "2026-09-13T14:29:29.980900+00:00"}
+{"event": "stage_progress", "stage": "thermal", "status": "accepted", "attempts": 1, "at": "2026-09-13T14:29:29.980914+00:00"}
+{"event": "execute", "at": "2026-09-13T14:29:30.725189+00:00", "status": "accepted", "stage": null, "finding": null, "resumed": true, "node": "execute"}
+{"event": "done", "status": "accepted", "exit_code": 0, "run_name": "PSU_2", "polymer_class": "PSFO", "class_source": null, "plan_path": "/home/alexzhao/PolyJarvis/data/PSU_2/raw/run_plan.json", "confidence": "high", "plan_mode": "reasoned", "gpu_hours": 5.1215, "unpriced": ["equil", "murnaghan"], "critic_verdict": null, "stage": null, "finding": null, "detail": "", "resumable": false}

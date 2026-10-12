@@ -1,2 +1,0 @@
-# Murnaghan Worker Memory Index
-

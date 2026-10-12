@@ -1,0 +1,56 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEEK_3/attempts/summary/attempt-0001/raw/byproducts_spec.json",
+      "sha256": "b19a70382a928682ceed94e0dd8b5096c0c955fac9608417cb5f4182fd89a4c4",
+      "size": 638
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEEK_3/attempts/summary/attempt-0001/raw/run_summary.json",
+      "sha256": "1d1d5faa63b61572b7e9286e594d826fb08036495e5964fdc3760dec27659439",
+      "size": 2629
+    }
+  ],
+  "attempt_id": "attempt-0001",
+  "findings": [],
+  "finished_at": "2026-09-13T13:27:33.282958+00:00",
+  "input_hash": "ff54e0510b164c3df1d209457b64d237e90e810968b14da0f77dc17155bbde45",
+  "outputs": {
+    "artifacts_missing": [
+      {
+        "file": "bulk_modulus_deform.json",
+        "found_in": null
+      }
+    ],
+    "run_summary_path": "/home/alexzhao/PolyJarvis/data/PEEK_3/attempts/summary/attempt-0001/raw/run_summary.json",
+    "status": "success",
+    "summary_json": "/home/alexzhao/PolyJarvis/data/PEEK_3/attempts/summary/attempt-0001/raw/run_summary.json"
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 770.0,
+    "T_melt_hold_K": 770.0,
+    "T_workflow_K": 770.0,
+    "annealing_T_high_K": 850.0,
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.66,
+    "dp_typical": 18,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 750,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_min_steps_per_T": 200000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 250,
+    "tg_t_step_K": 20
+  },
+  "stage": "summary",
+  "status": "accepted"
+}

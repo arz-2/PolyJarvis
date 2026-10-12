@@ -1,0 +1,276 @@
+{
+  "confidence": "high",
+  "cost_estimate": {
+    "cell_atoms_estimate": 6120,
+    "confidence": "high",
+    "ff_family": "pcff",
+    "note": "Partial/lower-bound total -- see unpriced_stages for what is not included (notably: equil-stage length, and any deform stage beyond a single primary-direction leg).",
+    "stages": {
+      "cool": {
+        "basis": "log-log interpolated between real measured points [(3020, 53.974), (5140, 46.822), (15040, 37.058)] -- 6120 atoms is within the measured [3020,15040] range",
+        "confidence": "high",
+        "gpu_hours": 2.7953,
+        "note": "19 cool blocks x 250000 steps (770->300 K at dT=25 K) + npt_final 500000; first blocks only -- adaptive extensions are not priced",
+        "ns_per_day_used": 45.0756,
+        "simulated_ns": 5.25,
+        "steps": 5250000
+      },
+      "deform": {
+        "basis": "log-log interpolated between real measured points [(3020, 53.974), (5140, 46.822), (15040, 37.058)] -- 6120 atoms is within the measured [3020,15040] range",
+        "confidence": "high",
+        "gpu_hours": 0.1065,
+        "note": "single primary-direction leg -- a lower bound, not a full multi-leg total [CONTINGENT: murnaghan's glassy fallback, charged only if BM_INADMISSIBLE routes to it -- included in worst-case, not in the base run]",
+        "ns_per_day_used": 45.0756,
+        "simulated_ns": 0.2,
+        "steps": 200000
+      },
+      "tg": {
+        "basis": "log-log interpolated between real measured points [(3020, 53.974), (5140, 46.822), (15040, 37.058)] -- 6120 atoms is within the measured [3020,15040] range",
+        "confidence": "high",
+        "gpu_hours": 2.8752,
+        "note": "1 rate (100 K/ns) x 27 T-bin(s) x 200000 steps, floor-checked against tg_min_steps_per_T=200000",
+        "ns_per_day_used": 45.0756,
+        "simulated_ns": 5.4,
+        "steps": 5400000
+      }
+    },
+    "total_gpu_hours": 5.777,
+    "unpriced_stages": [
+      {
+        "reason": "stage-length knobs default to None, deferred to generate_equilibration_workflow's own atom-count-tiered default inside the MCP LAMMPS engine -- not resolvable from decided_params alone; not priced here to avoid guessing",
+        "stage": "equil"
+      },
+      {
+        "reason": "no bm_pressures_atm configured -- cannot size the Murnaghan series",
+        "stage": "murnaghan"
+      }
+    ]
+  },
+  "decided_params": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 770.0,
+    "T_melt_hold_K": 770.0,
+    "T_workflow_K": 770.0,
+    "annealing_T_high_K": 850.0,
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.66,
+    "dp_typical": 18,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 750,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_min_steps_per_T": 200000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 250,
+    "tg_t_step_K": 20
+  },
+  "decisions": [
+    {
+      "acknowledgements": {},
+      "alternatives": [],
+      "alternatives_note": "NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.PKTN has no forcefield_alternatives, and this layer will not invent one. The moiety probe names what actually types this SMILES; the literature critic may name a candidate on the evidence.",
+      "choice": "pcff",
+      "confidence": "high",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "critique": {
+        "findings": [
+          "Accepted the critic's 'agrees' verdict on D-01_ff (pcff) at high confidence. Its lead (10.1021/acsami.3c01307) is an exact-SMILES, peer-reviewed, DOI-verified neat bulk-PEEK MD study using PCFF+ with pppm -- not a class_representative analog -- and it directly resolves the sign discrepancy this row's own autofill evidence recorded as unresolved: PCFF under-predicts amorphous PEEK density by ~4%, matching PolyJarvis's internal -5.1%, while PEEK2020's +2.2% is a cyclic-oligomer model artifact. The critic's own caution against extrapolating the cyclic-oligomer density sign to linear-chain PCFF cells is correct and preserved. No override applied; no suggested_override was offered.",
+          "Declined to set any overrides.experimental_* value. This SMILES resolves as a curated member (polymer_rules.json:classes.PKTN.member_smiles.PEEK), so experimental_tg_K=418, experimental_density_gcm3=1.263 (amorphous comparator -- NOT the 1.30-1.32 semicrystalline figure, per exp_density_note and the PEEK1 R-01 correction) and exp_K_GPa=[4.0,5.8] already resolve deterministically; the plan's tg success criterion t_range_brackets_exp_tg=418 confirms it. Pinning them would duplicate curated data, not add information. The critic's tg_target_K (418, from the MD study's own cited comparison target) independently corroborates the curated entry and was used only for that corroboration.",
+          "Declined to alter dp_typical=18 / nchain=10 despite the mPCFF size-convergence reference (polymer_rules.json:_metadata.primary_sources) naming 20 chains x 100-mer as the PCFF Tg production minimum. The 2026-09-02 revision removed PKTN's dp_min=50 deliberately, having found it rested on a rule misattributed to Patrone 2016 (a crosslinked-epoxy paper prescribing no DP floor), and chose to carry the residual risk as a reported RIGID_BACKBONE_CHAIN_LENGTH_BIAS uncertainty instead. That is a curated decision made against measured runs; re-imposing a larger cell from this seat would override it on no new evidence and would raise cost substantially. It is recorded in dominant_uncertainty instead.",
+          "Confidence is medium rather than high, and the reason is protocol rather than force field. Two of the three target properties (tg, bulk_modulus) depend on a PKTN thermal protocol revised 2026-09-01: tg_slope_gate_fallback and the cool_block_hold_steps pin were retired, the sweep re-rooted at the equilibration cool_block at tg_t_high_K rather than cold-starting from the 300 K glass, and the primary/alt Tg method-gap gate was re-armed. The class note states explicitly that the next PEEK/PSU run tests this fix rather than assuming it. Prior PKTN campaigns needed multiple recovery rounds and substantial GPU time to land a Tg, and the re-armed method-gap gate makes a thermal-stage failure more likely to surface by design -- budget for a tg-stage recovery. If the >20 K primary/alt gap or an inverted Tg-vs-rate trend reappears, the class note's own instruction is to restore tg_slope_gate_fallback='slowest_rate', not to widen the gate.",
+          "Anticipated, not a failure: run-summary is expected to warn on density. PKTN's notes record a ~5% PCFF under-prediction for amorphous PEEK (rho_sim ~1.194 vs the 1.263 comparator, band [1.199,1.326]), and the curated decision is explicitly NOT to widen the band, since widening would mask a real force-field systematic. The critic's exact-SMILES evidence now upgrades that from an internal-only measurement to a literature-corroborated one, which is the single most useful thing this critique contributed."
+        ],
+        "rounds": 1,
+        "status": "scientific_agent_decision"
+      },
+      "evidence": [
+        {
+          "claim": "polymer_rules.json:classes.PKTN.ff_note: PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF's general origin; no class-specific PCFF MD validation paper for PEEK has been located. PEEK2020 validates COMPASS II (same Class-II family) for PEEK: Tg=424-429K vs exp 418K (+1-3%), but its density figure over-predicts by +2.2% (1.364 vs exp 1.328 g/cm3) on a small cyclic-oligomer model -- the opposite sign from PolyJarvis's own measured PCFF density deficit of -5.1% on a linear amorphous melt. This is a genuine unresolved sign discrepancy (different Class-II variant, different structural model), not a confirmation or refutation of the internal PCFF number; no field-override recommended, and 'Class-II under-predicts PEEK density' should not be treated as a settled family-wide rule.",
+          "criterion": "literature_support",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PKTN.ff_justification_doi",
+          "source_doi": "10.3390/polym12051054"
+        },
+        {
+          "citation": "Afzal, M. A. F. et al. High-Throughput Molecular Dynamics Simulations and Validation of Thermophysical Properties of Polymers for Various Applications. ACS Appl. Polym. Mater. 2021, 3, 2, 620\u2013630.",
+          "claim": "OPLS3e GPU-based Tg for 315 polymers; validates electrostatics impact on polar vs apolar polymers. lj/cut acceptable only when backbone charge < 0.1 e.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Afzal2021]",
+          "source_doi": "10.1021/acsapm.0c00524"
+        },
+        {
+          "citation": "Hayashi, Y. et al. RadonPy: Automated Physical Property Calculation using All-atom Classical Molecular Dynamics Simulations for Polymer Informatics. npj Comput. Mater. 2022, 8, 222.",
+          "claim": "High-throughput GAFF2 polymer MD; 1 ns NVT anneal 300\u2192700 K; 10 chains ~10,000 atoms; LAMMPS; systematic Tg and density for 1070+ polymers. Primary reference for nchain, dp, and forcefield defaults.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Hayashi2022]",
+          "source_doi": "10.1038/s41524-022-00906-4"
+        },
+        {
+          "citation": "Combined Molecular Dynamics and DFT Simulation Study of the Molecular and Polymer Properties of a Catechol-Based Cyclic Oligomer of PEEK. Polymers 2020, 12, 1054.",
+          "claim": "COMPASS II MD Tg for PEEK: unit-cell 424.4 K, supercell 428.6 K vs exp 418 K (+1-3% error). Excellent agreement. Class II FF Tg validation for PKTN class; COMPASS II is same Class II family as PCFF.",
+          "criterion": "validation_data",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[PEEK2020]",
+          "source_doi": "10.3390/polym12051054"
+        },
+        {
+          "claim": "NOT MEASURED for this SMILES. No EMC trial build was run, so coverage is asserted from polymer_rules.json:classes.PKTN.ff_accuracy_prior='pcff' only; whether 'pcff' can type THIS repeat unit is unverified until the build stage runs. The moiety screen ran and matched no rule, so no trial build was triggered. That narrows the risk and measures nothing: the rules cover 77% of the measured failures (guides/ff_moiety_rules.json), so this SMILES is UNSCREENED for the rest, not cleared.",
+          "criterion": "parameter_coverage",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PKTN.ff_accuracy_prior"
+        },
+        {
+          "claim": "pcff-family cell of 6120 atoms (51894.4 g/mol): estimate_ns_per_day at this run's 6120-atom estimate: 45.075593356752755 ns/day (high confidence). electrostatics=pppm, cutoff_A=9.5.",
+          "criterion": "computational_cost",
+          "origin": "autofill",
+          "resolver": "select_hardware.select_hardware"
+        },
+        {
+          "citation": "Fundamentals of Crystalline Evolution and Properties of Carbon Nanotube-Reinforced Polyether Ether Ketone Nanocomposites in Fused Filament Fabrication",
+          "claim": "Neat bulk-PEEK MD (PCFF+, pppm electrostatics, NPT production at 500 K / 1 atm after an 800 atm / 750 K anneal) gives density 1.22 g/cm3 vs experimental 1.27 g/cm3 for amorphous PEEK (-3.9%) -- an exact-SMILES, same-chemistry, same-electrostatics result matching the sign and approximate magnitude of PolyJarvis's own measured PCFF density deficit (-5.1%). This resolves the sign discrepancy this row's own autofill evidence flagged: the +2.2% over-prediction in PEEK2020 is attributable to its cyclic-oligomer structural model, not to Class-II force fields over-predicting PEEK density on linear amorphous melts.",
+          "origin": "critic",
+          "source_doi": "10.1021/acsami.3c01307"
+        }
+      ],
+      "id": "D-01_ff",
+      "resolved_by": "polymer_rules.json:classes.PKTN.ff_accuracy_prior"
+    }
+  ],
+  "derived_inputs": {
+    "backbone_types": {
+      "data_file": "/home/alexzhao/PolyJarvis/data/PEEK_3/attempts/build/attempt-0001/work/cell/cell.data",
+      "derived_at": "2026-09-13T05:08:54.299319+00:00",
+      "source": "derive_backbone_types (heavy_atom_graph_diameter)",
+      "value": [
+        1,
+        2,
+        6,
+        7
+      ]
+    }
+  },
+  "dominant_uncertainty": "none_dominant",
+  "goal": "density, Tg and bulk modulus for amorphous PEEK (rev2 replicate campaign, replicate 3 replays the locked protocol)",
+  "hardware": {
+    "engine": "kokkos",
+    "ff_family": "pcff",
+    "gpu_per_run": 1,
+    "mpi_ranks": 1
+  },
+  "overrides": {},
+  "plan_mode": "reasoned",
+  "planned_stages": [
+    {
+      "stage": "build",
+      "success_criteria": {
+        "data_file_written": true
+      },
+      "track": "foundation"
+    },
+    {
+      "stage": "equil",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      },
+      "track": "foundation"
+    },
+    {
+      "stage": "equil-check",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      },
+      "track": "foundation"
+    },
+    {
+      "stage": "cool",
+      "success_criteria": {
+        "chain_submitted": true
+      },
+      "track": "cooling"
+    },
+    {
+      "stage": "cool-check",
+      "success_criteria": {
+        "cool_verdict": "PASS"
+      },
+      "track": "cooling"
+    },
+    {
+      "stage": "tg",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": 418
+      },
+      "track": "thermal"
+    },
+    {
+      "stage": "analyze-tg",
+      "success_criteria": {},
+      "track": "thermal"
+    },
+    {
+      "fallback": "deform",
+      "stage": "murnaghan",
+      "success_criteria": {
+        "chain_submitted": true
+      },
+      "track": "mechanical"
+    },
+    {
+      "stage": "analyze-bm",
+      "success_criteria": {},
+      "track": "mechanical"
+    },
+    {
+      "stage": "run-summary",
+      "success_criteria": {},
+      "track": "summary"
+    }
+  ],
+  "polymer_class": "PKTN",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "run_name": "PEEK_3",
+  "schema_version": "2.0",
+  "smiles": "*Oc1ccc(C(=O)c2ccc(Oc3ccc(*)cc3)cc2)cc1",
+  "system_size": {
+    "acknowledgements": {
+      "MW_FLOOR_UNKNOWN": {
+        "class": "PKTN",
+        "detail": "no documented entanglement Me for this class in polymer_rules.json:_metadata.global_notes -- bulk_modulus chain-length adequacy is UNASSESSED, not assumed adequate"
+      },
+      "RIGID_BACKBONE_CHAIN_LENGTH_BIAS": {
+        "class": "stiff",
+        "detail": "backbone classified stiff (backbone_rotatable_fraction=0.36, backbone_ring_fraction=0.80, longest_rigid_backbone_run=4 atoms -> stiff). The cell is sized by total system mass (Wang 2021), which for this heavy repeat unit (288.3 g/mol) gives DP=18 -- short chains. No chain-length-convergence study exists for rigid aromatic backbones, and no Kuhn-length value was supplied for this SMILES, so the residual chain-length bias on Tg is UNQUANTIFIED. Reported, not gated: a DP floor here would be the retired Fox-Flory rule, whose cited source (Patrone 2016) prescribes no floor and studies crosslinked epoxies with no degree of polymerization at all."
+      },
+      "nchain_below_production_minimum": {
+        "current_nchain": 10,
+        "detail": "nchain=10 is below the advisory PCFF production minimum 20. Its source (\"Bejagam 2020\") has no copy in this repo and no verified DOI, so the claim is unchecked; nchain>=10 (Wang 2021, verified) IS met, and Hayashi 2022 (RadonPy) ran nchain=10 across 1,077 polymers. Raising nchain to 20 at a fixed system-mass floor would halve per-chain MW (worse chain-length bias); raising it at fixed DP doubles cost for no criterion this module can state. Reported, not applied -- the L>=2*Rg finite-size gate (a separate, already-mechanized check) is the binding constraint on nchain; supply a nchain is now a pure function of the system-mass floor."
+      }
+    },
+    "dp_typical": 18,
+    "nchain": 10,
+    "reasons": [
+      "system size auto-filled {'dp_typical': 18, 'nchain': 10} via solve_system_size()",
+      "rigidity DP recommendation (backbone_rotatable_fraction=0.36, backbone_ring_fraction=0.80, longest_rigid_backbone_run=4 atoms -> stiff; DP_MW=18) does not exceed the existing recommendation 18"
+    ],
+    "resolved_by": "select_system_size.solve_system_size"
+  }
+}

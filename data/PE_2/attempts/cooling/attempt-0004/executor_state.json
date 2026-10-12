@@ -1,0 +1,386 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/raw/cooling.json",
+      "sha256": "a80fff02c1a6f97ceb5e3c49a62afd536886ba8d848358785772e761dfc72a7c",
+      "size": 11080
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/raw/d05_block.md",
+      "sha256": "f10de90c4c13ffced08ad75e5aba7bf2ef5d5c0a84b698b777f27a6a441d1a7d",
+      "size": 2048
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/log.lammps",
+      "sha256": "2f18229f6005a739aaf2528e19cf18b0d6193858b2a9e10ec6d19ff6dec1ff37",
+      "size": 2745
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_1.rst",
+      "sha256": "d814efeaccd09dad975bf184fa58e475fe80c263a7f7671a83f25e0da01aa65e",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_2.rst",
+      "sha256": "5938a09a8655cc1b88ae006b11d2af1373752e2467f75e79b519a2b668e961e7",
+      "size": 805858
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final.dump",
+      "sha256": "792f1b5a128b62fb63487389efa0fec10d6c8deaa12942e7e70f8a9266615439",
+      "size": 66763728
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final.in",
+      "sha256": "809b9da13e3963b670e252381fd6fbefcccdcf20582195c5723a2f1f5ea493dd",
+      "size": 4391
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final.log",
+      "sha256": "1b38ef377034444a0871ae78b4ecbd5099215f0ba6cefb9c13369b4f12239cdd",
+      "size": 96535
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final_last.dump",
+      "sha256": "011e5f60e56a453fc6049ebdd0ec5812055a0222d2f8067894e08dca5acf1ac4",
+      "size": 329523
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final_out.data",
+      "sha256": "ecc42af4c543224cdf3725dbfe07e26674d254ad6208a4d9a6341ee6f5484132",
+      "size": 739548
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final_out.restart",
+      "sha256": "01fe93aec3ddb7f4f66f19933469c291cdb11173e6b54a75114d148ad38c1878",
+      "size": 805586
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final_run.log",
+      "sha256": "67cf18da742a8cab0fd2aa6369f965d633f0e8c9f107abeb87a364d87293844c",
+      "size": 96188
+    }
+  ],
+  "attempt_id": "attempt-0004",
+  "findings": [
+    {
+      "code": "EXTEND",
+      "confidence": "high",
+      "details": {
+        "advisory_gates": {
+          "ct": true,
+          "density_drift": true,
+          "energy_component_drift": false,
+          "msd_not_trapped": false,
+          "msid_gaussian": true,
+          "residual_stress": true,
+          "rg": true,
+          "torsion": true
+        },
+        "applicable_clause": "require_rubbery",
+        "binding_gates": {
+          "density_homogeneity": true,
+          "density_sem": true,
+          "energy_drift": false,
+          "energy_sem": true,
+          "finite_size": true,
+          "n_eff_density": false
+        },
+        "cooling_extrapolation_reliable": null,
+        "cooling_verdict": null,
+        "density_value_binding": "n/a",
+        "extension_ns": 0.026,
+        "failing_binding_gates": [
+          "energy_drift",
+          "n_eff_density"
+        ],
+        "finite_size": {
+          "L_min_A": 46.09,
+          "L_over_2Rg": 0.696,
+          "L_over_2cutoff": 1.646,
+          "L_over_Ree": 0.651,
+          "available": true,
+          "box_A": [
+            46.09,
+            46.09,
+            46.09
+          ],
+          "cutoff_A": 14.0,
+          "graded_box": "actual_equilibrated",
+          "min_image_evaluated": true,
+          "pass": true,
+          "ree_self_image_flag": true,
+          "self_image_advisory": true,
+          "verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY"
+        },
+        "finite_size_min_image_unarmed": false,
+        "finite_size_verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
+        "homogeneity_verdict": "HOMOG_PASS",
+        "regime": "rubbery",
+        "relaxation_time_ns": 291957.6777,
+        "remedy": "extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': extend_ns=1.6 (1.5 x 20/19 independent-sample deficit) via restart-continuation (read_restart from npt_final's own .restart output, appended log/dump) at npt_prod_temp_K. Cap 2 per gate.",
+        "remedy_confidence": "high",
+        "residual_stress": {
+          "available": true,
+          "dev_atm": {
+            "Pxx": 12.7,
+            "Pyy": -58.7,
+            "Pzz": 46.0
+          },
+          "max_abs_dev_atm": 58.7,
+          "mean_pressure_atm": -16.4,
+          "resolved": false,
+          "von_mises_atm": 92.7,
+          "z_max": 1.47
+        },
+        "saved_to": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/raw/cooling.json",
+        "unmeasured_binding_gates": [],
+        "verdict": "EXTEND"
+      },
+      "remedy_id": null,
+      "severity": "blocking",
+      "stage": "cooling"
+    }
+  ],
+  "finished_at": "2026-09-14T01:11:29.488960+00:00",
+  "input_hash": "d4ea7757026c0483811864f824ac33d42d08634372aaef5a68df393fa25b51e3",
+  "outputs": {
+    "detail": {
+      "advisory_gates": {
+        "ct": true,
+        "density_drift": true,
+        "energy_component_drift": false,
+        "msd_not_trapped": false,
+        "msid_gaussian": true,
+        "residual_stress": true,
+        "rg": true,
+        "torsion": true
+      },
+      "applicable_clause": "require_rubbery",
+      "binding_gates": {
+        "density_homogeneity": true,
+        "density_sem": true,
+        "energy_drift": false,
+        "energy_sem": true,
+        "finite_size": true,
+        "n_eff_density": false
+      },
+      "cooling_extrapolation_reliable": null,
+      "cooling_verdict": null,
+      "density_value_binding": "n/a",
+      "extension_ns": 0.026,
+      "failing_binding_gates": [
+        "energy_drift",
+        "n_eff_density"
+      ],
+      "finite_size": {
+        "L_min_A": 46.09,
+        "L_over_2Rg": 0.696,
+        "L_over_2cutoff": 1.646,
+        "L_over_Ree": 0.651,
+        "available": true,
+        "box_A": [
+          46.09,
+          46.09,
+          46.09
+        ],
+        "cutoff_A": 14.0,
+        "graded_box": "actual_equilibrated",
+        "min_image_evaluated": true,
+        "pass": true,
+        "ree_self_image_flag": true,
+        "self_image_advisory": true,
+        "verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY"
+      },
+      "finite_size_min_image_unarmed": false,
+      "finite_size_verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
+      "homogeneity_verdict": "HOMOG_PASS",
+      "regime": "rubbery",
+      "relaxation_time_ns": 291957.6777,
+      "remedy": "extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': extend_ns=1.6 (1.5 x 20/19 independent-sample deficit) via restart-continuation (read_restart from npt_final's own .restart output, appended log/dump) at npt_prod_temp_K. Cap 2 per gate.",
+      "remedy_confidence": "high",
+      "residual_stress": {
+        "available": true,
+        "dev_atm": {
+          "Pxx": 12.7,
+          "Pyy": -58.7,
+          "Pzz": 46.0
+        },
+        "max_abs_dev_atm": 58.7,
+        "mean_pressure_atm": -16.4,
+        "resolved": false,
+        "von_mises_atm": 92.7,
+        "z_max": 1.47
+      },
+      "saved_to": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/raw/cooling.json",
+      "unmeasured_binding_gates": [],
+      "verdict": "EXTEND"
+    },
+    "halted": true,
+    "npt_prod_data_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final_out.data",
+    "npt_prod_dump_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final.dump",
+    "npt_prod_restart_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final_out.restart",
+    "reason": "EXTEND",
+    "stage_checkpoints": {
+      "npt_final": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final_out.data"
+    },
+    "cool_verdict": "EXTEND",
+    "cooling_json_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/raw/cooling.json",
+    "density_gcm3": 0.85918,
+    "npt_prod_log_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final.log",
+    "extend_history": []
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 550.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 620.0,
+    "bm_pressures_atm": [
+      1,
+      1000,
+      2500,
+      5000,
+      10000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "embedded",
+    "cooling_continuation_attempt": 1,
+    "cooling_continuation_ns": 0.5,
+    "cooling_extend_base_stage": "npt_final",
+    "cooling_extend_ensemble": "npt",
+    "ct_min_decay_melt": 0.25,
+    "cutoff_A": 14.0,
+    "density_initial_gcm3": 0.65,
+    "dp_typical": 179,
+    "dt_fs": 2.0,
+    "electrostatics": "lj_cut",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 450,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "trappe-ua",
+    "stage8_min_steps": 2500000,
+    "tg_min_steps_per_T": 250000,
+    "tg_rate_K_per_ns": 40,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20
+  },
+  "stage": "cooling",
+  "status": "accepted",
+  "outputs_before_promotion": {
+    "detail": {
+      "advisory_gates": {
+        "ct": true,
+        "density_drift": true,
+        "energy_component_drift": false,
+        "msd_not_trapped": false,
+        "msid_gaussian": true,
+        "residual_stress": true,
+        "rg": true,
+        "torsion": true
+      },
+      "applicable_clause": "require_rubbery",
+      "binding_gates": {
+        "density_homogeneity": true,
+        "density_sem": true,
+        "energy_drift": false,
+        "energy_sem": true,
+        "finite_size": true,
+        "n_eff_density": false
+      },
+      "cooling_extrapolation_reliable": null,
+      "cooling_verdict": null,
+      "density_value_binding": "n/a",
+      "extension_ns": 0.026,
+      "failing_binding_gates": [
+        "energy_drift",
+        "n_eff_density"
+      ],
+      "finite_size": {
+        "L_min_A": 46.09,
+        "L_over_2Rg": 0.696,
+        "L_over_2cutoff": 1.646,
+        "L_over_Ree": 0.651,
+        "available": true,
+        "box_A": [
+          46.09,
+          46.09,
+          46.09
+        ],
+        "cutoff_A": 14.0,
+        "graded_box": "actual_equilibrated",
+        "min_image_evaluated": true,
+        "pass": true,
+        "ree_self_image_flag": true,
+        "self_image_advisory": true,
+        "verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY"
+      },
+      "finite_size_min_image_unarmed": false,
+      "finite_size_verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
+      "homogeneity_verdict": "HOMOG_PASS",
+      "regime": "rubbery",
+      "relaxation_time_ns": 291957.6777,
+      "remedy": "extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': extend_ns=1.6 (1.5 x 20/19 independent-sample deficit) via restart-continuation (read_restart from npt_final's own .restart output, appended log/dump) at npt_prod_temp_K. Cap 2 per gate.",
+      "remedy_confidence": "high",
+      "residual_stress": {
+        "available": true,
+        "dev_atm": {
+          "Pxx": 12.7,
+          "Pyy": -58.7,
+          "Pzz": 46.0
+        },
+        "max_abs_dev_atm": 58.7,
+        "mean_pressure_atm": -16.4,
+        "resolved": false,
+        "von_mises_atm": 92.7,
+        "z_max": 1.47
+      },
+      "saved_to": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/raw/cooling.json",
+      "unmeasured_binding_gates": [],
+      "verdict": "EXTEND"
+    },
+    "halted": true,
+    "npt_prod_data_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final_out.data",
+    "npt_prod_dump_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final.dump",
+    "npt_prod_restart_path": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final_out.restart",
+    "reason": "EXTEND",
+    "stage_checkpoints": {
+      "npt_final": "/home/alexzhao/PolyJarvis/data/PE_2/attempts/cooling/attempt-0004/work/npt_final/npt_final_out.data"
+    }
+  },
+  "status_before_promotion": "remedy_required",
+  "operator_branch_acceptance": {
+    "decision": "operator standing authorization 2026-09-13 (same as PE_3)",
+    "schedule": "npt_final 5 ns + exactly one 0.5 ns continuation, identical to PE_1",
+    "failing_binding_gates": [
+      "energy_drift",
+      "n_eff_density"
+    ],
+    "measured": {
+      "energy_drift": {
+        "pass": false,
+        "drift_pct": 1.7315,
+        "p_value": 0.0059
+      },
+      "density_drift": {
+        "pass": true,
+        "drift_pct": 0.582,
+        "p_value": 0.0003
+      },
+      "n_eff_density": {
+        "pass": false,
+        "n_eff": 19,
+        "n_eff_min": 20
+      }
+    },
+    "pe_1_same_schedule": {
+      "energy_drift_pct": 2.0218,
+      "p": 0.0116,
+      "n_eff_density": 25,
+      "verdict": "PASS"
+    }
+  }
+}

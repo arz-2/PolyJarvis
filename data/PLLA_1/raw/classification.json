@@ -1,0 +1,116 @@
+{
+  "smiles": "*[C@@H](C)C(=O)O*",
+  "class_id": 9,
+  "polyinfo_class": "PEST",
+  "polymer_class": "PEST",
+  "class_source": "radonpy_polyinfo",
+  "priority_rank": 6,
+  "flags": {
+    "PURT": false,
+    "PURA": false,
+    "PIMD": false,
+    "PANH": false,
+    "PCBN": false,
+    "PEST": true,
+    "PAMD": false,
+    "PSIL": false,
+    "PPHS": false,
+    "PKTN": false,
+    "PSFO": false,
+    "POXI": false,
+    "PSUL": false,
+    "PIMN": false,
+    "PPNL": false,
+    "PSTR": false,
+    "PACR": false,
+    "PHAL": false,
+    "PDIE": false,
+    "PHYC": false,
+    "PVNL": false
+  },
+  "co_occurring": [],
+  "runner_up": null,
+  "groups": {
+    "PEST": {
+      "location": "backbone",
+      "source": "polyinfo_flags",
+      "smarts_var": "ester"
+    }
+  },
+  "chemistry": {
+    "screened_on": "2-mer",
+    "functional_groups": [
+      {
+        "id": "ester",
+        "label": "ester",
+        "polarity": "polar_aprotic",
+        "count": 1,
+        "count_2mer": 1,
+        "location": "backbone",
+        "locations": {
+          "backbone": 1,
+          "pendant": 0
+        },
+        "hbond_donors": 0,
+        "hbond_acceptors": 2,
+        "note": "The canonical backbone-vs-pendant case. PLA carries it in-chain (PEST); PMMA carries it as a side group (PACR). polyinfo_classifier sees only the first."
+      }
+    ],
+    "backbone_groups": [
+      "ester"
+    ],
+    "pendant_groups": [],
+    "tm_estimate": {
+      "tm_estimated_K": 259,
+      "tg_K": 173,
+      "tg_source": "group_contribution",
+      "tg_confidence": "very_low",
+      "backbone_symmetric": false,
+      "boyer_ratio_tg_over_tm": 0.667,
+      "n_asymmetric_backbone_atoms": 2,
+      "method": "boyer_beaman",
+      "mae_vs_experimental_K": 130,
+      "valid_only_if_crystallizable": true,
+      "caution": "+-130 K mean absolute error; meaningless for amorphous polymers, which have no Tm. Evidence only -- not a basis for setting T_equil_K."
+    },
+    "tg_estimate": {
+      "tg_estimated_K": 173,
+      "T_equil_K": 373,
+      "method": "structural_motif_group_contribution",
+      "confidence": "very_low",
+      "unmatched_heavy_frac": 0.6
+    },
+    "polarity_class": "polar_aprotic",
+    "hydrocarbon_only": false,
+    "apolar_aliphatic": false,
+    "implied_electrostatics": "pppm",
+    "elements": {
+      "C": 3,
+      "H": 4,
+      "O": 2
+    },
+    "n_heavy_atoms": 5,
+    "heteroatom_fraction": 0.4,
+    "aromatic_atom_fraction": 0.0,
+    "descriptor_basis": "2-mer, divided to one repeat unit",
+    "n_aromatic_rings": 0,
+    "hbond_donors": 0,
+    "hbond_acceptors": 2,
+    "rotatable_bonds": 1,
+    "tpsa": 26.3,
+    "mw_repeat_unit": 72.063,
+    "formal_charge": 0
+  },
+  "chemistry_consistency": {
+    "findings": [],
+    "n_warnings": 0,
+    "verdict": "consistent",
+    "polarity_class": "polar_aprotic",
+    "backbone_groups": [
+      "ester"
+    ],
+    "pendant_groups": []
+  },
+  "generated_at": "2026-09-09T00:09:36.637587+00:00",
+  "run_name": "PLLA_1"
+}

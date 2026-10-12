@@ -1,0 +1,79 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PLLA_3/attempts/summary/attempt-0001/raw/byproducts_spec.json",
+      "sha256": "b19a70382a928682ceed94e0dd8b5096c0c955fac9608417cb5f4182fd89a4c4",
+      "size": 638
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PLLA_3/attempts/summary/attempt-0001/raw/exp_lookup.json",
+      "sha256": "a3e21d58860a70a82e1b0f0081cbf897e6ca133dce3dea96d81e06e038d35328",
+      "size": 988
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PLLA_3/attempts/summary/attempt-0001/raw/run_summary.json",
+      "sha256": "41675fa3fff34be225cee1c3ee3a433bc83c58da59ecc62f0ac6b689c513274d",
+      "size": 2969
+    }
+  ],
+  "attempt_id": "attempt-0001",
+  "findings": [],
+  "finished_at": "2026-09-12T21:50:38.019679+00:00",
+  "input_hash": "d91e6bc5ee4475fdfc6202c22f0e3f634066281d6f150882ae3ac650515ba176",
+  "outputs": {
+    "artifacts_missing": [
+      {
+        "file": "bulk_modulus_deform.json",
+        "found_in": null
+      }
+    ],
+    "run_summary_path": "/home/arz2/PolyJarvis_v2/data/PLLA_3/attempts/summary/attempt-0001/raw/run_summary.json",
+    "status": "success",
+    "summary_json": "/home/arz2/PolyJarvis_v2/data/PLLA_3/attempts/summary/attempt-0001/raw/run_summary.json"
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 620.0,
+    "T_melt_hold_K": 620.0,
+    "T_workflow_K": 620.0,
+    "annealing_T_high_K": 700.0,
+    "backbone_types": [
+      1,
+      2,
+      3,
+      6,
+      7
+    ],
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.15,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.63,
+    "dp_typical": 70,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 967838819,
+    "experimental_density_gcm3": 1.248,
+    "experimental_tg_K": 331.0,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_min_steps_per_T": 200000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 25364483
+  },
+  "stage": "summary",
+  "status": "accepted"
+}

@@ -28,10 +28,10 @@ Tools exposed:
   14. check_equilibration_comprehensive - All convergence + structural checks, one call, one verdict
   15. extract_equilibrated_density      - Plateau density via reverse-cumulative-mean
   16. extract_thermal                   - Tg, CTE (α_g, α_r), ΔCp via bilinear curve_fit (standard polymer MD method)
-  16b. extract_tg_multirate             - Multi-rate Tg: log-linear + VF fit across cooling rates
   17. extract_bulk_modulus              - Isothermal K via NPT volume fluctuations
 """
 
+import getpass
 import os
 import sys
 import json
@@ -68,15 +68,19 @@ logging.basicConfig(
 logger = logging.getLogger("lammps_engine")
 
 # ─── Config ───────────────────────────────────────────────────────────────────
-LAMBDA_USER     = os.environ.get("LAMBDA_USER",    "arz2")
-LAMBDA_WORKDIR  = os.environ.get("LAMBDA_WORKDIR", f"/home/{LAMBDA_USER}/simulations")
-LAMBDA_LAMMPS   = os.environ.get("LAMBDA_LAMMPS",  f"/home/{LAMBDA_USER}/lammps-install/bin/lmp")
+# Default to the INVOKING user / their real home rather than a baked-in username + /home/<user>
+# guess: the latter is wrong on any box where the account differs or homes are not under /home
+# (macOS, /Users; clusters, /nfs/home). Every value stays env-overridable via .mcp.json.
+LAMBDA_USER     = os.environ.get("LAMBDA_USER",    getpass.getuser())
+_LAMBDA_HOME    = Path(os.path.expanduser(f"~{LAMBDA_USER}"))
+LAMBDA_WORKDIR  = os.environ.get("LAMBDA_WORKDIR", str(_LAMBDA_HOME / "simulations"))
+LAMBDA_LAMMPS   = os.environ.get("LAMBDA_LAMMPS",  str(_LAMBDA_HOME / "lammps-install/bin/lmp"))
 # KOKKOS full-offload binary (pair + class2 bonded + pppm + neigh on GPU). Separate prefix so the
 # GPU-package binary above stays the production fallback; selected per run via engine="kokkos".
 LAMBDA_LAMMPS_KOKKOS = os.environ.get("LAMBDA_LAMMPS_KOKKOS",
-                                      f"/home/{LAMBDA_USER}/lammps-install-kokkos/bin/lmp")
+                                      str(_LAMBDA_HOME / "lammps-install-kokkos/bin/lmp"))
 CONDA_ENV       = os.environ.get("CONDA_ENV",      "mol-builder")
-_openmpi_home = f"/home/{LAMBDA_USER}/openmpi"
+_openmpi_home = str(_LAMBDA_HOME / "openmpi")
 _sys_openmpi_bin = "/usr/bin"
 _sys_openmpi_lib = "/usr/lib/x86_64-linux-gnu"
 _sys_openmpi_prefix = "/usr"
@@ -198,9 +202,7 @@ def _double_launch_error(conflict: list) -> dict:
 
 
 # ─── Completion sentinels ─────────────────────────────────────────────────────
-# Each completed (or failed) run writes a small JSON file here.
-# Claude watches this directory via the Monitor tool so it is re-invoked
-# automatically when a simulation finishes, without polling.
+# Each completed or failed run writes a small JSON file here for deterministic consumers.
 SENTINEL_DIR = Path("/tmp/polyjarvis/sentinels")
 SENTINEL_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -223,8 +225,31 @@ class JobStatus(Enum):
     COMPLETED = "completed"
     FAILED    = "failed"
 
-# Persist run state here so chains survive server restarts
-STATE_FILE = Path.home() / "Desktop" / "Research" / "mcp-lammps-engine" / "run_state.json"
+# Persist run state here so chains survive server restarts. This lives INSIDE the repo: the
+# previous default was a personal ~/Desktop/... path that does not exist on a headless box or
+# a fresh clone, and writing run state outside the checkout means a run's own history is not
+# part of the run. Still env-overridable.
+#
+# The old location is not orphaned -- it is migrated once, on first startup, when the new file
+# does not yet exist. Copy, never move: another checkout may still be reading it.
+STATE_FILE = Path(os.environ.get(
+    "LAMMPS_ENGINE_STATE_FILE",
+    Path(__file__).resolve().parents[2] / "data" / "_engine" / "run_state.json"))
+_LEGACY_STATE_FILE = Path.home() / "Desktop" / "Research" / "mcp-lammps-engine" / "run_state.json"
+
+
+def _migrate_legacy_state() -> None:
+    if STATE_FILE.exists() or not _LEGACY_STATE_FILE.is_file():
+        return
+    try:
+        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(_LEGACY_STATE_FILE, STATE_FILE)
+        logger.info("Migrated run state from %s to %s", _LEGACY_STATE_FILE, STATE_FILE)
+    except OSError as exc:
+        logger.warning("Could not migrate run state from %s: %s", _LEGACY_STATE_FILE, exc)
+
+
+_migrate_legacy_state()
 
 class RunManager:
     def __init__(self):
@@ -251,15 +276,46 @@ class RunManager:
                         r["meta"] = {}
                 logger.info(f"Loaded {len(self.runs)} runs from {STATE_FILE}")
             except Exception as e:
-                logger.warning(f"Could not load run state: {e}")
+                # Preserve the unreadable file instead of silently discarding it -- resetting
+                # straight to {} means the very next _save() overwrites it for good, turning a
+                # corrupt-but-often-partially-recoverable file into unconditional, permanent
+                # loss with no trace it ever happened. Never block startup on this: a run-state
+                # cache is diagnostic bookkeeping, not the actual simulation results (those live
+                # under each run's own data/<run>/ directory, untouched by this file).
+                quarantine = STATE_FILE.with_name(
+                    f"{STATE_FILE.name}.corrupt.{datetime.now():%Y%m%dT%H%M%S}"
+                )
+                try:
+                    STATE_FILE.rename(quarantine)
+                    logger.warning(f"Could not load run state ({e}); quarantined unreadable "
+                                    f"file to {quarantine} and starting from empty run history")
+                except Exception as rename_err:
+                    logger.warning(f"Could not load run state ({e}); also failed to quarantine "
+                                    f"it ({rename_err}) -- starting from empty run history")
                 self.runs = {}
 
     def _save(self):
-        """Persist run state to disk (call inside lock)."""
+        """Persist run state to disk (call inside lock).
+
+        Writes to a temp file in the same directory then os.replace()s it onto STATE_FILE --
+        the rename is atomic on POSIX, so a reader always sees either the old or the new
+        complete file, never a partial write. The previous plain open(STATE_FILE, "w") + dump
+        truncated the target immediately and streamed into it; a process killed or crashed
+        mid-write left a syntactically invalid, truncated file on disk. Multiple processes each
+        importing this module (e.g. several short-lived diagnostic scripts run alongside a live
+        orchestrator, all pointed at this one shared, cross-checkout file) each hold their own
+        in-memory `runs` snapshot and can race to save around the same moment; a non-atomic
+        write turns that ordinary race into disk corruption instead of just a lost update. Hit
+        live 2026-08-17: corrupted this exact file, and _load()'s silent except-and-reset-to-{}
+        meant the next load would have silently discarded the corrupted (but structurally
+        recoverable) run history entirely on its next save had it not been manually recovered.
+        """
         try:
             STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with open(STATE_FILE, "w") as f:
+            tmp_path = STATE_FILE.with_name(f".{STATE_FILE.name}.{os.getpid()}.tmp")
+            with open(tmp_path, "w") as f:
                 json.dump(self.runs, f, indent=2)
+            os.replace(tmp_path, STATE_FILE)
         except Exception as e:
             logger.warning(f"Could not save run state: {e}")
 
@@ -351,7 +407,7 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str,
         f"N_GPU={n_gpu}",
         "",
         "# Progress log — one JSON object per line",
-        f"PROGRESS=$( dirname $0 )/chain_progress.jsonl",
+        "PROGRESS=$( dirname $0 )/chain_progress.jsonl",
         "",
         "log_done()  { echo \"{\\\"stage\\\":\\\"$1\\\",\\\"status\\\":\\\"done\\\",\\\"ts\\\":\\\"$(date -Iseconds)\\\"}\""
             " >> \"$PROGRESS\"; }",
@@ -407,6 +463,27 @@ def _build_chain_script(chain_id: str, stages: list, mpi: int, gpu_ids: str,
             f"\\\"failed_at\\\":\\\"{name}\\\",\\\"ts\\\":\\\"$(date -Iseconds)\\\"}}\" >> \"$PROGRESS\"; exit 1; }}",
             "",
         ]
+        if name == "minimize":
+            # LAMMPS' minimize command always exits 0, even when it stops at MAXITER/MAXEVAL
+            # without meeting ETOL/FTOL -- the && above never sees this as a failure. Grep the
+            # stage's own log for its stopping-criterion line; two convergent forms are known
+            # from this repo's archive: "energy tolerance" (matches "tolerance") and
+            # "linesearch alpha is zero" (a legitimate stall, not an artificial cutoff --
+            # distinct in kind from "max iterations"/"max force evaluations", which mean the
+            # structure was cut off before finding a real minimum). Anything not matching
+            # either convergent form is treated as non-convergent.
+            # `if ! grep ...; then ...; fi` is required under this script's `set -euo pipefail`
+            # -- a bare `grep -q` line would abort the whole script on exactly the
+            # non-convergence case this exists to catch.
+            lines += [
+                "# --- Minimization-convergence check (not itself a LAMMPS exit-code failure) ---",
+                f'if ! grep -Eq "Stopping criterion.*(tolerance|linesearch alpha is zero)" {wdir}/{log}; then',
+                f"  log_fail {name}; sentinel_fail minimize_not_converged; "
+                f'echo "{{\\"stage\\":\\"__chain__\\",\\"status\\":\\"failed\\","'
+                f'"\\"failed_at\\":\\"{name}\\",\\"ts\\":\\"$(date -Iseconds)\\"}}" >> "$PROGRESS"; exit 1',
+                "fi",
+                "",
+            ]
 
     lines += [
         f"echo \"{{\\\"stage\\\":\\\"__chain__\\\",\\\"status\\\":\\\"completed\\\","
@@ -738,11 +815,14 @@ def generate_script(
                        Common params: T_START, T_FINAL, N_STEPS, T_DAMP,
                        P_START, P_FINAL, P_DAMP, use_gpu, LOG_FILE, DUMP_FILE.
         velocity_seed: REQUIRED, non-null. Pins every RNG seed the script carries — the
-                       `velocity all create` seed, the npt_tg_step staircase's per-temperature
-                       reseed, and the nemd_langevin thermostat seeds (SEED_HOT = seed,
-                       SEED_COLD = seed + 1, unless params sets them). Pass the same value
-                       every call for a run and record it in run_log.md. Templates that
-                       inherit velocities from the .data file ignore it.
+                       `velocity all create` seed, and the nemd_langevin thermostat seeds
+                       (SEED_HOT = seed, SEED_COLD = seed + 1, unless params sets them). Pass
+                       the same value every call for a run and record it in run_log.md.
+                       Templates that inherit velocities from the .data file ignore it. A Tg
+                       sweep chains many single-temperature npt_tg_step calls (one per waypoint,
+                       each reading the previous call's WRITE_DATA_FILE) rather than one
+                       multi-temperature script — pass this run's one velocity_seed to every
+                       call in the chain.
 
     Returns:
         dict with script content, output path, and params used.
@@ -770,28 +850,12 @@ def generate_script(
             velocity_seed=velocity_seed,
         )
 
-        # For Tg staircases, compute and return the number of temperature steps so workers
-        # can pass n_stages to run_lammps_script without re-implementing the list logic.
-        n_tg_stages = 0
-        if template_name == "npt_tg_step" and "T_END" in params and "T_STEP" in params:
-            merged = {**TEMPLATE_DEFAULTS["npt_tg_step"], **params}
-            _t = float(merged.get("T_START", 450.0))
-            _end = float(params["T_END"])
-            _step = float(params["T_STEP"])
-            _temps: list = []
-            while _t > _end + 1e-6:
-                _temps.append(_t); _t -= _step
-            if not _temps or abs(_temps[-1] - _end) > 1e-6:
-                _temps.append(_end)
-            n_tg_stages = len(_temps)
-
         return {
             "status":         "success",
             "template":       template_name,
             "output_script":  output_script,
             "params_used":    {**TEMPLATE_DEFAULTS[template_name], **params},
             "system_info":    gen.get_system_info(),
-            "n_tg_stages":    n_tg_stages,
             "script_preview": script[:1500] + "\n..." if len(script) > 1500 else script,
         }
 
@@ -812,6 +876,10 @@ def run_lammps_script(
     progress_file: str = "",
     n_stages: int = 0,
     allow_concurrent_writer: bool = False,
+    data_file: Optional[str] = None,
+    h_type_ids: Optional[list] = None,
+    backbone_types: Optional[list] = None,
+    lj_cutoff: float = 12.0,
 ) -> dict:
     """
     Execute a LAMMPS .in script on the local GPU in the background.
@@ -834,6 +902,17 @@ def run_lammps_script(
                           "kokkos" (full-offload — pair+class2 bonded+pppm+neigh on GPU via
                           the KOKKOS binary, -sf kk), or "cpu". The KOKKOS path uses
                           LAMBDA_LAMMPS_KOKKOS and is ~7.9× faster on PCFF at mpi=1.
+        data_file:        Optional path to the .data file this script reads. When provided,
+                          the same pre-flight validation run_lammps_chain already performs
+                          (structural/charge/box checks) runs here too, before submission —
+                          closes a gap where the thermal Tg sweep and the deformation
+                          mechanical leg (both call this, not run_lammps_chain) previously got
+                          no early checks at all.
+        h_type_ids:       SHAKE H type IDs — validated against the data file.
+        backbone_types:   Backbone type IDs — validated against the data file.
+        lj_cutoff:        LJ cutoff (Å) used for the box-vs-cutoff preflight check. Pass the
+                          run's real cutoff_A — the 12.0 default overstates the bound for
+                          classes that run 9.5 Å.
 
     Returns:
         dict with run_id for status polling via get_run_status().
@@ -847,6 +926,29 @@ def run_lammps_script(
             conflict = _live_sim_writers([f"{work_dir}/{log_file}"])
             if conflict:
                 return _double_launch_error(conflict)
+
+        # Pre-flight validation (same check run_lammps_chain performs when data_file is given).
+        if data_file:
+            try:
+                content = Path(data_file).read_text(encoding="utf-8")
+                gen = ScriptGenerator(data_file=data_file)
+                gen.parse_data_file(content=content)
+                vr = gen.validate_data_file(
+                    content=content, h_type_ids=h_type_ids, backbone_types=backbone_types,
+                    lj_cutoff=lj_cutoff,
+                )
+                if vr["errors"]:
+                    return {
+                        "status": "error",
+                        "error": "Pre-flight validation failed — script not submitted",
+                        "validation_errors": vr["errors"],
+                        "validation_warnings": vr["warnings"],
+                        "validation_stats": vr["stats"],
+                    }
+                if vr["warnings"]:
+                    logger.warning(f"Pre-flight warnings for {data_file}: {vr['warnings']}")
+            except Exception as ve:
+                logger.warning(f"Pre-flight validation skipped (error reading data file): {ve}")
 
         meta = {
             "script":        script,
@@ -1004,7 +1106,6 @@ def run_lammps_chain(
         # FIX: collapse mkdir + write + chmod + launch into ONE heredoc SSH command
         # to avoid 4 sequential conda-activate round trips (~5-15s each) that
         # cause the MCP tool response to timeout before returning.
-        escaped_body = script_body.replace("'", "'\"'\"'")
         one_shot = (
             f"mkdir -p {chain_dir} && "
             f"cat > {chain_script} << 'POLYJARVIS_EOF'\n{script_body}\nPOLYJARVIS_EOF\n"
@@ -1029,9 +1130,7 @@ def run_lammps_chain(
         run_manager.create_with_id(chain_id, "lammps_nohup_chain", meta)
         run_manager.start(chain_id)
 
-        # Start a background thread that polls the remote progress file and writes
-        # a local sentinel when the nohup chain finishes — enabling Monitor-based
-        # auto-continuation without Claude polling.
+        # Poll remote progress and write a local completion sentinel.
         threading.Thread(
             target=_chain_completion_monitor,
             args=(chain_id, progress_file),
@@ -1083,8 +1182,7 @@ def _cleanup_chain_files(chain_id: str, progress_file: str, keep_log: bool = Fal
 def _chain_completion_monitor(chain_id: str, progress_file: str, poll_interval: int = 60):
     """
     Background thread: polls chain_progress.jsonl every poll_interval seconds.
-    Writes a sentinel file when the chain completes or fails so Claude can
-    be notified via the Monitor tool without polling get_run_status().
+    Writes a sentinel file when the chain completes or fails.
     """
     logger.info(f"[{chain_id}] Chain monitor started (polling every {poll_interval}s)")
     while True:
@@ -1201,7 +1299,7 @@ def get_run_status(run_id: str) -> dict:
     # analysis tools (extract_thermal etc.) can carry large per-frame lists
     # (structural_metrics_per_T, relaxation_metrics) that overflow the client (~73k chars). Keep
     # scalar result fields; replace big collections with a pointer — callers read the written JSON
-    # artifact (e.g. tg_summary.json) for full detail.
+    # artifact (e.g. thermal.json) for full detail.
     result = run.get("result")
     if not isinstance(result, dict):
         return run
@@ -1294,20 +1392,15 @@ def list_runs(status_filter: Optional[str] = None) -> dict:
 @mcp.tool()
 def watch_run(run_id: str) -> dict:
     """
-    Return a shell command Claude can pass to the Monitor tool to be notified
-    automatically when a run completes — no polling required.
+    Return completion-sentinel metadata for a submitted run.
 
-    Call this immediately after run_lammps_chain(), run_lammps_script(), or
-    any analysis tool. Then invoke the Monitor tool with the returned command.
-    The Monitor will block until the sentinel file appears and print its
-    contents; the harness re-invokes Claude at that point to continue the
-    workflow.
+    Deterministic callers can poll the sentinel path or process-liveness command.
 
     Args:
         run_id: The run_id or chain_id to watch.
 
     Returns:
-        monitor_command:        pass to the Monitor tool with timeout_ms=3600000.
+        monitor_command:        shell command that waits for the sentinel.
         recommended_timeout_ms: 3600000 (the Monitor max; runs may exceed it —
                                 re-arm by calling watch_run again on a bare timeout).
         sentinel_path:          completion sentinel JSON (status: completed|failed).
@@ -1339,17 +1432,122 @@ def watch_run(run_id: str) -> dict:
 
 
 
+def _ff_base_for(use_pcff: bool, use_trappe: bool, use_opls: bool,
+                 params_file: str, engine: str) -> dict:
+    """The force-field/engine keys every stage deck in a chain must carry.
+
+    Shared by generate_equilibration_workflow and generate_cooling_workflow so the two halves
+    of one run cannot drift onto different styles -- the cooling chain reads the equilibration
+    chain's own .data file, and a mismatch there is the "deck emits CHARMM regardless" class of
+    bug this repo has hit more than once.
+
+    PCFF class2 cells from EMC start at ~0.5x experimental density -- no separate soft-heat or
+    cutoff-only compression phase needed. SHAKE is off: PCFF runs stably at 1 fs all-atom
+    without constraints. TraPPE-UA is united-atom (no H), pure lj/cut, no kspace; SHAKE is
+    disabled there too -- UA removes the fast C-H stretch modes, so 2 fs is stable WITHOUT bond
+    constraints, and fix shake on a continuous backbone would fail in LAMMPS anyway (interior
+    atoms have 2 bonds; cluster-build requires terminal atoms). The 2 fs speedup comes from the
+    timestep alone (see _dt_prod_for).
+    """
+    if use_pcff:
+        ff_base = {"use_pcff": True, "use_shake": False}
+    elif use_trappe:
+        ff_base = {"use_trappe": True, "use_shake": False, "use_pppm": False,
+                   "LJ_CUTOFF": 14.0}
+    elif use_opls:
+        ff_base = {"use_opls": True, "use_shake": False}
+    else:
+        ff_base = {}
+    if params_file:
+        ff_base["params_file"] = params_file
+    # Carry the execution engine into every stage deck. GPU-enabled stages render the matching
+    # accelerator package (gpu -> `package gpu`; kokkos -> none, -sf kk handles it); use_gpu=False
+    # stages ignore it and stay CPU. Submit the chain with the SAME engine (run_lammps_chain).
+    ff_base["engine"] = engine
+    return ff_base
+
+
+def _make_stage_builders(gen, work_dir_base: str, ff_base: dict, velocity_seed: int):
+    """Return (_stage, _continue_stage) bound to one chain's generator and output directory.
+
+    Both build the same {name, template, script, work_dir, input_data, output_data,
+    output_restart, params} shape, and both put ff_base LAST so use_shake/use_pcff/params_file
+    always win over a stage's own params.
+    """
+
+    def _stage(name, template, p, prev_data):
+        stage_dir = f"{work_dir_base}/{name}"
+        script = f"{stage_dir}/{name}.in"
+        out_data = f"{stage_dir}/{name}_out.data"
+        out_restart = f"{stage_dir}/{name}_out.restart"
+        p = {
+            "LOG_FILE":           f"{name}.log",
+            "DUMP_FILE":          f"{name}.dump",
+            "LAST_DUMP_FILE":     f"{name}_last.dump",
+            "WRITE_DATA_FILE":    out_data,
+            "WRITE_RESTART_FILE": out_restart,
+            **p,        # stage params first (lower priority for FF keys)
+            **ff_base,  # ff_base last -- ensures use_shake/use_pcff/params_file always win
+        }
+        Path(stage_dir).mkdir(parents=True, exist_ok=True)
+        gen.generate(template_name=template, output_path=script, params=p,
+                     data_file_override=prev_data, velocity_seed=velocity_seed)
+        return {"name": name, "template": template, "script": script, "work_dir": stage_dir,
+                "input_data": prev_data, "output_data": out_data,
+                "output_restart": out_restart, "params": p}
+
+    def _continue_stage(base_name, template, p, restart_path):
+        """Genuinely CONTINUE base_name's own trajectory: read_restart (not read_data),
+        log/dump appended onto base_name's own files, no velocity re-initialization.
+        Returns the same shape as _stage(), keyed by the SAME name so callers can't
+        mistake this for a new, independently-numbered stage."""
+        stage_dir = f"{work_dir_base}/{base_name}"
+        script = f"{stage_dir}/{base_name}.in"
+        out_data = f"{stage_dir}/{base_name}_out.data"
+        out_restart = f"{stage_dir}/{base_name}_out.restart"
+        p = {
+            "LOG_FILE":           f"{base_name}.log",
+            "DUMP_FILE":          f"{base_name}.dump",
+            "LAST_DUMP_FILE":     f"{base_name}_last.dump",
+            "WRITE_DATA_FILE":    out_data,
+            "WRITE_RESTART_FILE": out_restart,
+            "use_restart":        True,
+            "LOG_APPEND":         True,
+            "dump_append":        True,
+            "init_velocity":      None,
+            **p,
+            **ff_base,
+        }
+        Path(stage_dir).mkdir(parents=True, exist_ok=True)
+        gen.generate(template_name=template, output_path=script, params=p,
+                     data_file_override=restart_path, velocity_seed=velocity_seed)
+        return {"name": base_name, "template": template, "script": script,
+                "work_dir": stage_dir, "input_data": restart_path, "output_data": out_data,
+                "output_restart": out_restart, "params": p}
+
+    return _stage, _continue_stage
+
+
 @mcp.tool()
 def generate_equilibration_workflow(
     data_file: str,
     work_dir_base: str,
     velocity_seed: int,
-    npt_prod_steps: Optional[int],
-    npt_cool_steps: Optional[int],
-    npt_cool300_steps: Optional[int],
-    melt_npt_steps: Optional[int],
-    extend_steps: Optional[int],
-    temp: float,
+    densify_ramp_steps: Optional[int],
+    densify_check_every_steps: Optional[int],
+    densify_steps_cap: Optional[int],
+    ff_activate_npt_steps: Optional[int],
+    anneal_heat_steps: Optional[int],
+    anneal_check_every_steps: Optional[int],
+    anneal_cap_steps: Optional[int],
+    melt_ramp_steps: Optional[int],
+    melt_hold_min_steps: Optional[int],
+    melt_hold_cap_steps: Optional[int],
+    nvt_melt_min_steps: Optional[int],
+    nvt_melt_cap_steps: Optional[int],
+    warmup_steps: Optional[int],
+    use_long_range: bool,
+    melt_hold_T: float,
     use_pcff: bool,
     use_trappe: bool,
     use_opls: bool,
@@ -1361,41 +1559,71 @@ def generate_equilibration_workflow(
     n_chains: int = 6,
     n_atoms: Optional[int] = None,
     params_file: str = "",
-    add_melt_npt: bool = False,
-    t_equil_K: Optional[float] = None,
-    add_300k_production: bool = True,
+    anneal_margin_K: float = 100.0,
     extend_only: bool = False,
+    restart_file: Optional[str] = None,
+    base_stage_name: Optional[str] = None,
+    extend_temp_K: Optional[float] = None,
+    thermostat_damp_fs: float = 100.0,
+    barostat_damp_fs: float = 1000.0,
+    resume_from: Optional[str] = None,
+    extend_ensemble: str = "npt",
+    minimize_etol: float = 1e-6,
+    minimize_ftol: float = 1e-6,
+    minimize_maxiter: int = 50000,
+    minimize_maxeval: int = 100000,
 ) -> dict:
     """
-    Auto-generate a complete equilibration workflow as a sequence of
-    LAMMPS scripts. Mirrors the Larsen 21-step logic but with full
-    parameter control.
+    Auto-generate a complete adaptive equilibration workflow as a sequence of LAMMPS
+    scripts, replacing the earlier anneal-before-densify pipeline.
 
-    Protocol (7-run chain, rubbery: temp ≤ 300 K):
-      minimize         - energy minimization in amorphous cell
-      nvt_softheat     - NVT heat from 300 K to max_temp
-      npt_compress     - NPT compress to max_press at max_temp
-      npt_pppm         - NPT decompress from max_press to 1 atm
-      npt_cool         - NPT cool from max_temp to target temp
-      nvt_production   - NVT production at target temp (GPU on; MSD/C(t) analysis)
-      npt_production   - NPT constant-T/P at target conditions (GPU on; bulk modulus)
+    Protocol (fixed stage names, adaptive stages EXTEND via restart-continuation — see
+    extend_only — rather than by lengthening this call's own N_STEPS):
+      minimize               - energy minimization in the as-built amorphous cell
+      nvt_warmup             - fixed, short NVT settle at 300 K (removes build artifacts)
+      npt_densify            - fixed, short NPT compress ramp 1->max_press atm at 300 K
+                               (voids removal). PPPM off during compression for OPLS (rapid
+                               box shrink guard). A ramp is one-shot by construction (LAMMPS
+                               interpolates P_START->P_FINAL monotonically over one `run`) —
+                               not itself adaptive.
+      npt_ff_activate        - fixed, short NPT decompress ramp max_press->press at 300 K,
+                               PPPM restored. Also one-shot.
+      npt_densify_hold       - ADAPTIVE: constant 300 K/press NPT hold, gated on
+                               density/non-bonded-energy half-window stability and no
+                               monotonic volume trend — the actual "has densification
+                               converged" question, asked only once the pressure shock
+                               (npt_densify/npt_ff_activate) is over.
+      anneal_heat            - fixed, short NVT ramp 300 K -> max_temp (one-shot, same reason)
+      anneal_hold            - ADAPTIVE: NVT hold AT max_temp (accessible conformational
+                               relaxation — NOT a claim of reptation/terminal relaxation)
+      npt_melt_ramp          - fixed, one-shot NPT ramp max_temp -> melt_hold_T. The first
+                               barostatted stage after an NVT anneal_hold, so the box is
+                               still the densified 300 K one and the barostat expands it to
+                               melt density here.
+      npt_melt_hold          - ADAPTIVE: NPT at melt_hold_T/press. THE GATED CELL — melt
+                               density, the thermo drift/SEM gates and the per-frame
+                               geometry checks (Rg/MSID/R_ee/torsion/P2/homogeneity/
+                               finite_size) all come from this stage's own log/trajectory.
+      nvt_melt_hold          - ADAPTIVE: NVT at melt_hold_T, FIXED volume (npt_melt_hold's
+                               own endpoint). Supplies the uncontaminated (non-barostat-
+                               rescaled) window MSD/kinetic-trap/C(t) need, and its endpoint
+                               is the cell every downstream track starts from.
 
-    Protocol (9-run chain, glassy: temp > 300 K, add_300k_production=True [default]):
-      Runs 1–7: same as above (at melt temperature)
-      npt_cool300      - NPT cool temp → 300 K (~1 ns)
-      npt_prod300      - NPT constant-T at 300 K (~2 ns) — density and deform source
-
-    Protocol (9-run chain, add_melt_npt=True, rubbery only: temp < t_equil_K):
-      Runs 1–4: unchanged
-      npt_cool_melt    - NPT cool max_temp → t_equil_K
-      npt_melt         - NPT isothermal at t_equil_K (melt density extraction)
-      npt_cool         - NPT cool t_equil_K → temp  (replaces standard npt_cool)
-      Runs 6–7: unchanged
+    This chain does NOT cool. The descent to the assessment temperature — cool_block_NN,
+    cool_block_NN and npt_final — is generate_cooling_workflow's, and runs only when a
+    property needs a cell at that temperature. A melt-only run stops here.
 
     Required args — no defaults. Every step count and the velocity seed must be passed on
     every call, including as an explicit null where the value does not apply to this path.
     Omitting one is what let two identically-prompted runs of the same system emit different
     `run N` counts, so omission is a schema error rather than a silent substitution.
+
+    Each adaptive stage is generated here with only its FIRST block's step count (the
+    *_check_every_steps / *_min_steps args) — this function never loops an adaptive stage
+    to convergence itself. Further blocks are separate restart-continuation calls
+    (extend_only=True, restart_file=<this stage's own .restart output>,
+    base_stage_name=<this stage's name>), driven by the orchestration layer's own
+    gate-and-extend loop, bounded by the matching *_cap_steps ceiling.
 
     Args:
         data_file:      Path to the .data file.
@@ -1403,31 +1631,71 @@ def generate_equilibration_workflow(
         velocity_seed:  REQUIRED, non-null. Pins the `velocity all create` RNG seed for every
                         stage that initialises velocities. Draw once per run, pass the same
                         value to every call for that run, and record it in run_log.md.
-        npt_prod_steps: REQUIRED. Step count for npt_production. Pass null to take the
-                        atom-count tier default (steps_npt // 2). Convert from ns:
-                        int(t_ns * 1e6 / dt_fs).
-        npt_cool_steps: REQUIRED. Step count for the npt_cool stage (max_temp→temp, or the
-                        t_equil_K→temp leg when add_melt_npt=True). Pass null to take
-                        steps_npt from the atom-count tier — the cooling ramp then runs at the
-                        same rate for a given cell size. Pass a larger value (e.g. 2x/4x the
-                        default) to slow the ramp — this is the re_melt_slow_recool recovery
-                        lever for UNDER_ANNEALED_COOLING (RECOVERY_PLAYBOOK.md /
-                        EQUILIBRATION.md).
-        npt_cool300_steps: REQUIRED. Step count for npt_cool300 (glassy only,
-                        T_workflow→300 K). Pass null to take int(1.0e6/dt_prod) (~1 ns), fixed
-                        regardless of cell size or T_workflow. Pass a larger value to slow the
-                        final cool to 300 K — the other re_melt_slow_recool lever.
-        melt_npt_steps: REQUIRED. Step count for the npt_melt isothermal run. Pass null to
-                        take int(1.0e6 / dt_prod) (≈1 ns at the production timestep). Ignored
-                        unless add_melt_npt=True.
-        extend_steps:   REQUIRED. Step count for the npt_extend stage. Pass null to take
-                        int(1.0e6 / dt_prod) (~1 ns). Ignored unless extend_only=True.
+        densify_ramp_steps: REQUIRED. Step count for the fixed npt_densify compress ramp
+                        (1->max_press). Null selects the atom-count tier default (steps_comp).
+        densify_check_every_steps: REQUIRED. Step count for npt_densify_hold's first block
+                        (the adaptive post-decompression hold). Null selects the atom-count
+                        tier default (steps_comp).
+        densify_steps_cap: REQUIRED. Ceiling on cumulative npt_densify_hold steps across all
+                        restart-continuation extensions. Null selects 3x the tier default.
+        ff_activate_npt_steps: REQUIRED. Step count for the fixed npt_ff_activate decompress
+                        ramp (max_press->press, PPPM restored). Null selects int(1.0e5/dt_prod)
+                        (~100 ps).
+        anneal_heat_steps: REQUIRED. Step count for the fixed 300 K -> max_temp anneal_heat
+                        ramp. Null selects the atom-count tier default (steps_heat).
+        anneal_check_every_steps: REQUIRED. Step count for anneal_hold's first block. Null
+                        selects the atom-count tier default (steps_heat).
+        anneal_cap_steps: REQUIRED. Ceiling on cumulative anneal_hold steps across all
+                        restart-continuation extensions. Null selects 3x the tier default.
+                        This is a TIME cap, not a cycle count — the retired eq_annealing_cycles
+                        knob no longer exists; annealing is one continuously-extendable hold.
+        melt_ramp_steps: REQUIRED. Step count for the fixed max_temp -> melt_hold_T
+                        npt_melt_ramp. Null selects the atom-count tier default (steps_heat).
+                        Size it generously: this is where the densified 300 K box expands to
+                        melt density, and a ramp is one-shot.
+        melt_hold_min_steps: REQUIRED. Step count for npt_melt_hold's first block. Null
+                        selects int(5.0e5/dt_prod) (~0.5 ns).
+        melt_hold_cap_steps: REQUIRED. Ceiling on cumulative npt_melt_hold steps across all
+                        restart-continuation extensions. Null selects int(5.0e6/dt_prod).
+        nvt_melt_min_steps: REQUIRED. Step count for nvt_melt_hold's first block. Null
+                        selects int(5.0e5/dt_prod) (~0.5 ns). NOTE this window is
+                        uncalibrated: MSD/C(t) decorrelate far faster at melt temperatures
+                        than at 300 K, so the 0.5 ns default is a placeholder, not a measured
+                        floor. This is now the ONLY fixed-volume window in the whole protocol.
+        nvt_melt_cap_steps: REQUIRED. Ceiling on cumulative nvt_melt_hold steps. Null selects
+                        int(2.0e6/dt_prod) (~2 ns).
+        warmup_steps:   REQUIRED. Step count for the fixed nvt_warmup stage. Null selects
+                        int(1.0e5/dt_prod) (~100 ps).
+        extend_ensemble: "npt" (default) or "nvt" — which ensemble extend_only continues.
+                        Must match base_stage_name's own ensemble (e.g. "nvt" for
+                        anneal_hold/nvt_melt_hold, "npt" for npt_densify_hold/npt_melt_hold)
+                        — mismatches would silently add or remove a barostat
+                        mid-trajectory. Ignored unless extend_only=True.
+        minimize_etol:  Energy-tolerance stopping criterion for the minimize stage (default
+                        1e-6, matches script_generator.py's own default). Escalated (looser,
+                        x10/attempt) by the raise_minimize_tolerance remedy on
+                        MINIMIZE_NOT_CONVERGED. Ignored unless resume_from is None (a resumed
+                        chain skips minimize entirely).
+        minimize_ftol:  Force-tolerance stopping criterion (default 1e-6). Same remedy/scope.
+        minimize_maxiter: Max minimizer iterations (default 50000). Escalated x4/attempt by the
+                        same remedy.
+        minimize_maxeval: Max force evaluations (default 100000). Same remedy/scope.
         polymer_name:   Label used in filenames and log comments.
-        temp:           REQUIRED. Target simulation temperature (K). This is the workflow
-                        temperature, not room temperature — a glassy melt runs at T_equil_K
-                        (typically 500-700 K), so the old 300.0 default silently built a
-                        cold chain that never melted.
-        max_temp:       Peak annealing temperature (K). Typically 2x Tg.
+        melt_hold_T:    REQUIRED. The melt hold temperature (K) — where this chain ENDS and
+                        every downstream track begins. Melt density and the binding melt gate
+                        are measured here. Resolved per-SMILES by the planning layer as
+                        max(class T_equil_K, Tg + 200) so it clears the MD glass transition
+                        (which sits ~120 K above the experimental Tg at accessible cooling
+                        rates); the Tg staircase starts from this cell and cools, so a melt
+                        hold below the MD transition would begin the sweep inside the glass.
+        max_temp:       Peak annealing temperature (K). Must be at or above melt_hold_T
+                        (enforced below) — npt_melt_ramp descends from it to the melt hold.
+                        A margin of anneal_margin_K is expected but only warned about, since
+                        the soak's value is a planning-layer judgement, not a correctness one.
+        anneal_margin_K: Expected margin between max_temp and melt_hold_T (default 100 K).
+                        Below it the ramp is near a no-op and the soak does no de-knotting;
+                        logged as a warning rather than rejected. See stage_params.py's own
+                        floor on this same invariant, which is where it is actually decided.
         press:          Target pressure (atm), typically 1.
         max_press:      Compression pressure (atm), typically 50000.
         n_chains:       NO-OP — accepted for backward compatibility but never read. Chain
@@ -1448,7 +1716,7 @@ def generate_equilibration_workflow(
         use_trappe:     Set True for EMC/TraPPE-UA systems (PHYC, PDIE).
                         Switches all templates to pair_style lj/cut 14.0 (no
                         kspace), multi/harmonic dihedrals, and SHAKE on all
-                        C-C bond types (enables dt=2 fs for npt_pppm through npt_production).
+                        C-C bond types (enables dt=2 fs for npt_ff_activate onward).
         use_opls:       Set True for EMC/OPLS-AA systems (PHAL, PSIL).
                         Switches all templates to pair_style lj/cut/coul/long 9.5,
                         multi/harmonic dihedrals, geometric mixing, special_bonds
@@ -1459,24 +1727,50 @@ def generate_equilibration_workflow(
                         When provided, Coeffs validation is skipped on the .data
                         file (EMC stores coefficients separately) and each script
                         includes the file via `include {params_file}`.
-        add_melt_npt:        If True and temp < t_equil_K, replace npt_cool with three
-                             runs: npt_cool_melt (max_temp→t_equil_K), npt_melt
-                             (isothermal at t_equil_K), npt_cool (t_equil_K→temp).
-                             npt_melt is the melt density extraction target.
-                             Default False (standard 7-run workflow).
-        t_equil_K:           Melt equilibration temperature (K). Required when
-                             add_melt_npt=True. Must satisfy temp < t_equil_K < max_temp.
-        add_300k_production: When True (default) and temp > 300.0, append npt_cool300
-                             (T→300 K, ~1 ns) and npt_prod300 (300 K constant-T, ~2 ns).
-                             These provide density and deformation input for glassy polymers.
-                             npt_production_log/dir in the return dict point to npt_prod300
-                             when present. Set False only for diagnostic or rubbery-at-high-T runs.
+        resume_from:    None (default, full chain from minimize) or one of "nvt_warmup" |
+                        "npt_densify" | "npt_ff_activate" | "npt_densify_hold" | "anneal_hold" |
+                        "npt_melt_ramp" | "npt_melt_hold" — skip every stage up to and
+                        including the named checkpoint and start the returned chain AFTER it,
+                        reading data_file as that checkpoint's own write_data output.
+                        Every resumable stage runs with init_velocity=None (no `velocity all
+                        create`), so it always inherits velocities from whatever .data file
+                        it's given — resuming is not a special case, it's how every stage
+                        boundary in the full chain already works. "anneal_hold" means both
+                        anneal_heat and anneal_hold already ran — starts at npt_melt_ramp.
+                        "npt_melt_hold" generates nvt_melt_hold alone, which is exactly what
+                        the melt gate's two-step EXTEND needs after lengthening npt_melt_hold:
+                        the NVT window and the handoff cell were both built from the
+                        pre-extension endpoint and are stale until regenerated. To continue a
+                        single already-run block rather than redo it, use extend_only.
+        extend_only:    If True, generate ONE restart-continuation stage (not a fresh chain) —
+                        see restart_file/base_stage_name below. This is the ONLY way any
+                        adaptive stage gets more steps; it is never done by re-generating that
+                        stage with a larger N_STEPS.
+        restart_file:   REQUIRED when extend_only=True. Path to base_stage_name's own
+                        <name>_out.restart file (NOT a .data file) — the continuation reads
+                        this via `read_restart`, preserving thermostat/barostat extended-system
+                        state and step count, and issues no `velocity create`.
+        extend_temp_K:  Unused by this tool — every adaptive stage of the core chain holds at
+                        a fixed, known condition (npt_densify_hold: 300 K; anneal_hold:
+                        max_temp; npt_melt_hold/nvt_melt_hold: melt_hold_T). Accepted for
+                        signature symmetry with generate_cooling_workflow, where a cool_block_NN
+                        genuinely does need it.
+        base_stage_name: REQUIRED when extend_only=True. The stage being continued — one of
+                        "npt_densify_hold", "anneal_hold", "npt_melt_hold", "nvt_melt_hold".
+                        The continuation's log/dump are opened in APPEND mode onto that stage's
+                        own LOG_FILE/DUMP_FILE, so the result is one continuous trajectory
+                        split across runs, not a new one.
 
     Returns:
         dict with:
-            stages       - list of stage dicts (script_path, work_dir, params)
-            run_order    - ordered list of stage names
-            instructions - how to execute this workflow
+            stages          - list of stage dicts (script_path, work_dir, params)
+            run_order       - ordered list of stage names
+            melt_data_path  - npt_melt_hold's output_data: the GATED melt cell. What the melt
+                              gate adjudicates, and the cooling stage's contraction reference.
+            melt_start_data_path - nvt_melt_hold's output_data: the HANDOFF cell. What the
+                              cooling stage and the Tg staircase both start from. Its box is
+                              npt_melt_hold's own, since NVT cannot move it.
+            instructions    - how to execute this workflow
     """
     try:
         if velocity_seed is None:
@@ -1487,6 +1781,59 @@ def generate_equilibration_workflow(
                          "chain cannot be reproduced. Draw one seed per run, pass it here, and "
                          "record it in run_log.md.",
             }
+        _CHECKPOINTS = ["nvt_warmup", "npt_densify", "npt_ff_activate", "npt_densify_hold",
+                       "anneal_hold", "npt_melt_ramp", "nvt_melt_hold"]
+        if resume_from not in (None, *_CHECKPOINTS):
+            return {"status": "error",
+                    "error": f"resume_from={resume_from!r} is not supported — must be one of "
+                             f"None, {', '.join(repr(c) for c in _CHECKPOINTS)}."}
+        if resume_from is not None and extend_only:
+            return {"status": "error", "error": "resume_from and extend_only are mutually exclusive"}
+        if extend_ensemble not in ("npt", "nvt"):
+            return {"status": "error",
+                    "error": f"extend_ensemble={extend_ensemble!r} must be 'npt' or 'nvt'"}
+        if extend_only and (not restart_file or not base_stage_name):
+            return {"status": "error",
+                    "error": "extend_only=True requires both restart_file (the base stage's own "
+                             ".restart output) and base_stage_name (the stage being continued) — "
+                             "a continuation reads restart state onto that stage's own log/dump, "
+                             "it does not start a new stage from a plain .data file."}
+        _STAGE_ENSEMBLE = {"npt_densify_hold": "npt", "anneal_hold": "nvt",
+                          "npt_melt_hold": "npt", "nvt_melt_hold": "nvt"}
+        if extend_only and base_stage_name:
+            _required_ensemble = _STAGE_ENSEMBLE.get(base_stage_name)
+            if _required_ensemble is not None and extend_ensemble != _required_ensemble:
+                return {"status": "error",
+                        "error": f"extend_ensemble={extend_ensemble!r} does not match "
+                                 f"base_stage_name={base_stage_name!r}'s own ensemble "
+                                 f"({_required_ensemble!r}) — continuing an {_required_ensemble} "
+                                 f"stage as {extend_ensemble} would silently add or remove a "
+                                 "barostat mid-trajectory."}
+        temp = melt_hold_T
+        if max_temp < melt_hold_T:
+            return {"status": "error",
+                    "error": f"max_temp={max_temp} is below melt_hold_T={melt_hold_T} — "
+                             "npt_melt_ramp descends from the anneal ceiling to the melt hold, "
+                             "so the ceiling must be at or above it. Raise max_temp (or the "
+                             "class's annealing_T_high_K)."}
+        if max_temp == melt_hold_T:
+            # Only the degenerate case is worth saying anything about. anneal_margin_K is a
+            # margin over T_equil_K -- the melt-EQUILIBRATION temperature -- and that is where
+            # stage_params enforces it; this generator never sees T_equil_K, so comparing the
+            # margin against melt_hold_T here would fire on every perfectly-correct run whose
+            # per-SMILES melt sits above T_equil (PS: melt 573 K, ceiling 650 K, a 77 K gap
+            # that is exactly the intended 100 K over T_equil=550).
+            logger.warning(
+                "max_temp == melt_hold_T == %s — npt_melt_ramp is a no-op and the anneal soak "
+                "runs at the melt temperature, so it does no de-knotting above it. Legal, but "
+                "probably not what was intended.", melt_hold_T)
+        if resume_from == "nvt_melt_hold":
+            # Legal and meaningful: it regenerates the closing npt_melt_hold from an
+            # already-extended nvt_melt_hold, which is exactly what the melt gate's two-step
+            # structural EXTEND needs. Left explicit so the asymmetry is visible.
+            pass
+        if thermostat_damp_fs <= 0 or barostat_damp_fs <= 0:
+            return {"status": "error", "error": "thermostat/barostat damping must be positive"}
 
         # Parse data file to get system info
         content = Path(data_file).read_text(encoding="utf-8")
@@ -1511,7 +1858,9 @@ def generate_equilibration_workflow(
 
         n_atoms = n_atoms or info.get("n_atoms", 0)
 
-        # Select step counts based on system size
+        # Select step counts based on system size. Only steps_comp and steps_heat are read
+        # below; steps_min/npt/nvt are unused (those stages take their counts elsewhere) and
+        # are kept pending review rather than removed.
         if n_atoms < 5000:
             steps_min   = 50000
             steps_comp  = 300000
@@ -1525,337 +1874,281 @@ def generate_equilibration_workflow(
             steps_npt   = 2000000
             steps_nvt   = 2000000
         else:
-            steps_min   = 50000
+            steps_min   = 50000    # noqa: F841 -- unused, see above
             steps_comp  = 1000000
             steps_heat  = 2000000
-            steps_npt   = 3000000
-            steps_nvt   = 3000000
+            steps_npt   = 3000000  # noqa: F841 -- unused, see above
+            steps_nvt   = 3000000  # noqa: F841 -- unused, see above
 
-        # PCFF class2 cells from EMC start at ~0.5× experimental density — no
-        # separate soft-heat or cutoff-only compression phase needed.
-        # SHAKE is off: PCFF runs stably at 1 fs all-atom without constraints.
-        # TraPPE-UA: united-atom (no H), pure lj/cut, no kspace.
-        # SHAKE is disabled — UA removes fast C-H stretch modes, so 2 fs is stable
-        # WITHOUT bond constraints. fix shake on a continuous backbone would fail in
-        # LAMMPS anyway (interior atoms have 2 bonds; cluster-build requires terminal atoms).
-        # The 2 fs speedup comes from timestep increase alone (dt_prod below).
-        if use_pcff:
-            ff_base = {"use_pcff": True, "use_shake": False}
-        elif use_trappe:
-            ff_base = {
-                "use_trappe": True,
-                "use_shake":  False,
-                "use_pppm":   False,
-                "LJ_CUTOFF":  14.0,
-            }
-        elif use_opls:
-            ff_base = {"use_opls": True, "use_shake": False}
-        else:
-            ff_base = {}
-        if params_file:
-            ff_base["params_file"] = params_file
-        # Carry the execution engine into every stage deck. GPU-enabled stages render the matching
-        # accelerator package (gpu → `package gpu`; kokkos → none, -sf kk handles it); use_gpu=False
-        # stages ignore it and stay CPU. Submit the chain with the SAME engine (run_lammps_chain).
-        ff_base["engine"] = engine
-
-        # TraPPE-UA with SHAKE enables 2 fs timestep for npt_pppm through npt_production.
-        # Stages 02-03 keep 0.5 fs (chain overlap risk at startup is too high for large dt).
+        ff_base = _ff_base_for(use_pcff, use_trappe, use_opls, params_file, engine)
+        # TraPPE-UA's united-atom sites permit 2 fs; the early ramps still pin 0.5 fs inline.
         dt_prod = 2.0 if use_trappe else 1.0
 
         stages = []
 
-        def _stage(name, template, p, prev_data):
-            stage_dir = f"{work_dir_base}/{name}"
-            script    = f"{stage_dir}/{name}.in"
-            out_data  = f"{stage_dir}/{name}_out.data"
-            p = {
-                "LOG_FILE":        f"{name}.log",
-                "DUMP_FILE":       f"{name}.dump",
-                "LAST_DUMP_FILE":  f"{name}_last.dump",
-                "WRITE_DATA_FILE": out_data,
-                **p,        # stage params first (lower priority for FF keys)
-                **ff_base,  # ff_base last — ensures use_shake/use_pcff/params_file always win
-            }
-            Path(stage_dir).mkdir(parents=True, exist_ok=True)
-            gen.generate(
-                template_name=template,
-                output_path=script,
-                params=p,
-                data_file_override=prev_data,
-                velocity_seed=velocity_seed,
-            )
-            return {
-                "name":            name,
-                "template":        template,
-                "script":   script,
-                "work_dir": stage_dir,
-                "input_data":      prev_data,
-                "output_data":     out_data,
-                "params":          p,
-            }
+        _stage, _continue_stage = _make_stage_builders(
+            gen, work_dir_base, ff_base, velocity_seed)
 
-        # --- Extend-only mode (deterministic equilibration extension) -----------------------------
-        # When equil-check returns EXTEND, add a SINGLE NPT continuation stage from an
-        # already-equilibrated cell. Deterministic: reuses the npt template via _stage (no
-        # hand-written .in), and returns the same shape as a full workflow so run_lammps_chain and
-        # the equil-check gate consume it identically. Submit with engine= matching this call.
+        # --- Extend-only mode: restart-based continuation of an already-submitted adaptive
+        # stage. This is the ONLY way any adaptive stage (npt_densify, anneal_hold, any
+        # npt_melt_hold, nvt_melt_hold) gets more steps — never by
+        # re-generating that stage with a larger N_STEPS. read_restart preserves
+        # thermostat/barostat extended-system state and step count; log/dump are opened in
+        # append mode onto base_stage_name's OWN files, so the result is one continuous
+        # trajectory, not a new independently-numbered stage.
         if extend_only:
-            ext_steps = int(extend_steps) if extend_steps else int(1.0e6 / dt_prod)  # ~1 ns default
-            sx = _stage("npt_extend", "npt", {
-                "T_START": temp, "T_FINAL": temp, "T_DAMP": 100.0,
-                "P_START": press, "P_FINAL": press, "P_DAMP": 1000.0,
+            # The continuation's own block length comes from whichever *_check_every_steps /
+            # *_min_steps arg governs base_stage_name — the SAME knob
+            # the orchestration layer passed (possibly escalated by a remedy) when it first
+            # submitted that stage, not a separate generic "how long to extend" parameter.
+            if base_stage_name == "npt_densify_hold":
+                ext_steps = densify_check_every_steps
+            elif base_stage_name == "anneal_hold":
+                ext_steps = anneal_check_every_steps
+            elif base_stage_name == "npt_melt_hold":
+                ext_steps = melt_hold_min_steps
+            elif base_stage_name == "nvt_melt_hold":
+                ext_steps = nvt_melt_min_steps
+            else:
+                return {"status": "error",
+                        "error": f"base_stage_name={base_stage_name!r} is not a recognized "
+                                 "adaptive stage of the CORE chain — must be one of "
+                                 "npt_densify_hold, anneal_hold, npt_melt_hold, nvt_melt_hold. "
+                                 "The cooldown's stages (cool_block_NN, npt_final) belong to "
+                                 "generate_cooling_workflow."}
+            ext_steps = int(ext_steps) if ext_steps else int(1.0e6 / dt_prod)
+            template = "nvt" if extend_ensemble == "nvt" else "npt"
+            # Each adaptive stage holds at its OWN fixed condition; a continuation must hold
+            # at the SAME one, not silently default to the workflow's temp/press.
+            if base_stage_name == "npt_densify_hold":
+                ext_T = 300.0
+            elif base_stage_name == "anneal_hold":
+                ext_T = max_temp
+            elif base_stage_name in ("npt_melt_hold", "nvt_melt_hold"):
+                ext_T = melt_hold_T
+            else:
+                ext_T = temp  # unreachable: base_stage_name already validated above
+            params = {
+                "T_START": ext_T, "T_FINAL": ext_T, "T_DAMP": thermostat_damp_fs,
                 "TIMESTEP": dt_prod, "N_STEPS": ext_steps,
-                "use_pppm": not use_trappe, "use_gpu": True, "write_restart": False,
-            }, data_file)
+                "use_pppm": use_long_range and not use_trappe,
+                "use_gpu": True,
+            }
+            if extend_ensemble == "npt":
+                params.update({"P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs})
+            sx = _continue_stage(base_stage_name, template, params, restart_file)
             stages.append(sx)
             return {
                 "status":             "success",
                 "polymer":            polymer_name,
                 "n_atoms":            n_atoms,
-                "temp":               temp,
+                "melt_hold_T":        melt_hold_T,
                 "max_temp":           max_temp,
                 "n_stages":           1,
                 "engine":             engine,
                 "extend_only":        True,
+                "extend_ensemble":    extend_ensemble,
                 "stages":             stages,
                 "run_order":          [sx["name"]],
-                "npt_production_log":  f"{sx['work_dir']}/{sx['params']['LOG_FILE']}",
-                "npt_production_dir":  sx["work_dir"],
-                "npt_tg_prep_data":    None,
+                # An extend-only call generates ONE continuation stage and nothing else, so it
+                # names no melt cells. The caller keeps the paths it already had -- and, when it
+                # extended npt_melt_hold, must regenerate nvt_melt_hold (resume_from=
+                # "npt_melt_hold") before those paths are valid again.
+                "melt_data_path":       None,
+                "melt_start_data_path": None,
                 "preflight_warnings":  vr["warnings"],
                 "preflight_stats":     vr["stats"],
                 "instructions": (
-                    f"Extend-only: 1 NPT continuation stage (npt_extend, {ext_steps} steps) from "
-                    f"{data_file} at {temp} K / {press} atm (engine={engine}). Submit with "
-                    f"run_lammps_chain(engine='{engine}'); then re-run equil-check on "
-                    f"{sx['output_data']}."
+                    f"Extend-only: continued {base_stage_name} ({extend_ensemble.upper()}, "
+                    f"{ext_steps} more steps) via read_restart from {restart_file}, "
+                    f"appending onto {sx['work_dir']}/{sx['params']['LOG_FILE']} "
+                    f"(engine={engine}). Submit with run_lammps_chain(engine='{engine}'); "
+                    f"then re-run the block gate on {sx['output_data']}."
                 ),
             }
 
-        # minimize
-        s1 = _stage("minimize", "minimize", {
-            "use_pppm":  True,
-            "use_gpu":   True,
-            "MIN_STYLE": "cg",
-            "MAXITER":   50000,
-        }, data_file)
-        stages.append(s1)
+        # --- minimize: only for the full chain -------------------------------------------------
+        if resume_from is None:
+            s_min = _stage("minimize", "minimize", {
+                "use_pppm":  use_long_range and not use_trappe,
+                "use_gpu":   True,
+                "MIN_STYLE": "cg",
+                "ETOL":      minimize_etol,
+                "FTOL":      minimize_ftol,
+                "MAXITER":   minimize_maxiter,
+                "MAXEVAL":   minimize_maxeval,
+            }, data_file)
+            stages.append(s_min)
+            prev_output = s_min["output_data"]
+        else:
+            prev_output = data_file  # stand-in for whatever checkpoint resume_from names
 
-        # nvt_softheat — GPU + PPPM throughout
-        s2 = _stage("nvt_softheat", "nvt", {
-            "T_START":    300.0,
-            "T_FINAL":    max_temp,
-            "T_DAMP":     50.0,
-            "TIMESTEP":   0.5,
-            "N_STEPS":    steps_comp,
-            "use_pppm":   True,
-            "use_gpu":    True,
-            "use_shake":  False,
-            "init_velocity": 300.0,
-        }, s1["output_data"])
-        stages.append(s2)
+        _resume_idx = _CHECKPOINTS.index(resume_from) if resume_from is not None else -1
 
-        # npt_compress — NPT compression to target density.
-        # OPLS-AA: use short-range Coulomb (use_pppm=False → lj/cut/coul/cut) during compression
-        # to prevent PPPM "out of range atoms" crash when the box shrinks rapidly at high pressure.
-        # Full PPPM resumes at npt_pppm. ff_base temporarily overridden so use_pppm=False wins.
-        saved_ff_base = ff_base
-        ff_base = {**ff_base, "use_pppm": False} if use_opls else ff_base
-        s3 = _stage("npt_compress", "npt_compress", {
-            "T_START":   max_temp,
-            "T_FINAL":   max_temp,
-            "T_DAMP":    100.0,
-            "P_START":   1.0,
-            "P_FINAL":   max_press,
-            "P_DAMP":    1000.0,
-            "TIMESTEP":  0.5,
-            "N_STEPS":   steps_comp,
-            "use_pppm":  False,
-            "use_gpu":   True,
-        }, s2["output_data"])
-        stages.append(s3)
-        ff_base = saved_ff_base  # restore PPPM for all subsequent stages
+        # 1. nvt_warmup — fixed, short 300 K settle (removes build artifacts)
+        if _resume_idx < 0:
+            s = _stage("nvt_warmup", "nvt", {
+                "T_START": 300.0, "T_FINAL": 300.0, "T_DAMP": thermostat_damp_fs,
+                "TIMESTEP": 0.5,
+                "N_STEPS": int(warmup_steps) if warmup_steps else int(1.0e5 / dt_prod),
+                "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
+                "use_shake": False, "init_velocity": 300.0,
+            }, prev_output)
+            stages.append(s)
+            prev_output = s["output_data"]
 
-        # npt_pppm — NPT decompress, GPU + PPPM
-        s4 = _stage("npt_pppm", "npt", {
-            "T_START":   max_temp,
-            "T_FINAL":   max_temp,
-            "T_DAMP":    100.0,
-            "P_START":   max_press,
-            "P_FINAL":   press,
-            "P_DAMP":    1000.0,
-            "TIMESTEP":  dt_prod,
-            "N_STEPS":   steps_comp,
-            "use_pppm":  True,
-            "use_gpu":   True,
+        # 2. npt_densify — fixed compress ramp 1->max_press at 300 K. A ramp is one-shot:
+        # LAMMPS interpolates P_START->P_FINAL monotonically over one `run`, so this is never
+        # itself an adaptive/extendable stage (npt_densify_hold, below, is).
+        # OPLS-AA: short-range Coulomb during compression (rapid box-shrink PPPM crash guard);
+        # full PPPM resumes at npt_ff_activate. ff_base temporarily overridden so it wins.
+        if _resume_idx < 1:
+            saved_ff_base = ff_base
+            ff_base = {**ff_base, "use_pppm": False} if use_opls else ff_base
+            s = _stage("npt_densify", "npt_compress", {
+                "T_START": 300.0, "T_FINAL": 300.0, "T_DAMP": thermostat_damp_fs,
+                "P_START": 1.0, "P_FINAL": max_press, "P_DAMP": barostat_damp_fs,
+                "TIMESTEP": 0.5,
+                "N_STEPS": int(densify_ramp_steps) if densify_ramp_steps else steps_comp,
+                "use_pppm": False, "use_gpu": True,
+            }, prev_output)
+            stages.append(s)
+            ff_base = saved_ff_base  # restore PPPM for all subsequent stages
+            prev_output = s["output_data"]
+
+        # 3. npt_ff_activate — fixed decompress ramp max_press->press at 300 K, PPPM restored.
+        if _resume_idx < 2:
+            s = _stage("npt_ff_activate", "npt", {
+                "T_START": 300.0, "T_FINAL": 300.0, "T_DAMP": thermostat_damp_fs,
+                "P_START": max_press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
+                "TIMESTEP": dt_prod,
+                "N_STEPS": int(ff_activate_npt_steps) if ff_activate_npt_steps else int(1.0e5 / dt_prod),
+                "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
+                "write_restart": True,
+            }, prev_output)
+            stages.append(s)
+            prev_output = s["output_data"]
+
+        # 4. npt_densify_hold — ADAPTIVE: constant 300 K/press NPT hold, gated (by the
+        # orchestration layer, via check_block_gate.py) on density/non-bonded-energy
+        # half-window stability and no monotonic volume trend. Generated here with only its
+        # FIRST block; further blocks are extend_only=True restart-continuations of THIS
+        # stage, capped at densify_steps_cap.
+        if _resume_idx < 3:
+            s = _stage("npt_densify_hold", "npt", {
+                "T_START": 300.0, "T_FINAL": 300.0, "T_DAMP": thermostat_damp_fs,
+                "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
+                "TIMESTEP": dt_prod,
+                "N_STEPS": int(densify_check_every_steps) if densify_check_every_steps else steps_comp,
+                "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
+                "write_restart": True,
+            }, prev_output)
+            stages.append(s)
+            prev_output = s["output_data"]
+
+        # 5/6. anneal_heat (fixed ramp) + anneal_hold (ADAPTIVE, first block only). One
+        # continuous high-T hold rather than repeated heat/cool cycling — supported by this
+        # repo's own cited literature (Wu2017, polymer_rules.json: single high-T equilibration
+        # + monotonic cooling is statistically equivalent to repeated thermal cycling once the
+        # melt is adequately equilibrated at T_max).
+        if _resume_idx < 4:
+            s = _stage("anneal_heat", "nvt", {
+                "T_START": 300.0, "T_FINAL": max_temp, "T_DAMP": thermostat_damp_fs,
+                "TIMESTEP": dt_prod,
+                "N_STEPS": int(anneal_heat_steps) if anneal_heat_steps else steps_heat,
+                "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
+                "write_restart": True,
+            }, prev_output)
+            stages.append(s)
+            prev_output = s["output_data"]
+
+            s = _stage("anneal_hold", "nvt", {
+                "T_START": max_temp, "T_FINAL": max_temp, "T_DAMP": thermostat_damp_fs,
+                "TIMESTEP": dt_prod,
+                "N_STEPS": int(anneal_check_every_steps) if anneal_check_every_steps else steps_heat,
+                "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
+                "write_restart": True,
+            }, prev_output)
+            stages.append(s)
+            prev_output = s["output_data"]
+        # resume_from == "anneal_hold": prev_output already = data_file, standing in
+        # correctly for anneal_hold's own (already-run) output.
+
+        # 7. npt_melt_ramp — fixed one-shot NPT ramp from the anneal ceiling down to the melt
+        # hold. This is the FIRST barostatted stage after an NVT anneal_hold, so the cell still
+        # carries the densified 300 K box and the barostat has to expand it to melt density
+        # here. That expansion used to happen inside cool_block_01, ungated; now the adaptive
+        # hold that follows gates it.
+        if _resume_idx < 5:
+            s = _stage("npt_melt_ramp", "npt", {
+                "T_START": max_temp, "T_FINAL": melt_hold_T, "T_DAMP": thermostat_damp_fs,
+                "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
+                "TIMESTEP": dt_prod,
+                "N_STEPS": int(melt_ramp_steps) if melt_ramp_steps else steps_heat,
+                "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
+                "write_restart": True,
+            }, prev_output)
+            stages.append(s)
+            prev_output = s["output_data"]
+
+        # 8. nvt_melt_hold — ADAPTIVE: NVT at melt_hold_T, FIXED volume (npt_melt_ramp's own
+        # endpoint, which is a barostatted melt). This is where the expensive work happens:
+        # chain relaxation, and the ideal-chain / decorrelation statistics that decide whether
+        # this melt is equilibrated at all (MSID, C(t), Rg, torsion, MSD). It runs at fixed
+        # volume because MSD and C(t) require it -- a barostatted trajectory affine-rescales
+        # coordinates every step, contaminating cumulative displacement -- and because the
+        # structural work is the long part, doing it here means the expensive stage is also the
+        # clean one. Extending THIS is how an under-relaxed melt is fixed.
+        if _resume_idx < 6:
+            s = _stage("nvt_melt_hold", "nvt", {
+                "T_START": melt_hold_T, "T_FINAL": melt_hold_T, "T_DAMP": thermostat_damp_fs,
+                "TIMESTEP": dt_prod,
+                "N_STEPS": int(nvt_melt_min_steps) if nvt_melt_min_steps
+                           else int(5.0e6 / dt_prod),
+                "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
+                "write_restart": True,
+            }, prev_output)
+            stages.append(s)
+            prev_output = s["output_data"]
+
+        # 9. npt_melt_hold — ADAPTIVE: NPT at melt_hold_T/press. TERMINAL, and THE GATED CELL.
+        # Melt density is measured here, on a structure the NVT hold has already relaxed --
+        # the ordering matters: measuring it before convergence would gate a density whose
+        # chains had not yet moved. npt_melt_ramp set the box near melt density, the NVT hold
+        # pinned it while the structure relaxed, and this stage lets the barostat correct the
+        # residual. Its endpoint is the cell every downstream track starts from.
+        s = _stage("npt_melt_hold", "npt", {
+            "T_START": melt_hold_T, "T_FINAL": melt_hold_T, "T_DAMP": thermostat_damp_fs,
+            "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
+            "TIMESTEP": dt_prod,
+            "N_STEPS": int(melt_hold_min_steps) if melt_hold_min_steps
+                       else int(2.0e6 / dt_prod),
+            "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
             "write_restart": True,
-        }, s3["output_data"])
-        stages.append(s4)
+        }, prev_output)
+        stages.append(s)
+        prev_output = s["output_data"]
 
-        # npt_cool — NPT cool to target temp.
-        # With add_melt_npt=True (rubbery validation runs): split into npt_cool_melt/npt_melt/npt_cool
-        # to capture an isothermal NPT run at t_equil_K for melt density extraction.
-        _use_melt_npt = (
-            add_melt_npt
-            and t_equil_K is not None
-            and temp < t_equil_K
-        )
-        _cool_steps = npt_cool_steps if npt_cool_steps is not None else steps_npt
-        if _use_melt_npt:
-            _melt_steps = melt_npt_steps or int(1.0e6 / dt_prod)
-            s5a = _stage("npt_cool_melt", "npt", {
-                "T_START":   max_temp,
-                "T_FINAL":   t_equil_K,
-                "T_DAMP":    100.0,
-                "P_START":   press,
-                "P_FINAL":   press,
-                "P_DAMP":    1000.0,
-                "TIMESTEP":  dt_prod,
-                "N_STEPS":   steps_npt // 2,
-                "use_pppm":  True,
-                "use_gpu":   True,
-                "write_restart": True,
-            }, s4["output_data"])
-            stages.append(s5a)
-            s5b = _stage("npt_melt", "npt", {
-                "T_START":   t_equil_K,
-                "T_FINAL":   t_equil_K,
-                "T_DAMP":    100.0,
-                "P_START":   press,
-                "P_FINAL":   press,
-                "P_DAMP":    1000.0,
-                "TIMESTEP":  dt_prod,
-                "N_STEPS":   _melt_steps,
-                "use_pppm":  True,
-                "use_gpu":   True,
-                "write_restart": True,
-            }, s5a["output_data"])
-            stages.append(s5b)
-            s5 = _stage("npt_cool", "npt", {
-                "T_START":   t_equil_K,
-                "T_FINAL":   temp,
-                "T_DAMP":    100.0,
-                "P_START":   press,
-                "P_FINAL":   press,
-                "P_DAMP":    1000.0,
-                "TIMESTEP":  dt_prod,
-                "N_STEPS":   _cool_steps,
-                "use_pppm":  True,
-                "use_gpu":   True,
-                "write_restart": True,
-            }, s5b["output_data"])
-            stages.append(s5)
-        else:
-            s5 = _stage("npt_cool", "npt", {
-                "T_START":   max_temp,
-                "T_FINAL":   temp,
-                "T_DAMP":    100.0,
-                "P_START":   press,
-                "P_FINAL":   press,
-                "P_DAMP":    1000.0,
-                "TIMESTEP":  dt_prod,
-                "N_STEPS":   _cool_steps,
-                "use_pppm":  True,
-                "use_gpu":   True,
-                "write_restart": True,
-            }, s4["output_data"])
-            stages.append(s5)
-
-        # nvt_production — NVT production, GPU + PPPM
-        s6 = _stage("nvt_production", "nvt", {
-            "T_START":   temp,
-            "T_FINAL":   temp,
-            "T_DAMP":    100.0,
-            "TIMESTEP":  dt_prod,
-            "N_STEPS":   steps_nvt,
-            "use_pppm":  True,
-            "use_gpu":   True,
-            "write_restart": False,
-        }, s5["output_data"])
-        stages.append(s6)
-
-        # npt_production — NPT production at target conditions, dedicated for K_T measurement.
-        # Must be constant-T/P; the npt_cool ramp is invalid for volume fluctuation method.
-        # Reads from nvt_production output (best-equilibrated config).
-        steps_npt_prod = npt_prod_steps if npt_prod_steps is not None else steps_npt // 2
-        s7 = _stage("npt_production", "npt", {
-            "T_START":       temp,
-            "T_FINAL":       temp,
-            "T_DAMP":        100.0,
-            "P_START":       press,
-            "P_FINAL":       press,
-            "P_DAMP":        1000.0,
-            "TIMESTEP":      dt_prod,
-            "N_STEPS":       steps_npt_prod,
-            "use_pppm":      True,
-            "use_gpu":       True,
-            "write_restart": False,
-        }, s6["output_data"])
-        stages.append(s7)
-
-        # npt_cool300 + npt_prod300 (glassy only): cool and produce at 300 K.
-        # temp > 300 means the chain runs at melt T; density and deform inputs
-        # must come from a constant-T 300 K run, not the cooling-ramp tail.
-        _add_300k = add_300k_production and temp > 300.0
-        s8 = s9 = None
-        if _add_300k:
-            steps_cool300 = npt_cool300_steps if npt_cool300_steps is not None else int(1.0e6 / dt_prod)   # ~1 ns default
-            steps_prod300 = int(2.0e6 / dt_prod)   # ~2 ns
-            s8 = _stage("npt_cool300", "npt", {
-                "T_START":       temp,
-                "T_FINAL":       300.0,
-                "T_DAMP":        100.0,
-                "P_START":       press,
-                "P_FINAL":       press,
-                "P_DAMP":        1000.0,
-                "TIMESTEP":      dt_prod,
-                "N_STEPS":       steps_cool300,
-                "use_pppm":      not use_trappe,
-                "use_gpu":       True,
-                "write_restart": False,
-            }, s7["output_data"])
-            stages.append(s8)
-            s9 = _stage("npt_prod300", "npt", {
-                "T_START":       300.0,
-                "T_FINAL":       300.0,
-                "T_DAMP":        100.0,
-                "P_START":       press,
-                "P_FINAL":       press,
-                "P_DAMP":        1000.0,
-                "TIMESTEP":      dt_prod,
-                "N_STEPS":       steps_prod300,
-                "use_pppm":      not use_trappe,
-                "use_gpu":       True,
-                "write_restart": False,
-            }, s8["output_data"])
-            stages.append(s9)
-
-        # npt_production_log/dir point to npt_prod300 (glassy) or npt_production (rubbery)
-        _npt_final = s9 if _add_300k else s7
-
-        # Tg sweep starting cell (Option C): rubbery polymers start from npt_melt (at T_equil_K),
-        # not npt_production (300 K). Glassy polymers use npt_prod300 (existing path, unchanged).
-        if _use_melt_npt:
-            _npt_tg_prep = s5b["output_data"]     # npt_melt at t_equil_K — well-relaxed melt
-        elif temp <= 300.0:
-            _npt_tg_prep = s4["output_data"]       # fallback: npt_pppm at max_temp
-        else:
-            _npt_tg_prep = None                    # glassy: use npt_prod300 (separate key)
+        final_stage = stages[-1]
 
         ret = {
             "status":     "success",
             "polymer":    polymer_name,
             "n_atoms":    n_atoms,
-            "temp":       temp,
+            "melt_hold_T": melt_hold_T,
             "max_temp":   max_temp,
             "n_stages":   len(stages),
             "engine":     engine,
             "stages":     stages,
             "run_order":  [s["name"] for s in stages],
-            "npt_production_log": f"{_npt_final['work_dir']}/{_npt_final['params']['LOG_FILE']}",
-            "npt_production_dir": _npt_final["work_dir"],
-            "npt_tg_prep_data":   _npt_tg_prep,
+            "npt_production_log": f"{final_stage['work_dir']}/{final_stage['params']['LOG_FILE']}",
+            "npt_production_dir": final_stage["work_dir"],
+            # ONE terminal cell now, named under both keys it is read by: npt_melt_hold is
+            # both the gated melt (what the gate adjudicates, and the cooling stage's
+            # contraction reference) and the handoff cell (what cooling and thermal start
+            # from). Before the NVT/NPT reorder these were two different stages.
+            "melt_data_path":       final_stage["output_data"],
+            "melt_start_data_path": final_stage["output_data"],
             "preflight_warnings": vr["warnings"],
             "preflight_stats":    vr["stats"],
             "instructions": (
@@ -1863,27 +2156,300 @@ def generate_equilibration_workflow(
                 "Execute in order using run_lammps_script().\n"
                 "GPU is ON for all stages.\n"
                 f"Pass engine='{engine}' to run_lammps_chain() so the launch flags match the decks.\n"
-                + (
-                    "npt_cool300 + npt_prod300 cool to 300 K and produce at 300 K — use npt_prod300 for density and deformation.\n"
-                    if _add_300k else
-                    "npt_production is a constant-T/P NPT run for bulk modulus (volume fluctuation method).\n"
-                    "npt_tg_prep_data points to the npt_melt output at T_equil_K — pass as the Tg sweep starting cell.\n"
-                )
-                + "Submit stages as a chain using run_lammps_chain()."
+                f"npt_melt_hold is the GATED melt cell at {melt_hold_T} K — melt density and "
+                "every thermo/geometry gate come from its own log and trajectory.\n"
+                "nvt_melt_hold is the handoff cell: the cooling stage and the Tg staircase both "
+                "start from its endpoint, whose box is npt_melt_hold's own.\n"
+                "This chain does NOT cool. Call generate_cooling_workflow() with "
+                "melt_start_data_path to descend to the assessment temperature.\n"
+                "Adaptive stages (npt_densify_hold, anneal_hold, npt_melt_hold, nvt_melt_hold) "
+                "are generated here with only their FIRST block — further steps come from "
+                "extend_only=True restart-continuation calls (read_restart, appended log/dump), "
+                "never from re-generating that stage with a larger N_STEPS.\n"
+                "Submit stages as a chain using run_lammps_chain()."
             ),
         }
-        if _add_300k:
-            ret["npt_prod300_log"]  = f"{s9['work_dir']}/{s9['params']['LOG_FILE']}"
-            ret["npt_prod300_data"] = s9["output_data"]
-            ret["npt_prod300_dump"] = f"{s9['work_dir']}/{s9['params']['DUMP_FILE']}"
-        if _use_melt_npt:
-            ret["melt_npt_log"] = f"{s5b['work_dir']}/{s5b['params']['LOG_FILE']}"
-            ret["melt_npt_dir"] = s5b["work_dir"]
+        if resume_from is not None:
+            ret["resumed_from"] = resume_from
         return ret
 
     except Exception as e:
         logger.error(f"generate_equilibration_workflow failed: {e}")
         return {"status": "error", "error": str(e)}
+
+@mcp.tool()
+def generate_cooling_workflow(
+    data_file: str,
+    work_dir_base: str,
+    velocity_seed: int,
+    T_melt_hold_K: float,
+    final_T_K: float,
+    cool_block_dT_K: Optional[float],
+    cool_block_hold_steps: Optional[int],
+    cool_block_hold_cap_steps: Optional[int],
+    stage8_min_steps: Optional[int],
+    stage8_cap_steps: Optional[int],
+    use_long_range: bool,
+    use_pcff: bool,
+    use_trappe: bool,
+    use_opls: bool,
+    engine: str,
+    polymer_name: str = "polymer",
+    press: float = 1.0,
+    n_atoms: Optional[int] = None,
+    params_file: str = "",
+    thermostat_damp_fs: float = 100.0,
+    barostat_damp_fs: float = 1000.0,
+    extend_only: bool = False,
+    restart_file: Optional[str] = None,
+    base_stage_name: Optional[str] = None,
+    extend_temp_K: Optional[float] = None,
+    extend_ensemble: str = "npt",
+    resume_from: Optional[str] = None,
+) -> dict:
+    """
+    Cool an already-equilibrated melt to the assessment temperature and produce the gated
+    assessment cell.
+
+    Runs only when a property needs a cell at final_T_K -- a density there, or any mechanical
+    property. A melt-only or Tg-only run never calls this: the Tg staircase descends from the
+    same melt cell on its own, sampling as it goes.
+
+    Protocol (fixed stage names, adaptive stages EXTEND via restart-continuation):
+      cool_block_NN          - ADAPTIVE (one segment per block): NPT blockwise cooldown,
+                               T_melt_hold_K -> final_T_K in cool_block_dT_K decrements. Each
+                               block is generated with its FIRST hold only; further holds are
+                               extend_only=True continuations of that SPECIFIC block, capped
+                               at cool_block_hold_cap_steps.
+      npt_final              - ADAPTIVE: NPT at final_T_K/press -- the assessment cell.
+                               Density, Rg/Ree/RDF/dihedrals/MSID/P2/homogeneity/finite-size
+                               and K_T are all computed from its own trajectory.
+
+    There is deliberately NO fixed-volume NVT window here. One existed (nvt_kinetic_stability,
+    3-20 ns depending on class) to give MSD/kinetic-trap and C(t) an uncontaminated trajectory
+    -- but at the assessment temperature both are ADVISORY in every regime (a glass cannot
+    satisfy them), so it fed nothing that could fail a run. Chain relaxation is adjudicated
+    where it is physically attainable: the melt gate, on nvt_melt_hold. Removed 2026-09-02.
+
+    The descent rate is the caller's business, not this tool's: cool_block_hold_steps is
+    resolved upstream (stage_params.rate_matched_cool_block_hold_steps) so the cooldown runs at
+    the same K/ns the Tg staircase uses. Two descents from one melt cell at two different rates
+    would mean a run's density and its Tg describe glasses with different thermal histories.
+
+    T_melt_hold_K == final_T_K is legal and emits ZERO cool blocks -- the melt IS the
+    assessment cell, and only npt_final is generated.
+
+    Args:
+        data_file:      The melt-start cell: nvt_melt_hold's own output_data from
+                        generate_equilibration_workflow (its melt_start_data_path).
+        velocity_seed:  REQUIRED, non-null. Same value as the equilibration chain's -- one seed
+                        per run. No stage here issues `velocity all create` (every one inherits
+                        velocities from the incoming .data), but the generator still requires
+                        it rather than silently drawing its own.
+        T_melt_hold_K:  Where the melt was held; the top of the descent. Must be >= final_T_K.
+        final_T_K:      The assessment temperature (300 K by default). cool_block's last block,
+                        and npt_final both run here.
+        cool_block_dT_K: REQUIRED. Nominal temperature decrement per cool_block. Null selects
+                        25.0 K.
+        cool_block_hold_steps: REQUIRED. Step count for each cool_block's first (base) hold.
+                        Null selects int(2.0e5/dt_prod) (~200 ps at dt=1fs).
+        cool_block_hold_cap_steps: REQUIRED. Ceiling on cumulative steps for any ONE
+                        cool_block's restart-continuation extensions. Null selects 3x the base.
+        stage8_min_steps / stage8_cap_steps: REQUIRED. First block and cumulative ceiling for
+                        npt_final. Null selects int(5.0e5/dt_prod) / int(5.0e6/dt_prod).
+        resume_from:    None (default, the whole descent) or "cool_block" (the entire blockwise
+                        cooldown already ran -- start at npt_final, reading data_file as the
+                        last block's own output).
+                        To regenerate the cooldown itself with a different rate, invalidate this
+                        stage rather than resuming: its input is the gated melt cell, so a fresh
+                        call rebuilds the whole descent without touching the core chain.
+        extend_temp_K:  REQUIRED when extend_only=True AND base_stage_name is a cool_block_NN
+                        name -- that block's own hold temperature, which cannot be inferred
+                        from the name alone. Ignored for npt_final, which holds at final_T_K.
+        (Force-field, engine and damping args behave exactly as in
+        generate_equilibration_workflow; the two chains share _ff_base_for so they cannot
+        emit different styles for the same cell.)
+
+    Returns:
+        dict with stages / run_order / npt_production_log / npt_production_dir /
+        assessment_data_path (npt_final's output_data) / instructions.
+    """
+    try:
+        if not velocity_seed:
+            return {"status": "error",
+                    "error": "velocity_seed is required and must not be null — pass the same "
+                             "seed the equilibration chain used for this run."}
+        _CHECKPOINTS = ["cool_block"]
+        if resume_from not in (None, *_CHECKPOINTS):
+            return {"status": "error",
+                    "error": f"resume_from={resume_from!r} is not supported — must be one of "
+                             f"None, {', '.join(repr(c) for c in _CHECKPOINTS)}."}
+        if resume_from is not None and extend_only:
+            return {"status": "error",
+                    "error": "resume_from and extend_only are mutually exclusive"}
+        if extend_ensemble not in ("npt", "nvt"):
+            return {"status": "error",
+                    "error": f"extend_ensemble={extend_ensemble!r} must be 'npt' or 'nvt'"}
+        if extend_only and (not restart_file or not base_stage_name):
+            return {"status": "error",
+                    "error": "extend_only=True requires both restart_file (the base stage's own "
+                             ".restart output) and base_stage_name (the stage being continued)."}
+        _STAGE_ENSEMBLE = {"npt_final": "npt"}
+        if extend_only and base_stage_name:
+            _required = ("npt" if base_stage_name.startswith("cool_block_")
+                         else _STAGE_ENSEMBLE.get(base_stage_name))
+            if _required is not None and extend_ensemble != _required:
+                return {"status": "error",
+                        "error": f"extend_ensemble={extend_ensemble!r} does not match "
+                                 f"base_stage_name={base_stage_name!r}'s own ensemble "
+                                 f"({_required!r}) — continuing an {_required} stage as "
+                                 f"{extend_ensemble} would silently add or remove a barostat "
+                                 "mid-trajectory."}
+        if final_T_K > T_melt_hold_K:
+            return {"status": "error",
+                    "error": f"final_T_K={final_T_K} exceeds T_melt_hold_K={T_melt_hold_K} — "
+                             "this chain only cools. A run that needs an assessment temperature "
+                             "above the melt hold needs a higher melt hold, not a heating ramp "
+                             "from an equilibrated melt."}
+        if thermostat_damp_fs <= 0 or barostat_damp_fs <= 0:
+            return {"status": "error", "error": "thermostat/barostat damping must be positive"}
+
+        content = Path(data_file).read_text(encoding="utf-8")
+        gen = ScriptGenerator(data_file=data_file)
+        info = gen.parse_data_file(content=content)
+        vr = gen.validate_data_file(content=content, h_type_ids=info.get("h_type_ids"))
+        errors = vr["errors"]
+        if params_file:
+            errors = [e for e in errors if "Coeffs' section missing" not in e]
+        if errors:
+            return {"status": "error",
+                    "error": "Pre-flight validation failed — workflow not generated",
+                    "validation_errors": errors, "validation_warnings": vr["warnings"],
+                    "validation_stats": vr["stats"]}
+
+        n_atoms = n_atoms or info.get("n_atoms", 0)
+        ff_base = _ff_base_for(use_pcff, use_trappe, use_opls, params_file, engine)
+        dt_prod = 2.0 if use_trappe else 1.0
+        _stage, _continue_stage = _make_stage_builders(
+            gen, work_dir_base, ff_base, velocity_seed)
+
+        stages = []
+
+        if extend_only:
+            if base_stage_name and base_stage_name.startswith("cool_block_"):
+                ext_steps = cool_block_hold_steps
+                if extend_temp_K is None:
+                    return {"status": "error",
+                            "error": "extend_only for a cool_block_NN stage requires "
+                                     "extend_temp_K (that block's own hold temperature) — it "
+                                     "cannot be inferred from base_stage_name alone."}
+                ext_T = extend_temp_K
+            elif base_stage_name == "npt_final":
+                ext_steps, ext_T = stage8_min_steps, final_T_K
+            else:
+                return {"status": "error",
+                        "error": f"base_stage_name={base_stage_name!r} is not a recognized "
+                                 "adaptive stage of the cooling chain — must be a cool_block_NN "
+                                 "name or npt_final."}
+            ext_steps = int(ext_steps) if ext_steps else int(1.0e6 / dt_prod)
+            template = "nvt" if extend_ensemble == "nvt" else "npt"
+            params = {"T_START": ext_T, "T_FINAL": ext_T, "T_DAMP": thermostat_damp_fs,
+                      "TIMESTEP": dt_prod, "N_STEPS": ext_steps,
+                      "use_pppm": use_long_range and not use_trappe, "use_gpu": True}
+            if extend_ensemble == "npt":
+                params.update({"P_START": press, "P_FINAL": press,
+                               "P_DAMP": barostat_damp_fs})
+            sx = _continue_stage(base_stage_name, template, params, restart_file)
+            stages.append(sx)
+            return {
+                "status": "success", "polymer": polymer_name, "n_atoms": n_atoms,
+                "T_melt_hold_K": T_melt_hold_K, "final_T_K": final_T_K, "n_stages": 1,
+                "engine": engine, "extend_only": True, "extend_ensemble": extend_ensemble,
+                "stages": stages, "run_order": [sx["name"]],
+                "assessment_data_path": None,
+                "npt_production_log": f"{sx['work_dir']}/{sx['params']['LOG_FILE']}",
+                "npt_production_dir": sx["work_dir"],
+                "preflight_warnings": vr["warnings"], "preflight_stats": vr["stats"],
+                "instructions": (
+                    f"Extend-only: continued {base_stage_name} ({extend_ensemble.upper()}, "
+                    f"{ext_steps} more steps) via read_restart from {restart_file}, appending "
+                    f"onto {sx['work_dir']}/{sx['params']['LOG_FILE']} (engine={engine}). "
+                    f"Submit with run_lammps_chain(engine='{engine}'); then re-run the gate on "
+                    f"{sx['output_data']}."
+                ),
+            }
+
+        _resume_idx = _CHECKPOINTS.index(resume_from) if resume_from is not None else -1
+        prev_output = data_file
+
+        # 1. cool_block_NN — the blockwise descent. Walking down from the melt hold in dT
+        # decrements; the final block lands exactly on final_T_K however short it is.
+        if _resume_idx < 0:
+            dT = float(cool_block_dT_K) if cool_block_dT_K else 25.0
+            base_hold = (int(cool_block_hold_steps) if cool_block_hold_steps
+                         else int(2.0e5 / dt_prod))
+            waypoints = []
+            t = T_melt_hold_K
+            while t > final_T_K + 1e-6:
+                waypoints.append(t)
+                t -= dT
+            waypoints.append(final_T_K)
+            for block_idx, (w_start, w_end) in enumerate(
+                    zip(waypoints[:-1], waypoints[1:]), start=1):
+                s = _stage(f"cool_block_{block_idx:02d}", "npt", {
+                    "T_START": w_start, "T_FINAL": w_end, "T_DAMP": thermostat_damp_fs,
+                    "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
+                    "TIMESTEP": dt_prod, "N_STEPS": base_hold,
+                    "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
+                    "write_restart": True,
+                }, prev_output)
+                stages.append(s)
+                prev_output = s["output_data"]
+
+        # 2. npt_final — ADAPTIVE, the assessment cell at final_T_K/press.
+        s = _stage("npt_final", "npt", {
+            "T_START": final_T_K, "T_FINAL": final_T_K, "T_DAMP": thermostat_damp_fs,
+            "P_START": press, "P_FINAL": press, "P_DAMP": barostat_damp_fs,
+            "TIMESTEP": dt_prod,
+            "N_STEPS": int(stage8_min_steps) if stage8_min_steps else int(5.0e5 / dt_prod),
+            "use_pppm": use_long_range and not use_trappe, "use_gpu": True,
+            "write_restart": True,
+        }, prev_output)
+        stages.append(s)
+
+        final_stage = stages[-1]
+        n_blocks = sum(1 for st in stages if st["name"].startswith("cool_block_"))
+        ret = {
+            "status": "success", "polymer": polymer_name, "n_atoms": n_atoms,
+            "T_melt_hold_K": T_melt_hold_K, "final_T_K": final_T_K,
+            "n_cool_blocks": n_blocks, "n_stages": len(stages), "engine": engine,
+            "stages": stages, "run_order": [st["name"] for st in stages],
+            "npt_production_log": f"{final_stage['work_dir']}/{final_stage['params']['LOG_FILE']}",
+            "npt_production_dir": final_stage["work_dir"],
+            "assessment_data_path": final_stage["output_data"],
+            "preflight_warnings": vr["warnings"], "preflight_stats": vr["stats"],
+            "instructions": (
+                f"Generated {len(stages)} staged scripts for {polymer_name} (engine={engine}): "
+                f"{n_blocks} cool blocks from {T_melt_hold_K} K to {final_T_K} K, then "
+                "npt_final.\n"
+                f"Pass engine='{engine}' to run_lammps_chain() so the launch flags match.\n"
+                "npt_final is the assessment cell — compute density/Rg/Ree/RDF/dihedrals/MSID/"
+                "K_T from its own trajectory.\n"
+                "Adaptive stages (each cool_block_NN and npt_final) are "
+                "generated with only their FIRST block — further steps come from "
+                "extend_only=True restart-continuation calls, never from re-generating with a "
+                "larger N_STEPS.\n"
+                "Submit stages as a chain using run_lammps_chain()."
+            ),
+        }
+        if resume_from is not None:
+            ret["resumed_from"] = resume_from
+        return ret
+
+    except Exception as e:
+        logger.error(f"generate_cooling_workflow failed: {e}")
+        return {"status": "error", "error": str(e)}
+
 
 
 # ─── Analysis tools (Tg, density, convergence, bulk modulus) ─────────────────
@@ -1930,20 +2496,33 @@ def _require_output_dir(output_dir, tool: str, legacy: str):
         )
 
 
-def _save_gate_verdict(out_dir, result: dict) -> dict:
-    """Persist the equilibration-gate verdict to <out_dir>/equilibration_gate.json.
+def _save_gate_verdict(out_dir, result: dict, output_name: str = "equilibration.json") -> dict:
+    """Persist the gate verdict under the "gate" key of <out_dir>/<output_name>.
 
     The decision that authorises (or blocks) every downstream property extraction used to exist
     only in the calling worker's reply, leaving nothing to audit — unlike every other stage,
     which leaves a JSON in raw/. Failures are written too: a probe that blew up is the case most
-    worth having a record of.
+    worth having a record of. The file is shared with check_equilibration_comprehensive
+    (top-level thermo/chain/spatial keys) and extract_equilibrated_density ("density" key) —
+    read-merge-write so this producer's own section replaces wholesale without clobbering theirs.
+
+    output_name selects which cell's file this is: equilibration.json for the melt gate,
+    cooling.json for the assessment gate. All three producers must be given the SAME name for
+    one cell, or the gate verdict lands in a different file from the measurements it adjudicates.
     """
     if not out_dir:
         return result
     try:
-        verdict_path = Path(out_dir) / "equilibration_gate.json"
+        verdict_path = Path(out_dir) / (output_name or "equilibration.json")
         verdict_path.parent.mkdir(parents=True, exist_ok=True)
-        verdict_path.write_text(json.dumps(result, indent=2, default=str))
+        merged = {}
+        if verdict_path.exists():
+            try:
+                merged = json.loads(verdict_path.read_text())
+            except (OSError, json.JSONDecodeError):
+                merged = {}
+        merged["gate"] = result
+        verdict_path.write_text(json.dumps(merged, indent=2, default=str))
         result["saved_to"] = str(verdict_path)
     except Exception as e:  # never let an audit-trail write mask the verdict itself
         logger.error(f"could not save equilibration gate verdict: {e}")
@@ -2283,6 +2862,7 @@ def _run_extract_thermal(
     tg_data_file: Optional[str] = None,
     backbone_types: Optional[List[str]] = None,
     method_gap_exempt: bool = False,
+    fit_t_max_K: Optional[float] = None,
 ) -> dict:
     """Background worker — runs extract_thermal.py via CLI."""
 
@@ -2305,6 +2885,8 @@ def _run_extract_thermal(
         parts.append(f"--backbone_types {' '.join(str(t) for t in backbone_types)}")
     if method_gap_exempt:
         parts.append("--method_gap_exempt")
+    if fit_t_max_K is not None:
+        parts.append(f"--fit_t_max_K {fit_t_max_K}")
 
     command = " ".join(parts)
     logger.info(f"Running thermal extraction via CLI: {command}")
@@ -2319,7 +2901,7 @@ def _run_extract_thermal(
     if n_bins < 4 or r2 < 0.80:
         result["recovery_hint"] = (
             "ABORT: R² < 0.80 or < 4 temperature bins — "
-            "re-spawn tg-sweep-worker with --tg_t_high_K +50 and --tg_t_low_K −50."
+            "the sweep starts at the melt hold, so widen it by raising T_melt_hold_K (via md_tg_ceiling_K) or lowering tg_t_low_K."
         )
     elif r2 < 0.90:
         result["recovery_hint"] = (
@@ -2347,6 +2929,7 @@ def extract_thermal(
     temp_col: str = "Temp",
     density_col: str = "Density",
     enthalpy_col: str = "Enthalpy",
+    fit_t_max_K: Optional[float] = None,
 ) -> dict:
     """
     Extract thermal properties (Tg, CTE, ΔCp) from a LAMMPS MD temperature-sweep log.
@@ -2431,6 +3014,7 @@ def extract_thermal(
             tg_data_file           = tg_data_file,
             backbone_types         = backbone_types,
                     method_gap_exempt   = method_gap_exempt,
+            fit_t_max_K            = fit_t_max_K,
 )),
         daemon=True,
     )
@@ -2440,93 +3024,6 @@ def extract_thermal(
         "run_id":     run_id,
         "run_type":   "extract_thermal",
         "log_file":   log_file,
-        "output_dir": output_dir,
-        "message":    "Poll with get_run_status(run_id)",
-    }
-
-
-# ── Tool: extract_tg_multirate ───────────────────────────────────────────────
-
-def _run_extract_tg_multirate(
-    rates: list,
-    tg_values: list,
-    output_dir: str,
-    polymer_name: str,
-    slow_rate_ref: float,
-) -> dict:
-    """Background worker — runs extract_tg_multirate.py via CLI."""
-    rate_args = " ".join(str(r) for r in rates)
-    tg_args   = " ".join(str(t) for t in tg_values)
-    parts = [
-        f"python {MDA_SCRIPTS_DIR}/extract_tg_multirate.py",
-        f"--rates {rate_args}",
-        f"--tg_values {tg_args}",
-        f"--output_dir {output_dir}",
-        f"--polymer_name {polymer_name}",
-        f"--slow_rate_ref {slow_rate_ref}",
-        "--no_plot",
-    ]
-    command = " ".join(parts)
-    logger.info(f"Running multi-rate Tg analysis: {command}")
-    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=120)
-    if exit_code != 0:
-        return {"status": "failed", "error": stderr, "stdout": stdout}
-    return _parse_json_from_stdout(stdout, stderr)
-
-
-@mcp.tool()
-def extract_tg_multirate(
-    rates_K_per_ns: list,
-    tg_values_K: list,
-    output_dir: str,
-    polymer_name: str = "polymer",
-    slow_rate_ref_K_per_ns: float = 5.0,
-) -> dict:
-    """
-    Fit a log-linear trend and attempt a Vogel-Fulcher (VF) extrapolation
-    across multiple cooling-rate Tg_MD values.
-
-    Primary output: log-linear slope (K per ln(K/ns)) and Tg at the
-    reference slow rate — this is the reliable deliverable for comparing
-    trend vs. Ramos 2015 Fig. 3.
-
-    Secondary output: VF extrapolated Tg0 (at Γ → 0).  Note that < 2 decades
-    of rate coverage gives a poorly-constrained VF fit; CI > 100 K is flagged
-    POORLY_CONSTRAINED.
-
-    The job runs in the background — poll with get_run_status(run_id).
-
-    Args:
-        rates_K_per_ns:          List of cooling rates in K/ns (same order as tg_values_K).
-        tg_values_K:             Tg_MD values in K from extract_thermal runs at each rate.
-        output_dir:              Directory for JSON, markdown, and plot outputs.
-        polymer_name:            Label for outputs and plot title.
-        slow_rate_ref_K_per_ns:  Reference rate for log-linear Tg reporting (default 5.0).
-
-    Returns:
-        dict with run_id.  Result includes loglinear_slope_K, loglinear_r_squared,
-        tg_at_slow_rate_K, vf_fit_quality, tg0_K (if VF converged), d06_markdown.
-    """
-    run_id = run_manager.create(
-        "extract_tg_multirate",
-        {"output_dir": output_dir, "n_rates": len(rates_K_per_ns)},
-    )
-    t = threading.Thread(
-        target=_analysis_run_background,
-        args=(run_id, _run_extract_tg_multirate, dict(
-            rates       = rates_K_per_ns,
-            tg_values   = tg_values_K,
-            output_dir  = output_dir,
-            polymer_name = polymer_name,
-            slow_rate_ref = slow_rate_ref_K_per_ns,
-        )),
-        daemon=True,
-    )
-    t.start()
-    return {
-        "status":     "submitted",
-        "run_id":     run_id,
-        "run_type":   "extract_tg_multirate",
         "output_dir": output_dir,
         "message":    "Poll with get_run_status(run_id)",
     }
@@ -2557,6 +3054,13 @@ def _run_check_equilibration_comprehensive(
     ct_min_decay: Optional[float] = None,
     cv_signal_max: float = 0.11,
     cutoff_A: Optional[float] = None,
+    struct_dump_file: Optional[str] = None,
+    struct_data_file: Optional[str] = None,
+    output_name: str = "equilibration.json",
+    homog_method: str = "formula",
+    homog_persist_max: float = 0.11,
+    homog_min_frames: int = 100,
+    homog_melt_cv_floor: Optional[float] = None,
 ) -> dict:
     """Background worker — runs check_equilibration_comprehensive.py via CLI."""
     bt_str = " ".join(str(t) for t in backbone_types)
@@ -2580,7 +3084,13 @@ def _run_check_equilibration_comprehensive(
         f"--energy_col {energy_col}",
         f'--atom_style "{atom_style}"',
         f"--cv_signal_max {cv_signal_max}",
+        f"--output_name {output_name}",
+        f"--homog_method {homog_method}",
+        f"--homog_persist_max {homog_persist_max}",
+        f"--homog_min_frames {homog_min_frames}",
     ]
+    if homog_melt_cv_floor is not None:
+        parts.append(f"--homog_melt_cv_floor {homog_melt_cv_floor}")
     if cutoff_A is not None:
         parts.append(f"--cutoff_A {cutoff_A}")
     if n_backbone_bonds is not None:
@@ -2589,6 +3099,10 @@ def _run_check_equilibration_comprehensive(
         parts.append(f"--graphs_dir {graphs_dir}")
     if ct_min_decay is not None:
         parts.append(f"--ct_min_decay {ct_min_decay}")
+    if struct_dump_file is not None:
+        parts.append(f"--struct_dump_file {struct_dump_file}")
+    if struct_data_file is not None:
+        parts.append(f"--struct_data_file {struct_data_file}")
 
     command = " ".join(parts)
     logger.info(f"Running comprehensive equilibration check: {command}")
@@ -2634,6 +3148,13 @@ def check_equilibration_comprehensive(
     energy_col: str = "TotEng",
     atom_style: str = "id resid type charge x y z",
     cv_signal_max: float = 0.11,
+    struct_dump_file: Optional[str] = None,
+    struct_data_file: Optional[str] = None,
+    output_name: str = "equilibration.json",
+    homog_method: str = "formula",
+    homog_persist_max: float = 0.11,
+    homog_min_frames: int = 100,
+    homog_melt_cv_floor: Optional[float] = None,
 ) -> dict:
     """
     Comprehensive polymer equilibration validator — thermo + structural checks in
@@ -2641,13 +3162,18 @@ def check_equilibration_comprehensive(
 
     Hard gates (block overall_pass=True):
       A. Density drift (regression p-value + magnitude)
-      B. Energy drift
+      B. Energy drift (aggregate TotEng, plus each present bond/angle/dihedral/vdW/coul/kspace
+         term independently -- a canceling drift between terms can otherwise hide inside a flat
+         TotEng; mirrors RadonPy's own per-term check_eq() gates)
       C. Density block-SEM < 1% of mean (Flyvbjerg-Petersen)
       D. Energy block-SEM < 1% of mean
       E. Rg CV across chains < 30%  (unequal conformation flag)
       F. P2 nematic order < 0.10    (residual backbone alignment)
-      G. Poisson-corrected density homogeneity CV < cv_signal_max (default 0.11; the raw
-         voxel CV's noise floor moves with cell size, so the signal CV is gated instead).
+      G. Density homogeneity, by homog_method: formula (per-frame CV minus a compound-Poisson
+         floor, < cv_signal_max); split_half (melt only: structure shared by the time-averaged
+         maps of the two halves of the hold, < homog_persist_max); measured_floor (glass:
+         per-frame CV minus the run's own melt CV homog_melt_cv_floor, < cv_signal_max). The formula floor assumes atoms
+         occupy voxels independently and fails well-mixed H-free melts such as PTFE.
       H. Finite size (spatial.finite_size), when cutoff_A is supplied: minimum image
          L >= 2*cutoff_A (below it the pair potential itself is wrong) and chain
          self-imaging L >= 2*Rg. L >= R_ee is reported but advisory.
@@ -2664,8 +3190,20 @@ def check_equilibration_comprehensive(
 
     Args:
         log_file:            LAMMPS log file (thermo output, e.g. 06_nvt_production.log).
-        dump_file:           LAMMPS dump trajectory (e.g. 06_nvt_production.dump).
-        data_file:           LAMMPS .data topology file.
+        dump_file:           LAMMPS dump trajectory carrying the ensemble-sensitive checks
+                             (MSD/kinetic-trap, C(t)) — must be a fixed-volume NVT window
+                             (e.g. nvt_melt_hold.dump); a barostatted trajectory
+                             affine-scales coordinates every step and contaminates cumulative
+                             CoM displacement.
+        data_file:           LAMMPS .data topology file paired with dump_file.
+        struct_dump_file:    Optional second trajectory carrying the ensemble-INsensitive
+                             per-frame geometry checks (Rg, MSID, R_ee, torsion, P2, density
+                             homogeneity, finite-size) instead of dump_file — normally
+                             npt_final's own dump, the actual equilibrated parent state. Omit
+                             to fall back to dump_file for everything. Must be paired with
+                             struct_data_file.
+        struct_data_file:    LAMMPS .data topology file paired with struct_dump_file. Required
+                             iff struct_dump_file is given.
         backbone_types:      List of LAMMPS atom type IDs that form the backbone.
                              Determine from inspect_data_file() — do not guess.
         output_dir:          Output directory. Required — the run's raw/ dir.
@@ -2740,6 +3278,13 @@ def check_equilibration_comprehensive(
             ct_min_decay        = ct_min_decay,
             cv_signal_max       = cv_signal_max,
             cutoff_A            = cutoff_A,
+            struct_dump_file    = struct_dump_file,
+            struct_data_file    = struct_data_file,
+            output_name         = output_name,
+            homog_method        = homog_method,
+            homog_persist_max   = homog_persist_max,
+            homog_min_frames    = homog_min_frames,
+            homog_melt_cv_floor = homog_melt_cv_floor,
         )),
         daemon=True,
     )
@@ -2766,8 +3311,16 @@ def _run_extract_equilibrated_density(
     plateau_shift_sigma: float,
     density_col: str,
     temp_col: str,
+    output_name: str = "equilibration.json",
 ) -> dict:
-    """Background worker — runs extract_equilibrated_density.py via CLI."""
+    """Background worker — runs extract_equilibrated_density.py via CLI.
+
+    output_name selects which cell's file the density is merged into -- equilibration.json for
+    the melt gate, a per-cell name for the assessment gate -- and matches the tool signature
+    above. It was threaded into this worker's call site by 71a6734 and used in the command
+    below without ever being added here, so every call raised TypeError; the melt gate is the
+    first caller to reach it, which is why it stayed latent until 2026-09-09.
+    """
 
     parts = [f"python {MDA_SCRIPTS_DIR}/extract_equilibrated_density.py"]
     parts.append(f"--log_file {log_file}")
@@ -2779,6 +3332,7 @@ def _run_extract_equilibrated_density(
     parts.append(f"--plateau_shift_sigma {plateau_shift_sigma}")
     parts.append(f"--density_col {density_col}")
     parts.append(f"--temp_col {temp_col}")
+    parts.append(f"--output_name {output_name}")
 
     command = " ".join(parts)
     logger.info(f"Running equilibrated density extraction via CLI: {command}")
@@ -2790,63 +3344,110 @@ def _run_extract_equilibrated_density(
     return _parse_json_from_stdout(stdout, stderr)
 
 
+# ── Tool: derive_backbone_types ───────────────────────────────────────────────
+
+def _run_derive_backbone_types(data_file: str) -> dict:
+    """Background worker — runs derive_backbone_types.py via CLI."""
+
+    command = f"python {MDA_SCRIPTS_DIR}/derive_backbone_types.py --data_file {data_file}"
+    logger.info(f"Running backbone_types derivation via CLI: {command}")
+
+    stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=300)
+
+    if exit_code != 0:
+        return {"status": "failed", "error": stderr, "stdout": stdout}
+    return _parse_json_from_stdout(stdout, stderr)
+
+
+@mcp.tool()
+def derive_backbone_types(data_file: str) -> dict:
+    """
+    Derive backbone_types from a .data file's bond topology alone — no simulation,
+    no atom-type-name guessing.
+
+    Finds each chain's backbone as the graph diameter of its heavy-atom bond graph
+    (BFS twice: farthest atom from an arbitrary start, then farthest atom from
+    there — the walk between them is the backbone; side branches are excluded by
+    construction since they're shorter than continuing along the main path).
+    Unions the atom type IDs found along every chain's backbone path.
+
+    Args:
+        data_file: Path to the .data file (the original pre-simulation cell, so
+                   Masses/Bonds are intact).
+
+    Returns:
+        dict with run_id. When completed, result includes:
+            backbone_types     — sorted list of backbone atom type IDs
+            method              — "heavy_atom_graph_diameter"
+            n_chains            — chains found (resids)
+            n_chains_resolved   — chains with >= 2 heavy atoms and bond topology
+    """
+    run_id = run_manager.create("derive_backbone_types", {"data_file": data_file})
+    t = threading.Thread(
+        target=_analysis_run_background,
+        args=(run_id, _run_derive_backbone_types, dict(data_file=data_file)),
+        daemon=True,
+    )
+    t.start()
+    return {
+        "status":    "submitted",
+        "run_id":    run_id,
+        "run_type":  "derive_backbone_types",
+        "data_file": data_file,
+        "message":   "Poll with get_run_status(run_id). Result includes backbone_types.",
+    }
+
+
 @mcp.tool()
 def assess_cooling_contraction(
     glass_data: str,
-    exp_density_gcm3: float,
     tg_K: float,
     t_equil_K: float,
     melt_data: Optional[str] = None,
-    alpha_glass: float = 2.5e-4,
-    alpha_melt: float = 6.0e-4,
-    band_pct: float = 5.0,
+    final_T_K: float = 300.0,
 ) -> dict:
     """
-    Melt-vs-glass density decomposition — distinguishes an UNDER-ANNEALED (kinetically
-    trapped) glass from force-field underbinding, which the convergence checks cannot.
+    Cooling-contraction self-consistency check — distinguishes an UNDER-ANNEALED (kinetically
+    trapped) glass from a normally-cooled one, purely from the run's own data.
 
-    A converged 300 K density only means the cell stopped moving, not that it stopped at the
-    RIGHT value: a trapped glass converges low because free volume froze in during cooling.
-    This computes densities directly from the final structures (box + masses), compares the
-    melt→glass contraction against the system's own thermal-expansion expectation, and routes
-    the correct remedy:
+    A converged density only means the cell stopped moving, not that it densified as
+    much as it should have: a trapped glass converges low because free volume froze in during
+    cooling. This computes densities directly from the final structures (box + masses),
+    compares the melt→glass contraction against the system's own thermal-expansion prediction
+    (alpha_glass/alpha_melt — literature-typical-polymer constants, not specific to any one
+    material), and reports:
 
-      - UNDER_ANNEALED_COOLING : melt density OK but cell under-contracted on cooling →
-        re-melt + SLOW re-cool (NOT EXTEND at 300 K — a glass cannot densify below Tg).
-      - MELT_STAGE_DEFICIT     : melt density already low → FF underbinding OR melt-stage
-        under-annealing; probe with a heavy melt anneal (NkepsuMbitou 10-TAC). Re-cool won't help.
-      - OK                     : glass density within ±band_pct of experiment.
+      - UNDER_ANNEALED_COOLING : the cell under-contracted relative to its own predicted
+        contraction → re-melt + SLOW re-cool (NOT EXTEND at final_T_K — a glass cannot
+        densify below Tg).
+      - OK                     : cooling contraction is self-consistent with the prediction.
+      - INSUFFICIENT_DATA      : glass-state density could not be measured.
 
-    Use this as a ROUTING gate alongside the absolute glass-vs-experiment density check whenever
-    a glassy production density falls below experiment (do not accept a sub-band density as
-    "force-field bias" without running this first). The alpha-extrapolation degrades over large
-    cooling spans; `extrapolation_reliable=False` (span > 300 K) means lean on the absolute
-    density gate and treat the split as indicative.
+    Deliberately never compares to an experimental/curated density or thermal-expansion
+    value — a novel system may have neither, and this check does not need either.
+    `extrapolation_reliable=False` (cooling span > 300 K) means treat the verdict as
+    indicative, not firm.
 
     Args:
-        glass_data:        npt_prod300_out.data at 300 K (the glass state). Required.
-        exp_density_gcm3:  experimental amorphous density at 300 K for the polymer.
-        tg_K:              experimental (or class) Tg in K. If <=300, treated as rubbery.
-        t_equil_K:         melt/equilibration temperature (T_workflow) in K.
-        melt_data:         npt_production_out.data at T_equil (melt). Optional but required
-                           for the melt/cooling split; without it only OK/below-band is returned.
-        alpha_glass:       volumetric thermal-expansion coeff below Tg (default 2.5e-4 /K).
-        alpha_melt:        volumetric thermal-expansion coeff above Tg (default 6.0e-4 /K).
-        band_pct:          pass band as % below experiment (default 5.0).
+        glass_data:  npt_final_out.data at final_T_K (the assessed state). Required.
+        tg_K:        (class) Tg in K. If <=final_T_K the cell is never a glass at the
+                     temperature it is graded at -> rubbery/equilibrium (no-op).
+        t_equil_K:   melt/equilibration temperature (T_workflow) in K.
+        melt_data:   the melt-reference cool_block output at T_equil. Optional but required for
+                     the self-consistency computation; without it the verdict is OK/non-blocking.
+        final_T_K:   assessment temperature (K) -- where glass_data was written, and the cold
+                     endpoint of the contraction. 300 is its default, not its definition.
 
     Returns:
-        dict with rho_melt, rho_glass, glass_density_gap_pct, melt_density_gap_pct,
-        expected_contraction, actual_contraction, contraction_shortfall,
-        under_annealed_cooling (bool), verdict, remedy, extrapolation_reliable, markdown.
+        dict with rho_melt, rho_glass, expected_contraction, actual_contraction,
+        contraction_shortfall, under_annealed_cooling (bool), verdict, remedy,
+        extrapolation_reliable, markdown.
     """
     parts = [f"python {MDA_SCRIPTS_DIR}/assess_cooling_contraction.py",
              f"--glass_data {glass_data}",
-             f"--exp_density_gcm3 {exp_density_gcm3}",
              f"--tg_K {tg_K}",
              f"--t_equil_K {t_equil_K}",
-             f"--alpha_glass {alpha_glass}",
-             f"--alpha_melt {alpha_melt}",
-             f"--band_pct {band_pct}"]
+             f"--final_T_K {final_T_K}"]
     if melt_data:
         parts.append(f"--melt_data {melt_data}")
     command = " ".join(parts)
@@ -2862,22 +3463,22 @@ def enforce_equilibration_gate(
     regime: str,
     dp: Optional[float],
     ct_gate_reliable: bool,
-    exp_density_gcm3: Optional[float],
     tg_K: Optional[float],
     t_equil_K: Optional[float],
     glass_data: Optional[str],
     melt_data: Optional[str],
     out_dir: Optional[str],
-    alpha_glass_per_K: Optional[float],
-    alpha_melt_per_K: Optional[float],
+    final_T_K: float = 300.0,
+    output_name: str = "equilibration.json",
 ) -> dict:
     """
     Mechanized equilibration gate verdict — replaces prose PASS/EXTEND/FAIL judgment with a
     programmatic cross-check of check_equilibration_comprehensive's per-gate results against
     decision_policy.json's require_glassy / require_rubbery clauses, plus density_value_binding
-    (a glassy 300K density >5% below experiment requires an assess_cooling_contraction diagnosis
-    before any verdict — a check overall_pass never performs on its own, since it only tests that
-    density stopped moving, not that it stopped at the right value).
+    (an unconditional self-consistency check on a glassy run's melt→glass contraction vs. its
+    own thermal-expansion prediction — a check overall_pass never performs on its own, since it
+    only tests that density stopped moving, not that it stopped at a physically consistent
+    value). Never compares to any experimental/curated density or thermal-expansion value.
 
     Single-call: if density_value_binding is triggered and no cached diagnosis exists at
     <out_dir>/cooling_contraction.json, this calls assess_cooling_contraction.py internally
@@ -2892,30 +3493,30 @@ def enforce_equilibration_gate(
 
     Args:
         comprehensive_json: Path to check_equilibration_comprehensive's saved JSON output.
-        regime:             "glassy" or "rubbery" (T_workflow_K > 300 → glassy).
+        regime:             "melt" (the melt hold -- rg and ct BIND there, see
+                            enforce_gate.BINDING_MELT), "glassy", or "rubbery". The melt gate
+                            passes "melt" outright rather than resolving it, because
+                            resolve_regime answers "glassy" whenever Tg is unresolvable.
         dp:                 Degree of polymerization (drives the require_glassy DP≥30 carve-out).
         ct_gate_reliable:   False for aromatic-backbone classes (PSFO/PKTN) — C(t) is
                             structurally undefined there regardless of DP.
-        exp_density_gcm3:   Point experimental density (g/cm³) for this polymer member.
-        tg_K:               Point experimental Tg (K) for this polymer member.
+        tg_K:               (Class) Tg (K) — used only to split the cooling path into a glassy
+                            and a melt segment, never as an experimental target.
         t_equil_K:          Melt/equilibration temperature (T_workflow_K).
+        final_T_K:          Assessment temperature (K) — npt_final's own temperature, and the
+                            cold endpoint of the cooling-contraction check. 300 is its default,
+                            not its definition.
         glass_data:         npt_prod300_out.data (glass at 300K) — required only if
                             density_value_binding needs to run assess_cooling_contraction.
         melt_data:          npt_production_out.data (melt at T_equil) — same condition.
         out_dir:            Run's raw/ output directory — cooling_contraction.json is cached
                             here so repeat calls (e.g. after an EXTEND) don't re-run the probe.
-        alpha_glass_per_K:  Class- or literature-grounding-sourced volumetric thermal-expansion
-                            coeff below Tg, from decided_params.alpha_glass_per_K (set at plan
-                            time — this tool never searches for it live). None falls back to
-                            assess_cooling_contraction.py's generic default (2.5e-4/K).
-        alpha_melt_per_K:   Same, above Tg (decided_params.alpha_melt_per_K). None falls back to
-                            the generic default (6.0e-4/K).
 
     Returns:
-        dict: regime, applicable_clause, binding_gates, advisory_gates, density_gap_pct,
+        dict: regime, applicable_clause, binding_gates, advisory_gates,
         density_value_binding, failing_binding_gates, verdict (PASS | EXTEND |
         STRUCTURAL_FAIL | FAIL), remedy (set only for STRUCTURAL_FAIL — e.g.
-        re_melt_slow_recool | heavy_melt_anneal_probe | a melt-mixing extension note).
+        re_melt_slow_recool | a melt-mixing extension note).
     """
     repo_root = Path(__file__).resolve().parents[2]
     orchestration_dir = str(repo_root / "orchestration" / "scripts")
@@ -2931,14 +3532,12 @@ def enforce_equilibration_gate(
     live_args.regime = regime
     live_args.dp = dp
     live_args.ct_gate_reliable = ct_gate_reliable
-    live_args.exp_density_gcm3 = exp_density_gcm3
     live_args.tg_k = tg_K
     live_args.t_equil_k = t_equil_K
+    live_args.final_t_k = final_T_K
     live_args.glass_data = glass_data
     live_args.melt_data = melt_data
     live_args.out_dir = out_dir
-    live_args.alpha_glass_per_k = alpha_glass_per_K
-    live_args.alpha_melt_per_k = alpha_melt_per_K
 
     result = enforce_gate.enforce_live(live_args)
 
@@ -2946,19 +3545,15 @@ def enforce_equilibration_gate(
         cc_args = result["assess_cooling_contraction_args"]
         parts = [f"python {MDA_SCRIPTS_DIR}/assess_cooling_contraction.py",
                  f"--glass_data {cc_args['glass_data']}",
-                 f"--exp_density_gcm3 {cc_args['exp_density_gcm3']}",
                  f"--tg_K {cc_args['tg_K']}",
-                 f"--t_equil_K {cc_args['t_equil_K']}"]
+                 f"--t_equil_K {cc_args['t_equil_K']}",
+                 f"--final_T_K {cc_args.get('final_T_K', 300.0)}"]
         if cc_args.get("melt_data"):
             parts.append(f"--melt_data {cc_args['melt_data']}")
         if cc_args.get("melt_log"):
             parts.append(f"--melt_log {cc_args['melt_log']}")
         if cc_args.get("glass_log"):
             parts.append(f"--glass_log {cc_args['glass_log']}")
-        if cc_args.get("alpha_glass") is not None:
-            parts.append(f"--alpha_glass {cc_args['alpha_glass']}")
-        if cc_args.get("alpha_melt") is not None:
-            parts.append(f"--alpha_melt {cc_args['alpha_melt']}")
         command = " ".join(parts)
         logger.info(f"enforce_equilibration_gate: auto-running density_value_binding probe: {command}")
         stdout, stderr, exit_code = _conda_run(command, workdir=LAMBDA_WORKDIR, timeout=600)
@@ -2967,13 +3562,13 @@ def enforce_equilibration_gate(
             failure = {"status": "failed",
                        "error": "assess_cooling_contraction probe failed inside enforce_equilibration_gate",
                        "detail": cooling_result}
-            return _save_gate_verdict(out_dir, failure)
+            return _save_gate_verdict(out_dir, failure, output_name)
         save_path = Path(result["save_result_to"])
         save_path.parent.mkdir(parents=True, exist_ok=True)
         save_path.write_text(json.dumps(cooling_result, indent=2))
         result = enforce_gate.enforce_live(live_args)  # re-run now that the cache exists
 
-    return _save_gate_verdict(out_dir, result)
+    return _save_gate_verdict(out_dir, result, output_name)
 
 
 @mcp.tool()
@@ -2986,6 +3581,7 @@ def extract_equilibrated_density(
     plateau_shift_sigma: float = 1.0,
     density_col: str = "Density",
     temp_col: str = "Temp",
+    output_name: str = "equilibration.json",
 ) -> dict:
     """
     Extract the equilibrated (plateau) density from a single LAMMPS log.
@@ -3056,6 +3652,7 @@ def extract_equilibrated_density(
             plateau_shift_sigma = plateau_shift_sigma,
             density_col         = density_col,
             temp_col            = temp_col,
+            output_name         = output_name,
         )),
         daemon=True,
     )
@@ -3373,6 +3970,9 @@ def run_bulk_modulus_series(
     use_opls: bool,
     engine: str,
     thermo_freq: int = 100,
+    thermostat_damp_fs: float = 100.0,
+    barostat_damp_fs: float = 1000.0,
+    use_long_range: bool = True,
     output_dir: Optional[str] = None,
 ) -> dict:
     """
@@ -3391,7 +3991,8 @@ def run_bulk_modulus_series(
     Args:
         data_file:      Equilibrated .data file (e.g. 07_npt_production_out.data).
         work_dir:       Base directory; subdirs bm_P{P}/ are created per pressure.
-        pressures_atm:  List of target pressures in atm (at least 3).
+        pressures_atm:  One or more target pressures in atm. EOS analysis still requires
+                        at least three; single-point calls support independently retried points.
         temp_K:         Simulation temperature (K). Use 300 K for property measurement.
         run_name:       NO-OP — accepted and required for backward compatibility, but never
                         read in the body. Do not treat it as a protocol knob.
@@ -3424,11 +4025,10 @@ def run_bulk_modulus_series(
         extract_bulk_modulus_murnaghan after the chain completes.
     """
     try:
-        if len(pressures_atm) < 3:
+        if len(pressures_atm) < 1:
             return {
                 "status": "error",
-                "error": f"At least 3 pressure points required for Murnaghan fit "
-                         f"(got {len(pressures_atm)})."
+                "error": "At least one pressure point is required."
             }
         if velocity_seed is None:
             return {
@@ -3459,11 +4059,14 @@ def run_bulk_modulus_series(
                     "T_FINAL":     temp_K,
                     "P_START":     float(p_atm),
                     "P_FINAL":     float(p_atm),
+                    "T_DAMP":      thermostat_damp_fs,
+                    "P_DAMP":      barostat_damp_fs,
                     "N_STEPS":     npt_steps,
                     "TIMESTEP":    dt_fs,
                     "THERMO_FREQ": thermo_freq,
                     "LOG_FILE":    log_path,
                     "use_gpu":     True,
+                    "use_pppm":    use_long_range and not use_trappe,
                     "engine":      engine,
                     "use_trappe":  use_trappe,
                     "use_pcff":    use_pcff,
@@ -3594,10 +4197,10 @@ def extract_bulk_modulus_murnaghan(
         of sequence (likely inadequate equilibration at that point).
 
     Output files written to output_dir:
-        bulk_modulus_murnaghan.json  — B0_GPa, B0_prime, V0_A3, r_squared, …
-                                       Also contains bulk_modulus_GPa alias for
-                                       compatibility with generate_run_summary.
-        murnaghan_eos.png            — P vs V scatter with fit curve
+        mechanical.json      — B0_GPa, B0_prime, V0_A3, r_squared, …
+                               Also contains bulk_modulus_GPa alias for
+                               compatibility with generate_run_summary.
+        murnaghan_eos.png    — P vs V scatter with fit curve
 
     The job runs in the background — poll with get_run_status(run_id).
 
@@ -3605,7 +4208,7 @@ def extract_bulk_modulus_murnaghan(
         log_files:      List of LAMMPS log file paths, one per pressure point.
                         Same order as pressures_atm. From run_bulk_modulus_series.
         pressures_atm:  List of target pressures (atm), same order as log_files.
-        output_dir:     Directory for bulk_modulus_murnaghan.json output.
+        output_dir:     Directory for mechanical.json output.
         graphs_dir:     Directory for PNG figures. Defaults to output_dir/figures.
         eq_fraction:    Fraction of each log used as production window. Default 0.5.
         npt_prod_log:   Optional separate NPT production log for the fluctuation
@@ -3791,15 +4394,14 @@ def _run_generate_run_summary(
     d04: Optional[str],
     d05: Optional[str],
     d06: Optional[str],
-    exp_tg_min: Optional[float],
-    exp_tg_max: Optional[float],
-    exp_density_min: Optional[float],
-    exp_density_max: Optional[float],
-    exp_K_min: Optional[float],
-    exp_K_max: Optional[float],
     graphs_dir: Optional[str] = None,
     n_replicates: Optional[int] = None,
     tg_path: Optional[str] = None,
+    equilibration_path: Optional[str] = None,
+    melt_equilibration_path: Optional[str] = None,
+    mechanical_path: Optional[str] = None,
+    bulk_modulus_deform_path: Optional[str] = None,
+    byproducts_spec: Optional[str] = None,
 ) -> dict:
     """Background worker — runs generate_run_summary.py via CLI."""
     parts = [f"python {MDA_SCRIPTS_DIR}/generate_run_summary.py"]
@@ -3821,15 +4423,14 @@ def _run_generate_run_summary(
     if d04 is not None: parts.append(f"--d04 '{d04}'")
     if d05 is not None: parts.append(f"--d05 '{d05}'")
     if d06 is not None: parts.append(f"--d06 '{d06}'")
-    if exp_tg_min is not None:      parts.append(f"--exp_tg_min {exp_tg_min}")
-    if exp_tg_max is not None:      parts.append(f"--exp_tg_max {exp_tg_max}")
-    if exp_density_min is not None: parts.append(f"--exp_density_min {exp_density_min}")
-    if exp_density_max is not None: parts.append(f"--exp_density_max {exp_density_max}")
-    if exp_K_min is not None:       parts.append(f"--exp_K_min {exp_K_min}")
-    if exp_K_max is not None:       parts.append(f"--exp_K_max {exp_K_max}")
     if graphs_dir:                  parts.append(f"--graphs_dir {graphs_dir}")
     if n_replicates is not None:    parts.append(f"--n_replicates {n_replicates}")
     if tg_path:                     parts.append(f"--tg_path {tg_path}")
+    if equilibration_path:          parts.append(f"--equilibration_path {equilibration_path}")
+    if melt_equilibration_path:     parts.append(f"--melt_equilibration_path {melt_equilibration_path}")
+    if mechanical_path:             parts.append(f"--mechanical_path {mechanical_path}")
+    if bulk_modulus_deform_path:    parts.append(f"--bulk_modulus_deform_path {bulk_modulus_deform_path}")
+    if byproducts_spec:             parts.append(f"--byproducts_spec {byproducts_spec}")
 
     command = " ".join(parts)
     logger.info(f"Running generate_run_summary via CLI: {command}")
@@ -3861,14 +4462,13 @@ def generate_run_summary(
     d04: Optional[str] = None,
     d05: Optional[str] = None,
     d06: Optional[str] = None,
-    exp_tg_min: Optional[float] = None,
-    exp_tg_max: Optional[float] = None,
-    exp_density_min: Optional[float] = None,
-    exp_density_max: Optional[float] = None,
-    exp_K_min: Optional[float] = None,
-    exp_K_max: Optional[float] = None,
     n_replicates: Optional[int] = None,
     tg_path: Optional[str] = None,
+    equilibration_path: Optional[str] = None,
+    melt_equilibration_path: Optional[str] = None,
+    mechanical_path: Optional[str] = None,
+    bulk_modulus_deform_path: Optional[str] = None,
+    byproducts_spec: Optional[str] = None,
 ) -> dict:
     """
     Aggregate all Stage 4 analysis outputs into a single run_summary.json.
@@ -3879,6 +4479,11 @@ def generate_run_summary(
     bulk modulus), convergence, structural checks, artifact paths, and
     provenance (git commit, MDAnalysis version, timestamp).
 
+    Reports measured values only — no experimental PASS/FAIL grading. Most runs are novel
+    systems with no curated experimental reference, so compare results.tg/density/bulk_modulus
+    against literature by hand (or via exp_lookup.json, written separately for provenance) when
+    a reference happens to exist.
+
     Call as the final step of Stage 4, after all analysis tools have run.
     All artifact paths in the summary are relative to data/[RUN]/ in the
     PolyJarvis repo (e.g. "graphs/tg_fit.png").
@@ -3886,7 +4491,7 @@ def generate_run_summary(
     Args:
         output_dir:       Absolute path to data/[RUN]/raw/.
                           Every analysis JSON must already exist directly here —
-                          only tg_summary.json is searched recursively. Anything an
+                          only thermal.json is searched recursively. Anything an
                           extractor wrote into a subdirectory is reported in
                           artifacts_missing, not silently dropped.
         run_name:         Run directory name (e.g. "PS4").
@@ -3897,16 +4502,29 @@ def generate_run_summary(
         charge_method:    Charge method used (e.g. "AM1-BCC", "embedded in FF").
         dp, n_chains, n_atoms: System size parameters.
         date_start, date_end: ISO date strings (e.g. "2026-06-04").
-        d01–d06:          Decision strings from run_log.md.
-        exp_tg_min/max:   Experimental Tg range (K) for PASS/FAIL status.
-        exp_density_min/max: Experimental density range (g/cm³).
-        exp_K_min/max:    Experimental bulk modulus range (GPa).
+        d01–d06:          Decision strings (caller-resolved from the run plan).
         n_replicates:     Replicate count reported in results.tg.n_replicates
                           (single-run protocol: 1).
-        tg_path:          Explicit path to the canonical tg_summary.json (e.g.
-                          tg_r40/tg_summary.json — the slowest-rate folder). When
+        tg_path:          Explicit path to the canonical thermal.json (e.g.
+                          tg_r40/thermal.json — the slowest-rate folder). When
                           supplied, skips rglob discovery; prevents alphabetical-order
                           bugs when multiple rate folders coexist.
+        byproducts_spec:    Path to a JSON list of free measurements to surface alongside the
+                            requested results -- written by run_campaign.do_summary from
+                            orchestration/scripts/track_registry.py. A path rather than an import
+                            because track_registry lives in orchestration/ and these analysis
+                            scripts deploy separately, the same reasoning as the explicit
+                            cross-attempt paths below.
+        equilibration_path, mechanical_path, bulk_modulus_deform_path:
+                          Explicit paths to the accepted equilibration/mechanical
+                          attempts' own equilibration.json/mechanical.json/
+                          bulk_modulus_deform.json. Under the attempt-based run layout
+                          these files live under a DIFFERENT stage's own attempt raw
+                          dir, never under this call's own output_dir — the plain
+                          same-dir lookup can never find them without these (mirrors
+                          tg_path's existing precedent for exactly this reason).
+                          Omit only for a flat (non-attempt-based) run where every
+                          stage shares one output_dir.
 
     Returns:
         dict with status and summary_json path on success.
@@ -3922,11 +4540,11 @@ def generate_run_summary(
             charge_method=charge_method, dp=dp, n_chains=n_chains, n_atoms=n_atoms,
             date_start=date_start, date_end=date_end,
             d01=d01, d02=d02, d03=d03, d04=d04, d05=d05, d06=d06,
-            exp_tg_min=exp_tg_min, exp_tg_max=exp_tg_max,
-            exp_density_min=exp_density_min, exp_density_max=exp_density_max,
-            exp_K_min=exp_K_min, exp_K_max=exp_K_max,
             graphs_dir=graphs_dir, n_replicates=n_replicates,
-            tg_path=tg_path,
+            tg_path=tg_path, equilibration_path=equilibration_path,
+            melt_equilibration_path=melt_equilibration_path,
+            mechanical_path=mechanical_path, bulk_modulus_deform_path=bulk_modulus_deform_path,
+            byproducts_spec=byproducts_spec,
         )),
         daemon=True,
     )
@@ -3943,11 +4561,13 @@ def generate_run_summary(
 # ─── Entry point ──────────────────────────────────────────────────────────────
 def _recover_interrupted_chains():
     """
-    On server startup, find any chains that were running/pending when the
-    server last died and re-launch their threads, skipping stages whose
-    output data file already exists locally.
+    On server startup, settle any legacy in-process chains ("lammps_chain")
+    that were running/pending when the server last died: complete them if
+    every stage's output data file exists locally, otherwise fail them with a
+    resubmit message. Current chains ("lammps_nohup_chain") run detached and
+    outlive the server, so they are not touched here.
     """
-    recovered = 0
+    settled = 0
     for run in run_manager.all():
         if run["run_type"] != "lammps_chain":
             continue
@@ -3957,8 +4577,6 @@ def _recover_interrupted_chains():
         chain_id = run["run_id"]
         meta     = run["meta"]
         stages   = meta.get("stages", [])
-        mpi      = meta.get("mpi", 2)
-        gpu_ids  = meta.get("gpu_ids", "0")
 
         if not stages:
             run_manager.fail(chain_id, "Cannot recover: full stage list not persisted (pre-fix chain)")
@@ -3978,19 +4596,17 @@ def _recover_interrupted_chains():
         if not remaining:
             run_manager.complete(chain_id, {"recovered": True, "note": "All stages already complete on disk"})
             logger.info(f"[{chain_id}] Recovery: all stages already done")
+            settled += 1
             continue
 
-        logger.info(f"[{chain_id}] Recovering: {len(remaining)} stages remaining")
-        thread = threading.Thread(
-            target=_lammps_chain_background,
-            args=(chain_id, remaining, mpi, gpu_ids),
-            daemon=True,
-        )
-        thread.start()
-        recovered += 1
+        run_manager.fail(chain_id, f"Cannot recover: {len(remaining)} stage(s) unfinished and "
+                                   "in-process chains are no longer supported; resubmit with "
+                                   "run_lammps_chain")
+        logger.warning(f"[{chain_id}] Legacy chain marked failed: {len(remaining)} stages unfinished")
+        settled += 1
 
-    if recovered:
-        logger.info(f"Startup recovery: re-launched {recovered} interrupted chain(s)")
+    if settled:
+        logger.info(f"Startup recovery: settled {settled} legacy interrupted chain(s)")
 
 
 if __name__ == "__main__":

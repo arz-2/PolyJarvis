@@ -1,0 +1,151 @@
+INFO: mpi_ranks not given — derived 1 from hardware_policy[trappe] (engine=gpu)
+INFO: gpu_ids not given — derived "0" from hardware_policy[trappe]; claim free GPU(s) with orchestration/scripts/hardware_runtime.py
+2026-09-13 18:22:03,906 [LAMMPS-ENGINE] INFO Loaded 156 runs from /home/alexzhao/PolyJarvis/data/_engine/run_state.json
+2026-09-13 18:22:08,139 [LAMMPS-ENGINE] WARNING Pre-flight validation skipped (error reading data file): 'utf-8' codec can't decode byte 0xa0 in position 93: invalid start byte
+2026-09-13 18:22:08,139 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work && cat > /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/chain_541dbf5e.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+# PolyJarvis chain 541dbf5e — auto-generated, do not edit (engine=gpu)
+set -euo pipefail
+
+CHAIN_ID=541dbf5e
+LMP=/home/alexzhao/lammps-install/bin/lmp
+OFFLOAD_FLAGS="-sf gpu -pk gpu 1"
+MPI=1
+GPU_IDS=1
+N_GPU=1
+
+# Progress log — one JSON object per line
+PROGRESS=/home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/chain_541dbf5e_progress.jsonl
+
+log_done()  { echo "{\"stage\":\"$1\",\"status\":\"done\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_fail()  { echo "{\"stage\":\"$1\",\"status\":\"failed\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+log_start() { echo "{\"stage\":\"$1\",\"status\":\"running\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; }
+
+# Completion sentinel — written by THIS nohup'd script so it survives an
+# MCP-server restart (the in-process chain monitor is only a fast-path).
+mkdir -p /tmp/polyjarvis/sentinels
+SENTINEL=/tmp/polyjarvis/sentinels/done_541dbf5e.json
+PIDFILE=/tmp/polyjarvis/sentinels/pid_541dbf5e
+sentinel_ok()   { echo "{\"run_id\":\"541dbf5e\",\"status\":\"completed\"}" > "$SENTINEL"; }
+sentinel_fail() { echo "{\"run_id\":\"541dbf5e\",\"status\":\"failed\",\"stage\":\"$1\"}" > "$SENTINEL"; }
+
+export CUDA_VISIBLE_DEVICES=1
+export PATH=/home/alexzhao/openmpi/bin:$PATH
+export LD_LIBRARY_PATH=/home/alexzhao/openmpi/lib:${LD_LIBRARY_PATH:-}
+export OPAL_PREFIX=/home/alexzhao/openmpi
+# Record our own PID so watch_run can check liveness ($$ is the long-lived chain).
+echo $$ > "$PIDFILE"
+LAMMPS_LAUNCH="env CUDA_VISIBLE_DEVICES=$GPU_IDS $LMP $OFFLOAD_FLAGS"
+
+# --- Stage 1/1: npt_final ---
+mkdir -p /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final
+cd /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final
+log_start npt_final
+$LAMMPS_LAUNCH -in /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final.in >> /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final_run.log 2>&1 \
+  && log_done npt_final \
+  || { log_fail npt_final; sentinel_fail npt_final; echo "{\"stage\":\"__chain__\",\"status\":\"failed\",\"failed_at\":\"npt_final\",\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"; exit 1; }
+
+echo "{\"stage\":\"__chain__\",\"status\":\"completed\",\"n_stages\":1,\"ts\":\"$(date -Iseconds)\"}" >> "$PROGRESS"
+sentinel_ok
+rm -f "$PIDFILE"
+
+POLYJARVIS_EOF
+chmod +x /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/chain_541dbf5e.sh && setsid nohup bash /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/chain_541dbf5e.sh > /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/chain_541dbf5e.log 2>&1 </dev/null & disown; echo $!
+2026-09-13 18:22:38,190 [LAMMPS-ENGINE] INFO [541dbf5e] Chain monitor started (polling every 60s)
+[wait] cooling chain: watching 541dbf5e
+2026-09-13 18:23:38,190 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/chain_541dbf5e_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:24:38,267 [LAMMPS-ENGINE] INFO Running comprehensive equilibration check: python /home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/analysis_scripts/check_equilibration_comprehensive.py --log_file /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final.log --dump_file /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final.dump --data_file /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final_out.data --backbone_types 1 2 --output_dir /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/raw --skip_frames 50 --timestep_fs 2.0 --dump_every 1000 --bond_length_A 1.54 --eq_fraction 0.5 --drift_threshold_pct 1.0 --drift_pvalue 0.01 --block_count 10 --temp_col Temp --density_col Density --energy_col TotEng --atom_style "id resid type charge x y z" --cv_signal_max 0.11 --output_name cooling.json --cutoff_A 14.0 --graphs_dir /home/alexzhao/PolyJarvis/data/PE_3/graphs --struct_dump_file /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final.dump --struct_data_file /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final_out.data
+2026-09-13 18:24:38,267 [LAMMPS-ENGINE] INFO Running: python /home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/analysis_scripts/check_equilibration_comprehensive.py --log_file /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final.log --dump_file /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final.dump --data_file /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final_out.data --backbone_types 1 2 --output_dir /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/raw --skip_frames 50 --timestep_fs 2.0 --dump_every 1000 --bond_length_A 1.54 --eq_fraction 0.5 --drift_threshold_pct 1.0 --drift_pvalue 0.01 --block_count 10 --temp_col Temp --density_col Density --energy_col TotEng --atom_style "id resid type charge x y z" --cv_signal_max 0.11 --output_name cooling.json --cutoff_A 14.0 --graphs_dir /home/alexzhao/PolyJarvis/data/PE_3/graphs --struct_dump_file /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final.dump --struct_data_file /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final_out.data
+2026-09-13 18:24:38,412 [LAMMPS-ENGINE] INFO Running: tail -5 /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/chain_541dbf5e_progress.jsonl 2>/dev/null || echo ''
+2026-09-13 18:24:38,657 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_541dbf5e.json
+2026-09-13 18:24:38,657 [LAMMPS-ENGINE] INFO [541dbf5e] Chain monitor: completed
+2026-09-13 18:24:38,657 [LAMMPS-ENGINE] INFO [541dbf5e] Removed chain_541dbf5e_progress.jsonl
+2026-09-13 18:24:38,657 [LAMMPS-ENGINE] INFO [541dbf5e] Removed chain_541dbf5e.sh
+2026-09-13 18:24:38,657 [LAMMPS-ENGINE] INFO [541dbf5e] Removed chain_541dbf5e.log
+2026-09-13 18:25:39,382 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_98d17b1f.json
+2026-09-13 18:25:40,286 [LAMMPS-ENGINE] INFO Running equilibrated density extraction via CLI: python /home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/analysis_scripts/extract_equilibrated_density.py --log_file /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final.log --output_dir /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/raw --eq_fraction 0.5 --target_temp 300.0 --temp_tolerance 50.0 --plateau_shift_sigma 1.0 --density_col Density --temp_col Temp --output_name cooling.json
+2026-09-13 18:25:40,286 [LAMMPS-ENGINE] INFO Running: python /home/alexzhao/PolyJarvis/mcp-servers/mcp-lammps-engine/analysis_scripts/extract_equilibrated_density.py --log_file /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/work/npt_final/npt_final.log --output_dir /home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/raw --eq_fraction 0.5 --target_temp 300.0 --temp_tolerance 50.0 --plateau_shift_sigma 1.0 --density_col Density --temp_col Temp --output_name cooling.json
+2026-09-13 18:25:41,239 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_d1998878.json
+{
+  "status": "escalation_required",
+  "stage": "cooling",
+  "finding": {
+    "code": "EXTEND",
+    "stage": "cooling",
+    "severity": "blocking",
+    "confidence": "high",
+    "details": {
+      "regime": "rubbery",
+      "applicable_clause": "require_rubbery",
+      "binding_gates": {
+        "energy_drift": false,
+        "density_sem": true,
+        "energy_sem": true,
+        "n_eff_density": false,
+        "density_homogeneity": true,
+        "finite_size": true
+      },
+      "unmeasured_binding_gates": [],
+      "advisory_gates": {
+        "density_drift": true,
+        "energy_component_drift": false,
+        "residual_stress": true,
+        "rg": true,
+        "ct": true,
+        "torsion": true,
+        "msd_not_trapped": false,
+        "msid_gaussian": true
+      },
+      "density_value_binding": "n/a",
+      "cooling_verdict": null,
+      "cooling_extrapolation_reliable": null,
+      "homogeneity_verdict": "HOMOG_PASS",
+      "finite_size_verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
+      "finite_size": {
+        "available": true,
+        "pass": true,
+        "self_image_advisory": true,
+        "verdict": "SIZE_CHAIN_SELF_IMAGE_ADVISORY",
+        "L_min_A": 45.81,
+        "cutoff_A": 14.0,
+        "L_over_2cutoff": 1.636,
+        "L_over_2Rg": 0.65,
+        "L_over_Ree": 0.559,
+        "ree_self_image_flag": true,
+        "min_image_evaluated": true,
+        "box_A": [
+          45.81,
+          45.81,
+          45.81
+        ],
+        "graded_box": "actual_equilibrated"
+      },
+      "finite_size_min_image_unarmed": false,
+      "residual_stress": {
+        "available": true,
+        "dev_atm": {
+          "Pxx": 37.6,
+          "Pyy": -13.3,
+          "Pzz": -24.3
+        },
+        "von_mises_atm": 57.2,
+        "max_abs_dev_atm": 37.6,
+        "z_max": 1.1,
+        "resolved": false,
+        "mean_pressure_atm": -19.8
+      },
+      "failing_binding_gates": [
+        "energy_drift",
+        "n_eff_density"
+      ],
+      "verdict": "EXTEND",
+      "remedy": "extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': extend_ns=2.0 (1.5 x 20/15 independent-sample deficit) via restart-continuation (read_restart from npt_final's own .restart output, appended log/dump) at npt_prod_temp_K. Cap 2 per gate.",
+      "remedy_confidence": "high",
+      "saved_to": "/home/alexzhao/PolyJarvis/data/PE_3/attempts/cooling/attempt-0007/raw/cooling.json",
+      "relaxation_time_ns": 755462.6712000001,
+      "extension_ns": 0.167
+    },
+    "remedy_id": null
+  },
+  "state_path": "/home/alexzhao/PolyJarvis/data/PE_3/workflow_state.json"
+}

@@ -1,0 +1,694 @@
+{
+  "active_finding_retired_by_operator": {
+    "code": "DENSITY_HETEROGENEITY",
+    "confidence": "high",
+    "details": {
+      "advisory_gates": {
+        "msd_not_trapped": true,
+        "msid_gaussian": false,
+        "residual_stress": true
+      },
+      "applicable_clause": "require_melt",
+      "binding_gates": {
+        "chain_displacement": true,
+        "density_drift": true,
+        "density_homogeneity": false,
+        "density_sem": true,
+        "energy_component_drift": true,
+        "energy_drift": true,
+        "energy_sem": true,
+        "finite_size": true,
+        "n_eff_density": true,
+        "p2": true,
+        "rg": true,
+        "torsion": true
+      },
+      "cooling_extrapolation_reliable": null,
+      "cooling_verdict": null,
+      "density_value_binding": "n/a",
+      "failing_binding_gates": [
+        "density_homogeneity"
+      ],
+      "finite_size": {
+        "L_min_A": 39.1,
+        "L_over_2Rg": 1.094,
+        "L_over_2cutoff": 1.777,
+        "L_over_Ree": 0.845,
+        "available": true,
+        "box_A": [
+          39.1,
+          39.1,
+          39.1
+        ],
+        "cutoff_A": 11.0,
+        "graded_box": "actual_equilibrated",
+        "min_image_evaluated": true,
+        "pass": true,
+        "ree_self_image_flag": true,
+        "self_image_advisory": false,
+        "verdict": "SIZE_PASS"
+      },
+      "finite_size_min_image_unarmed": false,
+      "finite_size_verdict": "SIZE_PASS",
+      "homogeneity_verdict": "HOMOG_HETEROGENEOUS",
+      "regime": "melt",
+      "remedy": "MELT-MIXING \u2014 extend the melt reference block in place (extend_only=True, base_stage_name=<the cool_block_NN tagged as the melt reference>, extend_temp_K=temp, cap 2), then re-run the gate. Never re-melt from scratch and never touch the cooling ramp for a mixing defect.",
+      "remedy_confidence": "high",
+      "residual_stress": {
+        "available": true,
+        "dev_atm": {
+          "Pxx": -11.7,
+          "Pyy": -42.6,
+          "Pzz": 54.3
+        },
+        "max_abs_dev_atm": 54.3,
+        "mean_pressure_atm": 15.4,
+        "resolved": false,
+        "von_mises_atm": 85.7,
+        "z_max": 1.55
+      },
+      "saved_to": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/equilibration/attempt-0001/raw/equilibration.json",
+      "unmeasured_binding_gates": [],
+      "verdict": "STRUCTURAL_FAIL"
+    },
+    "remedy_id": null,
+    "severity": "blocking",
+    "stage": "equilibration"
+  },
+  "agent_escalations": [
+    {
+      "at": "2026-09-14T06:45:18.295675+00:00",
+      "decision": {
+        "action": "end_run",
+        "modifications": {},
+        "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] ROOT CAUSE: most likely a false positive of the density-homogeneity check on perfluorinated chemistry, not an unmixed melt. No lever in the contract changes the quantity the gate measures.\n\nWHY THE AUTO-REMEDY NEVER RAN: the engine did not try melt_homogeneity and run out. It declined on sizing: recovery_log.jsonl auto_remedy_rejected melt_homogeneity, \"ValueError: cannot size a continuation: the finding carries no extension_ns and there is no default (failing gates: ['density_homogeneity'])\". remedy_counters.total=0.\n\nEVIDENCE (attempts/equilibration/attempt-0001/raw/equilibration.json):\n(1) density_homogeneity is the only failing binding gate: cv_signal 0.185 vs max 0.11; cv_mean 0.279, poisson_cv 0.208, 24.2 atoms/voxel, grid 5^3.\n(2) Every indicator that would show a mixing defect passes. MSD/Ree^2=0.93 (chains' centres of mass moved about one R_ee), no kinetic trap. Torsion JS 0.00027 (stable). Rg CV 15%, P2 0.027. C(t) is 60% decayed with tau_relax 4.0 ns inside a 4.95 ns trajectory. Density drift 0.45% with n_eff 73, all energy components pass, T=700.02 K.\n(3) Every other run with this checker has cv_signal 0.00-0.07: aPS_1/2/3, PLLA_1/2/3, sPVC_2/3, iPMMA_1, PEG cross-grades. The one other outlier is PTFE_noAI at 0.193, run on the identical cell (same emc_seed 909670995 and velocity_seed 930760043), which also stopped on this gate. The failure tracks the chemistry and reproduces, so retry or wait_and_retry would repeat it. Disk has 28 G free and there is no GPU-related cause.\n(4) Mechanism: the shot-noise floor assumes voxel mass comes from independent atoms, with only a mass-dispersion correction (check_equilibration_comprehensive.py:870-874). That works for H-rich polymers, where H carries little mass. In PTFE, 76% of the mass is F bonded 1.35 A from C, so the real counting units are CF2 groups of 50 amu, about 8 per voxel. Their counting floor is 1/sqrt(8.07)=0.352. The measured cv_mean of 0.279 is below that floor (a liquid is sub-Poissonian), so the whole \"signal\" is consistent with counting noise the formula under-subtracts.\n\nWHY NO REVISE_PLAN LEVER HELPS:\n(a) nchain: the adaptive grid targets about 25 atoms/voxel (line 1176, clamp [3,10]). A bigger cell keeps the same atoms/voxel and the same under-subtracted floor. Only past the grid_n=10 clamp does occupancy rise. Estimated from 1/sqrt(n) scaling of the measured cv, clearing 0.11 needs about 60 atoms/voxel even at the atom-level floor, i.e. about 60k atoms (nchain ~200, 20x this 3k-atom cell). That is about 20x the atoms of a 4.76 h equilibration, far beyond the plan's total_gpu_hours estimate of 5.37. Ree > L (0.845, advisory self-image flag) is real but is not the failing gate.\n(b) npt_continuation_ns: run_campaign.py:2701 would extend npt_melt_hold in place. But voxel counting noise does not fall with trajectory length, and every mixing indicator already passes. The expected result is a null re-fail, then another escalation, for several more GPU-hours (the 2 ns melt hold was part of a 4.76 h attempt).\n(c) Seeds, dt, T and the force field do not touch the voxel counting statistics.\n\nDECISION: equilibration has already used 4.76 GPU-h (01:52-06:38) of a 5.37 GPU-h plan estimate. No available action has a credible chance of passing this gate at a cost worth paying. Close the run.\n\nRecord for follow-up: the melt otherwise meets every thermo, chain and structural gate (rho=1.450 g/cm3 at 700 K). The fix belongs in the checker: a bonded-group compound-Poisson floor, or a correlation-aware noise estimate. After that, PTFE_noAI and PTFE_AI can be regraded without new simulation."
+      },
+      "finding": {
+        "code": "DENSITY_HETEROGENEITY",
+        "confidence": "high",
+        "details": {
+          "advisory_gates": {
+            "msd_not_trapped": true,
+            "msid_gaussian": false,
+            "residual_stress": true
+          },
+          "applicable_clause": "require_melt",
+          "binding_gates": {
+            "chain_displacement": true,
+            "density_drift": true,
+            "density_homogeneity": false,
+            "density_sem": true,
+            "energy_component_drift": true,
+            "energy_drift": true,
+            "energy_sem": true,
+            "finite_size": true,
+            "n_eff_density": true,
+            "p2": true,
+            "rg": true,
+            "torsion": true
+          },
+          "cooling_extrapolation_reliable": null,
+          "cooling_verdict": null,
+          "density_value_binding": "n/a",
+          "failing_binding_gates": [
+            "density_homogeneity"
+          ],
+          "finite_size": {
+            "L_min_A": 39.1,
+            "L_over_2Rg": 1.094,
+            "L_over_2cutoff": 1.777,
+            "L_over_Ree": 0.845,
+            "available": true,
+            "box_A": [
+              39.1,
+              39.1,
+              39.1
+            ],
+            "cutoff_A": 11.0,
+            "graded_box": "actual_equilibrated",
+            "min_image_evaluated": true,
+            "pass": true,
+            "ree_self_image_flag": true,
+            "self_image_advisory": false,
+            "verdict": "SIZE_PASS"
+          },
+          "finite_size_min_image_unarmed": false,
+          "finite_size_verdict": "SIZE_PASS",
+          "homogeneity_verdict": "HOMOG_HETEROGENEOUS",
+          "regime": "melt",
+          "remedy": "MELT-MIXING \u2014 extend the melt reference block in place (extend_only=True, base_stage_name=<the cool_block_NN tagged as the melt reference>, extend_temp_K=temp, cap 2), then re-run the gate. Never re-melt from scratch and never touch the cooling ramp for a mixing defect.",
+          "remedy_confidence": "high",
+          "residual_stress": {
+            "available": true,
+            "dev_atm": {
+              "Pxx": -11.7,
+              "Pyy": -42.6,
+              "Pzz": 54.3
+            },
+            "max_abs_dev_atm": 54.3,
+            "mean_pressure_atm": 15.4,
+            "resolved": false,
+            "von_mises_atm": 85.7,
+            "z_max": 1.55
+          },
+          "saved_to": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/equilibration/attempt-0001/raw/equilibration.json",
+          "unmeasured_binding_gates": [],
+          "verdict": "STRUCTURAL_FAIL"
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "equilibration"
+      },
+      "manifest": "attempt-0001",
+      "offered_actions": [
+        "retry",
+        "wait_and_retry",
+        "revise_plan",
+        "end_run"
+      ]
+    },
+    {
+      "at": "2026-09-15T01:16:07.604182+00:00",
+      "decision": {
+        "action": "accept_with_caveat",
+        "modifications": {},
+        "rationale": "[recovery-agent diagnosis via claude-opus-5[1m]] ROOT CAUSE: the PTFE transition is intrinsically broad at this rate. Per-point noise is not the problem, so the rate lever that method_gap usually calls for is unlikely to help.\n\nWHAT I READ (attempts/thermal/attempt-0001/raw/thermal.json):\n- The hyperbola fit gives Tg 525 K and the bilinear alternative gives 452.6 K, a method gap of 72.4 K against a 20 K limit.\n- The fitted transition width is transition_width_c_K = 248.2 K, with tg_uncertainty_K 66.8 and r^2 0.9889.\n- The density curve bends smoothly over most of the 100-715 K window. There is no sharp kink for either model to find, which is why the two models disagree.\n- Per-T sampling is not noisy. 29 of 31 temperatures PASS as stable, n_eff is mostly 18-402, slopes have valid signs and order, and all 82 plateau bins were used. The only unstable points are the top two (700 and 680 K, EXHAUSTED). Their densities are non-monotonic (1.500 at 700 K, then 1.450 at 680 K, then 1.495 at 660 K), and tg_melt_start_density_consistent is false.\n- Halving tg_rate_K_per_ns doubles the steps per T. That shrinks the variance of each point, but it does not narrow a 248 K-wide curvature. Both fits would still be run on the same smoothly bending curve.\n\nCOST:\n- The failing thermal sweep at 100 K/ns took 5.1 h (20:07 to 01:15).\n- Lowering the rate carries EXTRA_INVALIDATION to cooling, so the 2.7 h cooldown (17:26 to 20:07) would re-run as well. Going to 50 K/ns costs about 10 h of sweep plus a cooling re-run, roughly 13-15 GPU-h. The plan's whole-run estimate is 5.37 GPU-h, and equilibration and cooling have already used well over that.\n- No auto-remedy was tried: remedy_counters.total=0, and tg_breakpoint correctly declines method_gap.\n\nGRADING TARGET: the plan's own dominant_uncertainty says PTFE's experimental Tg is ambiguous. The curated value is 160 K (gamma relaxation), against a relaxation near 400 K. Both fitted values (453 and 525 K) are far from 160 K, and the hyperbola value sits close to md_tg_ceiling_K 550. So even a narrower gap would give a number with no reliable reference to grade against.\n\nWHY NOT THE OTHERS:\n- retry: a pinned seed reproduces a deterministic result.\n- wait_and_retry: there is no resource cause.\n- revise_plan with a lower tg_rate: high cost for a low chance of closing a 72 K gap on a 248 K-wide transition.\n- end_run: throws away the mechanical (bulk modulus) stage, which is still pending and can run on the accepted cooled glass.\n\nrecover.md section 4 names exactly this case ('TG_REVIEW method_gap on a broad transition') for accept_with_caveat. Tg is withheld: tg_reportable=false, and it must not be frozen into the cache. The 300 K density and K can still finish."
+      },
+      "finding": {
+        "code": "TG_REVIEW",
+        "confidence": "high",
+        "details": {
+          "gate_output": {
+            "is_glassy": true,
+            "per_rate": [
+              {
+                "Tg_K": 525.0,
+                "fit_quality": "GOOD",
+                "output_dir": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/thermal/attempt-0001/raw",
+                "r_squared": 0.9889,
+                "rate": 100.0,
+                "tg_gate_cause": "method_gap",
+                "tg_gate_verdict": "TG_REVIEW",
+                "tg_melt_start_density_consistent": false,
+                "tg_per_t_sampling": [
+                  {
+                    "T_K": 700.0,
+                    "extensions_used": 2,
+                    "mean_density_gcm3": 1.5003136975124378,
+                    "n_eff": 9,
+                    "outcome": "EXHAUSTED",
+                    "stable": false
+                  },
+                  {
+                    "T_K": 680.0,
+                    "extensions_used": 2,
+                    "mean_density_gcm3": 1.4498956248756216,
+                    "n_eff": 15,
+                    "outcome": "EXHAUSTED",
+                    "stable": false
+                  },
+                  {
+                    "T_K": 660.0,
+                    "extensions_used": 2,
+                    "mean_density_gcm3": 1.4950218422885573,
+                    "n_eff": 18,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 640.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.5191945517412935,
+                    "n_eff": 23,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 620.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.5700297671641792,
+                    "n_eff": 7,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 600.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.612961255721393,
+                    "n_eff": 27,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 580.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.6423224577114428,
+                    "n_eff": 18,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 560.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.666750284079602,
+                    "n_eff": 20,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 540.0,
+                    "extensions_used": 1,
+                    "mean_density_gcm3": 1.7059893447761196,
+                    "n_eff": 19,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 520.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.7272788507462686,
+                    "n_eff": 44,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 500.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.7426300308457712,
+                    "n_eff": 27,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 480.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.77555008159204,
+                    "n_eff": 31,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 460.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.7897246796019899,
+                    "n_eff": 77,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 440.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.8119423781094528,
+                    "n_eff": 101,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 420.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.8318239666666665,
+                    "n_eff": 105,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 400.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.842279572636816,
+                    "n_eff": 112,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 380.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.8583175373134326,
+                    "n_eff": 271,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 360.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.8719510427860697,
+                    "n_eff": 19,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 340.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.8863378900497514,
+                    "n_eff": 119,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 320.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.8880198547263685,
+                    "n_eff": 63,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 300.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.9001232348258708,
+                    "n_eff": 149,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 280.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.908120724875622,
+                    "n_eff": 83,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 260.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.9176421885572137,
+                    "n_eff": 121,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 240.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.9264411711442788,
+                    "n_eff": 80,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 220.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.9371144980099502,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 200.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.9445330492537314,
+                    "n_eff": 78,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 180.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.954563714925373,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 160.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.9604351930348258,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 140.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.9683842771144278,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 120.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.9758415676616916,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 100,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.9822865641791045,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  }
+                ],
+                "tg_start_cell": {
+                  "T_start_K": 700.0,
+                  "outcome": "MELT_HOLD_START",
+                  "start_data_path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data"
+                },
+                "velocity_seed": 930760043
+              }
+            ],
+            "tg_gate_cause": "method_gap",
+            "tg_gate_verdict": "TG_REVIEW"
+          }
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "thermal"
+      },
+      "manifest": "attempt-0001",
+      "offered_actions": [
+        "retry",
+        "wait_and_retry",
+        "revise_plan",
+        "accept_with_caveat",
+        "end_run"
+      ]
+    }
+  ],
+  "caveats": [
+    {
+      "at": "2026-09-15T01:16:07.607866+00:00",
+      "attempt_id": "attempt-0001",
+      "code": "TG_REVIEW",
+      "decided_by": "recovery_agent",
+      "note": "stage accepted so the run can finish; its gate verdict stands and the property is withheld from results and from the characterization cache",
+      "rationale": "[recovery-agent diagnosis via claude-opus-5[1m]] ROOT CAUSE: the PTFE transition is intrinsically broad at this rate. Per-point noise is not the problem, so the rate lever that method_gap usually calls for is unlikely to help.\n\nWHAT I READ (attempts/thermal/attempt-0001/raw/thermal.json):\n- The hyperbola fit gives Tg 525 K and the bilinear alternative gives 452.6 K, a method gap of 72.4 K against a 20 K limit.\n- The fitted transition width is transition_width_c_K = 248.2 K, with tg_uncertainty_K 66.8 and r^2 0.9889.\n- The density curve bends smoothly over most of the 100-715 K window. There is no sharp kink for either model to find, which is why the two models disagree.\n- Per-T sampling is not noisy. 29 of 31 temperatures PASS as stable, n_eff is mostly 18-402, slopes have valid signs and order, and all 82 plateau bins were used. The only unstable points are the top two (700 and 680 K, EXHAUSTED). Their densities are non-monotonic (1.500 at 700 K, then 1.450 at 680 K, then 1.495 at 660 K), and tg_melt_start_density_consistent is false.\n- Halving tg_rate_K_per_ns doubles the steps per T. That shrinks the variance of each point, but it does not narrow a 248 K-wide curvature. Both fits would still be run on the same smoothly bending curve.\n\nCOST:\n- The failing thermal sweep at 100 K/ns took 5.1 h (20:07 to 01:15).\n- Lowering the rate carries EXTRA_INVALIDATION to cooling, so the 2.7 h cooldown (17:26 to 20:07) would re-run as well. Going to 50 K/ns costs about 10 h of sweep plus a cooling re-run, roughly 13-15 GPU-h. The plan's whole-run estimate is 5.37 GPU-h, and equilibration and cooling have already used well over that.\n- No auto-remedy was tried: remedy_counters.total=0, and tg_breakpoint correctly declines method_gap.\n\nGRADING TARGET: the plan's own dominant_uncertainty says PTFE's experimental Tg is ambiguous. The curated value is 160 K (gamma relaxation), against a relaxation near 400 K. Both fitted values (453 and 525 K) are far from 160 K, and the hyperbola value sits close to md_tg_ceiling_K 550. So even a narrower gap would give a number with no reliable reference to grade against.\n\nWHY NOT THE OTHERS:\n- retry: a pinned seed reproduces a deterministic result.\n- wait_and_retry: there is no resource cause.\n- revise_plan with a lower tg_rate: high cost for a low chance of closing a 72 K gap on a 248 K-wide transition.\n- end_run: throws away the mechanical (bulk modulus) stage, which is still pending and can run on the accepted cooled glass.\n\nrecover.md section 4 names exactly this case ('TG_REVIEW method_gap on a broad transition') for accept_with_caveat. Tg is withheld: tg_reportable=false, and it must not be frozen into the cache. The 300 K density and K can still finish.",
+      "reportable": false,
+      "stage": "thermal"
+    }
+  ],
+  "created_at": "2026-09-14T01:52:08.045383+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 700.0,
+    "T_melt_hold_K": 700.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 780.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "opls-library",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 11.0,
+    "density_initial_gcm3": 0.89,
+    "dp_typical": 50,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 909670995,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 550,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "opls/2024/opls-aa",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 930760043
+  },
+  "engine_version": "workflow-engine-v3",
+  "input_hash_restamp": [
+    {
+      "at": "2026-09-16T22:03:47.051705+00:00",
+      "reason": "trajectory dumps compressed to .dump.gz (no re-execution, no re-analysis); artifact paths and sha256 changed, so dependency checksums and every dependent stage input hash shifted",
+      "stages": {
+        "cooling": {
+          "after": "ea726564909a717e59386a3eece08d25286b02e5a29a005d6316f1d711dc8630",
+          "before": "c26e29297c7e6d17f0b176d5b3b740044bdb01bb44a849dc9b18d185e2033ad9"
+        },
+        "mechanical": {
+          "after": "0bfda259609c73a3d60d5102388e4f1f2c4d2e59eed9cc74850d68ab67177d23",
+          "before": "b610277a8cf7d952a92714020176f913162e48c8554276fd26941b42641293d8"
+        },
+        "summary": {
+          "after": "744acf5a8f6694ae60938d2e7084d3c630ef325c486ef10e6a058d1cf99d70df",
+          "before": "ae50464d0ff24432102dadc0fb860330e0f938491d684e65e8d5224ead90db8d"
+        },
+        "thermal": {
+          "after": "c9755106451952e62ada0e8e9ad042e4ba15285ee37dcf26dfe8004b14818b37",
+          "before": "2dd5ad4624e617f415b759835aaa0a8eba3a3a53dd3240cf0e09d2ad2cb4ac1d"
+        }
+      }
+    }
+  ],
+  "operator_interventions": [
+    {
+      "action": "regrade_via_reattach",
+      "arm_note": "applied to the AI arm only; PTFE_noAI left at escalation_required",
+      "at": "2026-09-14T17:17:22.544781+00:00",
+      "attempt_id": "attempt-0001",
+      "previous_terminated_by": {
+        "at": "2026-09-14T06:45:18.296923+00:00",
+        "by": "recovery_agent",
+        "code": "DENSITY_HETEROGENEITY",
+        "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] ROOT CAUSE: most likely a false positive of the density-homogeneity check on perfluorinated chemistry, not an unmixed melt. No lever in the contract changes the quantity the gate measures.\n\nWHY THE AUTO-REMEDY NEVER RAN: the engine did not try melt_homogeneity and run out. It declined on sizing: recovery_log.jsonl auto_remedy_rejected melt_homogeneity, \"ValueError: cannot size a continuation: the finding carries no extension_ns and there is no default (failing gates: ['density_homogeneity'])\". remedy_counters.total=0.\n\nEVIDENCE (attempts/equilibration/attempt-0001/raw/equilibration.json):\n(1) density_homogeneity is the only failing binding gate: cv_signal 0.185 vs max 0.11; cv_mean 0.279, poisson_cv 0.208, 24.2 atoms/voxel, grid 5^3.\n(2) Every indicator that would show a mixing defect passes. MSD/Ree^2=0.93 (chains' centres of mass moved about one R_ee), no kinetic trap. Torsion JS 0.00027 (stable). Rg CV 15%, P2 0.027. C(t) is 60% decayed with tau_relax 4.0 ns inside a 4.95 ns trajectory. Density drift 0.45% with n_eff 73, all energy components pass, T=700.02 K.\n(3) Every other run with this checker has cv_signal 0.00-0.07: aPS_1/2/3, PLLA_1/2/3, sPVC_2/3, iPMMA_1, PEG cross-grades. The one other outlier is PTFE_noAI at 0.193, run on the identical cell (same emc_seed 909670995 and velocity_seed 930760043), which also stopped on this gate. The failure tracks the chemistry and reproduces, so retry or wait_and_retry would repeat it. Disk has 28 G free and there is no GPU-related cause.\n(4) Mechanism: the shot-noise floor assumes voxel mass comes from independent atoms, with only a mass-dispersion correction (check_equilibration_comprehensive.py:870-874). That works for H-rich polymers, where H carries little mass. In PTFE, 76% of the mass is F bonded 1.35 A from C, so the real counting units are CF2 groups of 50 amu, about 8 per voxel. Their counting floor is 1/sqrt(8.07)=0.352. The measured cv_mean of 0.279 is below that floor (a liquid is sub-Poissonian), so the whole \"signal\" is consistent with counting noise the formula under-subtracts.\n\nWHY NO REVISE_PLAN LEVER HELPS:\n(a) nchain: the adaptive grid targets about 25 atoms/voxel (line 1176, clamp [3,10]). A bigger cell keeps the same atoms/voxel and the same under-subtracted floor. Only past the grid_n=10 clamp does occupancy rise. Estimated from 1/sqrt(n) scaling of the measured cv, clearing 0.11 needs about 60 atoms/voxel even at the atom-level floor, i.e. about 60k atoms (nchain ~200, 20x this 3k-atom cell). That is about 20x the atoms of a 4.76 h equilibration, far beyond the plan's total_gpu_hours estimate of 5.37. Ree > L (0.845, advisory self-image flag) is real but is not the failing gate.\n(b) npt_continuation_ns: run_campaign.py:2701 would extend npt_melt_hold in place. But voxel counting noise does not fall with trajectory length, and every mixing indicator already passes. The expected result is a null re-fail, then another escalation, for several more GPU-hours (the 2 ns melt hold was part of a 4.76 h attempt).\n(c) Seeds, dt, T and the force field do not touch the voxel counting statistics.\n\nDECISION: equilibration has already used 4.76 GPU-h (01:52-06:38) of a 5.37 GPU-h plan estimate. No available action has a credible chance of passing this gate at a cost worth paying. Close the run.\n\nRecord for follow-up: the melt otherwise meets every thermo, chain and structural gate (rho=1.450 g/cm3 at 700 K). The fix belongs in the checker: a bonded-group compound-Poisson floor, or a correlation-aware noise estimate. After that, PTFE_noAI and PTFE_AI can be regraded without new simulation.",
+        "reason": "agent_decision",
+        "stage": "equilibration"
+      },
+      "stage": "equilibration",
+      "why": "DENSITY_HETEROGENEITY came from the per-frame compound-Poisson floor, which assumes atoms occupy voxels independently and fails well-mixed H-free melts. Replaced by the time-averaged check (homogeneity_verdict, 2026-09-14); on this attempt's own npt_melt_hold it gives signal 0.033 < 0.08. No re-simulation: the completed chain 30ec13de is re-gated."
+    }
+  ],
+  "plan_decided_params": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 700.0,
+    "T_melt_hold_K": 700.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 780.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "opls-library",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 11.0,
+    "density_initial_gcm3": 0.89,
+    "dp_typical": 50,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 909670995,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 550,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "opls/2024/opls-aa",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 930760043
+  },
+  "plan_hash": "550878a98ef87afeac40728d49b8e4f571ded85d6cd5f3932e0702c37ba9bf55",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {},
+    "total": 0
+  },
+  "run_name": "PTFE_AI",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-14T01:52:38.778355+00:00",
+          "input_hash": "59a718ec26d7ec109eaa194daca74ea7d840100267291c3874c6d5dce18cc548",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-14T01:52:08.046009+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "59a718ec26d7ec109eaa194daca74ea7d840100267291c3874c6d5dce18cc548",
+      "status": "accepted"
+    },
+    "cooling": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-14T20:07:50.645230+00:00",
+          "input_hash": "ea726564909a717e59386a3eece08d25286b02e5a29a005d6316f1d711dc8630",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/cooling/attempt-0001/executor_state.json",
+          "started_at": "2026-09-14T17:26:56.807075+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "ea726564909a717e59386a3eece08d25286b02e5a29a005d6316f1d711dc8630",
+      "status": "accepted"
+    },
+    "equilibration": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-14T17:26:52.760359+00:00",
+          "input_hash": "e9dd2688f17928b807109130a3b021c2b0c19aa56592d6afbc5c7e1b5745cc54",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/equilibration/attempt-0001/executor_state.json",
+          "regrade_note": "verdict from the retired per-frame homogeneity formula withdrawn by operator; attempt reopened so the engine reattaches and re-gates it",
+          "started_at": "2026-09-14T01:52:38.782700+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "e9dd2688f17928b807109130a3b021c2b0c19aa56592d6afbc5c7e1b5745cc54",
+      "status": "accepted"
+    },
+    "mechanical": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T02:57:24.976285+00:00",
+          "input_hash": "0bfda259609c73a3d60d5102388e4f1f2c4d2e59eed9cc74850d68ab67177d23",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/mechanical/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T01:16:10.282610+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "0bfda259609c73a3d60d5102388e4f1f2c4d2e59eed9cc74850d68ab67177d23",
+      "status": "accepted"
+    },
+    "summary": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T02:57:46.404393+00:00",
+          "input_hash": "744acf5a8f6694ae60938d2e7084d3c630ef325c486ef10e6a058d1cf99d70df",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/summary/attempt-0001/executor_state.json",
+          "started_at": "2026-09-15T02:57:35.620851+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "744acf5a8f6694ae60938d2e7084d3c630ef325c486ef10e6a058d1cf99d70df",
+      "status": "accepted"
+    },
+    "thermal": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-15T01:15:18.045829+00:00",
+          "input_hash": "c9755106451952e62ada0e8e9ad042e4ba15285ee37dcf26dfe8004b14818b37",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/thermal/attempt-0001/executor_state.json",
+          "started_at": "2026-09-14T20:07:55.739774+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "c9755106451952e62ada0e8e9ad042e4ba15285ee37dcf26dfe8004b14818b37",
+      "status": "accepted"
+    }
+  },
+  "status": "accepted",
+  "updated_at": "2026-09-15T02:57:46.410782+00:00"
+}

@@ -1,0 +1,69 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/summary/attempt-0001/raw/byproducts_spec.json",
+      "sha256": "b19a70382a928682ceed94e0dd8b5096c0c955fac9608417cb5f4182fd89a4c4",
+      "size": 638
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/summary/attempt-0001/raw/exp_lookup.json",
+      "sha256": "bb0c618d2d7faeb69603e76f88ec7deb676c1539f053d21b70c70092ce8d3b3c",
+      "size": 2733
+    },
+    {
+      "path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/summary/attempt-0001/raw/run_summary.json",
+      "sha256": "9f09f43ddc266ac77d93b704b21dd15cc06b764f63be41116082dacab6b58a86",
+      "size": 3960
+    }
+  ],
+  "attempt_id": "attempt-0001",
+  "findings": [],
+  "finished_at": "2026-09-15T02:57:46.404393+00:00",
+  "input_hash": "ae50464d0ff24432102dadc0fb860330e0f938491d684e65e8d5224ead90db8d",
+  "outputs": {
+    "artifacts_missing": [
+      {
+        "file": "bulk_modulus_deform.json",
+        "found_in": null
+      }
+    ],
+    "run_summary_path": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/summary/attempt-0001/raw/run_summary.json",
+    "status": "success",
+    "summary_json": "/home/arz2/PolyJarvis_v2/data/PTFE_AI/attempts/summary/attempt-0001/raw/run_summary.json"
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 700.0,
+    "T_melt_hold_K": 700.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 780.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "opls-library",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 11.0,
+    "density_initial_gcm3": 0.89,
+    "dp_typical": 50,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 909670995,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 550,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "opls/2024/opls-aa",
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 930760043
+  },
+  "stage": "summary",
+  "status": "accepted"
+}

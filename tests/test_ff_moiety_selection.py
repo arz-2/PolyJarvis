@@ -1,0 +1,376 @@
+"""D-01's per-SMILES force-field resolution: the moiety screen and the EMC probe.
+
+The screen NARROWS, a real EMC trial build DECIDES. These tests pin both halves plus the
+measured numbers the screen rests on -- a rule that stops predicting fails here rather than
+rotting quietly in guides/ff_moiety_rules.json.
+
+Nothing here runs EMC: check_typing is monkeypatched, same pattern as test_select_forcefield.py.
+"""
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
+
+import forcefield as sf                                  # noqa: E402
+import make_deterministic_plan as mdp                     # noqa: E402
+import scientific_control as sc                           # noqa: E402
+from rules_common import load_rules                       # noqa: E402
+
+RULES_PATH = REPO_ROOT / "guides" / "ff_moiety_rules.json"
+SWEEP = REPO_ROOT / "docs" / "ff_coverage_sweep" / "arm0.jsonl"
+MOIETY_RULES = json.loads(RULES_PATH.read_text())
+rdkit = pytest.importorskip("rdkit", reason="moiety matching needs RDKit")
+from rdkit import Chem, RDLogger                          # noqa: E402
+
+RDLogger.DisableLog("rdApp.*")
+
+
+# ─── the rules still measure what they claim ──────────────────────────────────────────
+
+@pytest.fixture(scope="module")
+def sweep():
+    """(monomer_id -> mol, set of monomer_ids whose class-prior build failed)."""
+    rows = [json.loads(line) for line in SWEEP.read_text().splitlines() if line.strip()]
+    mols = {r["monomer_id"]: Chem.MolFromSmiles(r["smiles"]) for r in rows}
+    return mols, {r["monomer_id"] for r in rows if not r["built"]}
+
+
+@pytest.mark.parametrize("rule", MOIETY_RULES["moieties"], ids=lambda r: r["id"])
+def test_each_rule_still_hits_its_recorded_precision(rule, sweep):
+    mols, failed = sweep
+    pat = Chem.MolFromSmarts(rule["smarts"])
+    assert pat is not None, f"{rule['id']}: unparseable SMARTS {rule['smarts']!r}"
+    matched = {mid for mid, m in mols.items() if m is not None and m.HasSubstructMatch(pat)}
+    ev = rule["evidence"]
+    assert len(matched) == ev["matches"], (
+        f"{rule['id']} now matches {len(matched)} monomers, recorded {ev['matches']}")
+    hits = len(matched & failed)
+    assert hits == ev["failures"]
+    assert round(hits / len(matched), 3) == ev["precision"]
+
+
+def test_every_rule_blocks_every_registered_emc_field(sweep):
+    """The measurement that shapes the resolver: these groups are not a PCFF problem. Every
+    rule fails at or near 1.00 for all nine registered EMC fields, which is why a blocker
+    means "probe the prior once, then refuse" and not "cascade through the alternatives"."""
+    for rule in MOIETY_RULES["moieties"]:
+        rates = {f: b["fail_rate"] for f, b in rule["blocks"].items()}
+        assert len(rates) >= 9, f"{rule['id']}: only {len(rates)} fields measured"
+        weak = {f: r for f, r in rates.items() if r < 0.9}
+        assert not weak, f"{rule['id']}: {weak} now build often enough to be worth probing"
+
+
+def test_the_rules_declare_their_own_coverage_gap():
+    """No match is UNSCREENED, not cleared. If this ever reads as full coverage, the
+    NOT MEASURED path in _coverage_claim stops being honest."""
+    assert "77%" in MOIETY_RULES["_metadata"]["coverage_gap"]
+
+
+# ─── the resolver ─────────────────────────────────────────────────────────────────────
+
+_CLEAN = "*CC(*)c1ccccc1"            # polystyrene: matches no rule
+_BLOCKED = "*C(C*)c1c(cccc1)C(=O)NC"  # PI94, a real measured carbonyl_adjacent_N failure
+
+
+@pytest.fixture
+def lammps_integrates_every_field(monkeypatch):
+    """The probe loop asks the LAMMPS binary for its styles before it calls check_typing;
+    with no binary that list is empty and nothing is probed. Stub both so these tests
+    exercise the resolver's decision, not the host's LAMMPS build."""
+    monkeypatch.setattr(sf, "installed_styles", lambda *a, **k: {"stub"})
+    monkeypatch.setattr(sf, "check_integration", lambda *a, **k: {"integrates": True})
+
+
+def test_no_blocker_keeps_the_prior_and_runs_no_probe(monkeypatch):
+    monkeypatch.setattr(sf, "check_typing",
+                        lambda *a, **k: pytest.fail("probed a SMILES with no blocker"))
+    out = sf.select_by_moiety(_CLEAN, "pcff")
+    assert out["field"] == "pcff"
+    assert out["probed"] == []
+    assert out["typed"] is None       # NOT True: nothing was measured
+    assert out["blockers"] == []
+
+
+def test_a_blocker_that_still_types_keeps_the_prior(monkeypatch, lammps_integrates_every_field):
+    """3% of carbonyl_adjacent_N matches build anyway. The probe is what catches them, so a
+    false positive costs one trial build and not a demotion off a DOI-backed field."""
+    monkeypatch.setattr(sf, "check_typing", lambda *a, **k: {"types_smiles": True})
+    out = sf.select_by_moiety(_BLOCKED, "pcff")
+    assert out["field"] == "pcff"
+    assert out["probed"] == ["pcff"]
+    assert out["typed"] is True
+    assert [b["id"] for b in out["blockers"]] == ["carbonyl_adjacent_N"]
+
+
+def test_a_blocker_that_types_nowhere_refuses_rather_than_defaulting(monkeypatch):
+    monkeypatch.setattr(sf, "check_typing", lambda *a, **k: {"types_smiles": False})
+    out = sf.select_by_moiety(_BLOCKED, "pcff")
+    assert out["field"] is None
+    assert out["typed"] is False
+    assert "no cascade applies" in out["reason"]
+
+
+def test_probing_off_leaves_the_prior_explicitly_unverified():
+    out = sf.select_by_moiety(_BLOCKED, "pcff", probe=False)
+    assert out["field"] == "pcff"
+    assert out["probed"] == []
+    assert "unverified" in out["reason"]
+
+
+def test_an_unavailable_screen_is_unscreened_not_clean(monkeypatch):
+    monkeypatch.setattr(sf, "_match_moieties", lambda *a, **k: None)
+    out = sf.select_by_moiety(_CLEAN, "pcff")
+    assert out["unscreened"] is True
+    assert out["field"] == "pcff"
+
+
+def test_a_measured_blocker_removes_every_alternative_from_the_probe_order():
+    blockers = sf._match_moieties(_BLOCKED)
+    assert sf._ranked_candidates("pcff", blockers) == ["pcff"]
+
+
+def test_ranking_prefers_the_prior_then_its_own_lineage():
+    order = sf._ranked_candidates("pcff", [])
+    assert order[0] == "pcff"
+    same = [f for f in order[1:] if sf.LINEAGE[f] == "class2"]
+    assert order[1:1 + len(same)] == same
+
+
+def test_no_field_without_a_lammps_deck_can_be_selected():
+    """script_generator.py emits class2/opls/trappe/dreiding decks with GAFF as the else
+    branch. A CHARMM field has none, so it would silently run the GAFF deck."""
+    assert "charmm/c36a" in sf.FIELDS
+    assert "charmm/c36a" not in sf.RUNNABLE_FIELDS
+    assert "charmm/c36a" not in sf._ranked_candidates("pcff", [])
+
+
+# ─── what reaches the plan ────────────────────────────────────────────────────────────
+
+def test_not_measured_survives_a_screen_that_found_nothing():
+    """A screen passing is not a coverage measurement -- the rules miss 23% of failures --
+    so D-01's parameter_coverage must keep the prefix the rationale gap list keys off."""
+    claim, _ = mdp._coverage_claim("PSTR", "pcff", "pcff",
+                                   {"probed": [], "blockers": []})
+    assert claim.startswith("NOT MEASURED")
+    assert "matched no rule" in claim and "UNSCREENED" in claim
+    # and it must not blame a flag that WAS passed: a SMILES matching no rule is never probed
+    assert "--with-ff-probe" not in claim
+
+    blocked = mdp._coverage_claim("PSTR", "pcff", "pcff",
+                                  {"probed": [], "blockers": [{"id": "nitro"}]})[0]
+    assert "probing was off (--with-ff-probe)" in blocked
+
+
+def test_a_real_probe_replaces_not_measured():
+    claim, resolver = mdp._coverage_claim("PSTR", "pcff", "pcff", {"probed": ["pcff"]})
+    assert claim.startswith("MEASURED")
+    assert resolver == "forcefield.select_by_moiety"
+
+
+def test_a_probe_that_typed_nothing_says_the_plan_must_not_build():
+    claim, _ = mdp._coverage_claim("PSTR", "pcff", None, {"probed": ["pcff"]})
+    assert "must not build" in claim
+
+
+def test_a_departure_from_the_prior_carries_its_own_uncertainty():
+    u = mdp._ff_prior_uncertainty("PURT", "pcff", "opls/2024/opls-aa", {"blockers": []})
+    assert u["name"] == "ff_accuracy_prior_not_met"
+    assert "ff_justification_doi does not cover" in u["detail"]
+    assert mdp._ff_prior_uncertainty("PURT", "pcff", "pcff") is None
+
+
+def test_no_admissible_field_is_a_dominant_uncertainty():
+    u = mdp._ff_prior_uncertainty("PIMD", "pcff", None, {"blockers": [{"id": "nitro"}]})
+    assert u["dominant"] is True
+    assert "nitro" in u["detail"]
+
+
+def test_a_demoted_plan_without_the_uncertainty_is_a_structural_finding():
+    import validate_run_plan as vrp
+    plan = {"polymer_class": "PSTR",
+            "decided_params": {"preferred_ff": "compass"},
+            "decisions": [{"id": "D-01_ff", "choice": "compass"}]}
+    checks = {f["check"] for f in vrp._forcefield_findings(plan)}
+    assert "ff_prior_departure_unacknowledged" in checks
+    # acknowledged on the row it describes, not in a plan-wide uncertainties[] list
+    plan["decisions"][0]["acknowledgements"] = {"ff_accuracy_prior_not_met": "departure noted"}
+    checks = {f["check"] for f in vrp._forcefield_findings(plan)}
+    assert "ff_prior_departure_unacknowledged" not in checks
+
+
+def test_the_rules_file_is_hashed_into_the_build_stage():
+    """Without this, editing a moiety rule invalidates no accepted build."""
+    src = (REPO_ROOT / "orchestration" / "scripts" / "run_campaign.py").read_text()
+    assert '"ff_moiety_rules.json"' in src
+
+
+# ─── the override enum ────────────────────────────────────────────────────────────────
+
+def test_every_class_prior_round_trips_through_validate_overrides():
+    """The hand-written enum had "trappe" for "trappe-ua" and was lowercase-only, so 4 of the
+    6 values in real use were rejected -- which any dynamic resolver hits immediately."""
+    for cid, entry in load_rules()["classes"].items():
+        sc.validate_overrides({"preferred_ff": entry["ff_accuracy_prior"]})
+
+
+@pytest.mark.parametrize("value", ["trappe-ua", "gaff2_mod", "dreiding", "opls/2024/opls-ua"])
+def test_real_field_names_are_accepted_as_overrides(value):
+    sc.validate_overrides({"preferred_ff": value})
+
+
+def test_a_field_with_no_deck_is_not_an_override():
+    with pytest.raises(ValueError):
+        sc.validate_overrides({"preferred_ff": "charmm/c36a"})
+
+
+# ─── the CLI seam ─────────────────────────────────────────────────────────────────────
+
+def test_match_moieties_batches_a_whole_list_in_one_subprocess(tmp_path):
+    """A per-SMILES round trip through the conda seam is what made the 982-molecule sweep
+    take minutes; the precision test above depends on this staying batched."""
+    inp = tmp_path / "smiles.json"
+    inp.write_text(json.dumps([_CLEAN, _BLOCKED, "not a smiles"]))
+    r = subprocess.run([sys.executable,
+                        str(REPO_ROOT / "orchestration" / "scripts" / "rdkit_cli.py"),
+                        "match-moieties", "--input", str(inp)],
+                       capture_output=True, text=True, timeout=120)
+    out = json.loads(r.stdout)["results"]
+    assert len(out) == 3
+    assert out[0]["moieties"] == []
+    assert [m["id"] for m in out[1]["moieties"]] == ["carbonyl_adjacent_N"]
+    assert "error" in out[2]
+
+
+def test_match_moieties_refuses_both_or_neither_input():
+    cli = str(REPO_ROOT / "orchestration" / "scripts" / "rdkit_cli.py")
+    r = subprocess.run([sys.executable, cli, "match-moieties"],
+                       capture_output=True, text=True, timeout=60)
+    assert r.returncode == 1 and "exactly one" in r.stdout
+
+
+# ─── the refusal has to survive every layer that rebuilds the row ─────────────────────
+
+def test_the_refusal_survives_materialize_plan(monkeypatch, lammps_integrates_every_field):
+    """materialize_plan re-derives plan["decisions"] from build_decisions, which transcribes
+    class fields only. Without carrying D-01's measured choice AND admissible set through,
+    a SMILES that types under no field silently gets the class prior back and dies in EMC --
+    the exact failure this resolution exists to prevent."""
+    monkeypatch.setattr(sf, "check_typing", lambda *a, **k: {"types_smiles": False})
+    # The scaffold plan carries the refusal directly now -- decision.json was folded into
+    # run_plan.json on 2026-09-04, so there is no separate artifact to carry it through.
+    scaffold = mdp.make_plan("t", "PSTR", _BLOCKED, {"density"}, with_ff_probe=True)
+    d01 = scaffold["decisions"][0]
+    assert d01["choice"] is None and d01["admissible"] == []
+
+    intent = sc.ScientificIntent(run_name="t", goal="g", smiles=_BLOCKED,
+                                 requested_properties=("density",), polymer_class_hint="PSTR")
+    plan = sc.materialize_plan(intent, sc.PlanDecision(
+        polymer_class="PSTR", properties=("density",), rationale=("reviewed",),
+        dominant_uncertainty="ff_transferability", confidence="medium"))
+    row = next(r for r in plan["decisions"] if r["id"] == "D-01_ff")
+    assert row["choice"] is None
+    assert row["admissible"] == []
+    # and the cell is still sized/priced against a real field, not None
+    assert plan["decided_params"]["preferred_ff"] == "pcff"
+
+
+def test_a_plan_that_types_nowhere_is_refused_by_the_validator(monkeypatch,
+                                                              lammps_integrates_every_field):
+    import validate_run_plan as vrp
+    monkeypatch.setattr(sf, "check_typing", lambda *a, **k: {"types_smiles": False})
+    plan = mdp.make_plan("t", "PSTR", _BLOCKED, {"density"}, with_ff_probe=True)
+    checks = {f["check"] for f in vrp._forcefield_findings(plan)}
+    assert "ff_no_admissible_field" in checks
+
+
+def test_a_scaffold_plan_still_names_an_unverified_blocker():
+    """No probe means nothing was measured -- but the screen already ran, and a plan that
+    stayed silent about a matched blocker would hide the one fact it does know."""
+    plan = mdp.make_plan("t", "PSTR", _BLOCKED, {"density"})
+    # The screen result is recorded on the decision it qualifies, not in a plan-wide
+    # assumptions[] bag -- it describes D-01's field and nothing else reads it.
+    findings = plan["decisions"][0]["critique"]["findings"]
+    unverified = [a for a in findings if a.startswith("D-01_ff UNVERIFIED")]
+    assert unverified and "carbonyl_adjacent_N" in unverified[0]
+    row = next(r for r in plan["decisions"] if r["id"] == "D-01_ff")
+    assert "admissible" not in row       # nothing was measured, so claim nothing
+    assert row["choice"] == "pcff"
+
+
+def test_a_clean_scaffold_plan_claims_no_blocker():
+    plan = mdp.make_plan("t", "PSTR", _CLEAN, {"density"})
+    assert not [a for a in plan["decisions"][0]["critique"]["findings"]
+                if a.startswith("D-01_ff UNVERIFIED")]
+
+
+def test_every_runnable_field_has_an_explicit_hardware_family():
+    """resolve_ff_family's substring chain is a last resort, not the routing table. The alias
+    keys were display-cased ("TraPPE-UA", "GAFF2_mod") and stopped matching once the class
+    values were canonicalized -- silently, because the fallback happened to agree."""
+    from rules_common import hardware_policy, resolve_ff_family
+    aliases = hardware_policy(load_rules()).get("ff_aliases", {})
+    missing = sorted(f for f in sf.RUNNABLE_FIELDS if f not in aliases)
+    assert not missing, f"no explicit hardware family for {missing}"
+    families = {resolve_ff_family(f, {"ff_aliases": aliases}) for f in sf.RUNNABLE_FIELDS}
+    assert families <= {"pcff", "opls", "trappe", "gaff"}
+
+
+def test_the_screen_does_not_care_where_the_repeat_unit_was_cut():
+    """A repeat unit may be cut anywhere along the backbone, and every rule in
+    ff_moiety_rules.json describes a BOND. Nylon-6 written `*NCCCCCC(=O)*` and `*CCCCCC(=O)N*`
+    is the same polymer, but in the first the N-C(=O) bond is exactly the one the two `*`
+    markers stand for -- so the monomer does not contain the amide the chain always has, and
+    the screen returned "no known blocking moiety" for it until 2026-09-04. It screens the
+    2-mer now (rdkit_cli._dimer_for_screening), which makes the answer cut-invariant.
+    """
+    for smiles in ("*NCCCCCC(=O)*", "*CCCCCC(=O)N*", "*C(=O)NCCCCC*"):
+        blockers = sf.select_by_moiety(smiles, "pcff", probe=False)["blockers"]
+        assert sorted(b["id"] for b in blockers) == ["carbonyl_adjacent_N"], smiles
+
+
+def test_every_curated_member_smiles_still_screens_the_same_way():
+    """The 2-mer switch must ADD the cut-hidden linkages and change nothing else: a newly
+    matching blocker costs a real EMC trial build, so a false positive here is not free."""
+    curated = {}
+    for cid, cls in load_rules()["classes"].items():
+        for name, value in (cls.get("member_smiles") or {}).items():
+            for smiles in (value if isinstance(value, list) else [value]):
+                if isinstance(smiles, str) and smiles.count("*") == 2:
+                    curated[f"{cid}/{name}"] = smiles
+    assert len(curated) >= 40, "member_smiles shrank; this test is no longer a real sweep"
+
+    monomer = _monomer_blockers(list(curated.values()))
+    if monomer is None:
+        pytest.skip("RDKit unavailable -- the screen itself degrades to UNSCREENED here")
+
+    changed = []
+    for label, smiles in curated.items():
+        hits = sf._match_moieties(smiles)
+        if hits is not None and sorted(b["id"] for b in hits) != monomer[smiles]:
+            changed.append(label)
+    assert not changed, f"2-mer screening changed the verdict for {changed}"
+
+
+def _monomer_blockers(smiles_list):
+    """{smiles: [rule ids]} as the pre-2026-09-04 monomer-only screen would have found them.
+
+    In-process, not a subprocess: the documented test runner IS the mol env
+    (mcp-servers/.venv/bin/python, see AGENTS.md), so RDKit is importable here. Shelling out
+    to a hard-coded interpreter path instead raised FileNotFoundError in any checkout without
+    that venv built -- a clean `git worktree add`, for instance -- turning "the screen is
+    unavailable, skip" into a hard failure.
+    """
+    Chem = pytest.importorskip("rdkit.Chem")
+    pytest.importorskip("rdkit.RDLogger").DisableLog("rdApp.*")
+    rules = json.loads((REPO_ROOT / "guides" / "ff_moiety_rules.json").read_text())["moieties"]
+    patterns = [(r["id"], Chem.MolFromSmarts(r["smarts"])) for r in rules]
+    out = {}
+    for smiles in smiles_list:
+        mol = Chem.MolFromSmiles(smiles)
+        out[smiles] = sorted(i for i, pat in patterns if mol and mol.HasSubstructMatch(pat))
+    return out

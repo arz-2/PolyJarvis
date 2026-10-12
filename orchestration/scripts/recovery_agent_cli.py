@@ -1,0 +1,336 @@
+#!/usr/bin/env python3
+"""Headless recovery-agent adapter for scientific_control.py's --recovery-agent-command.
+
+Reads a PolyJarvis failure payload on stdin (the JsonSubprocessAgent contract shared by
+both scientific_control.py's outer recovery loop and workflow_engine.py's inner
+stage-escalation loop), runs a headless Claude session that invokes the `/recover`
+slash command -- the same command a live orchestrating session uses, loading its
+diagnosis playbook from this repo's own .claude/commands/recover.md (tracked in this
+checkout, not the sibling PolyJarvis worktree -- that sibling's recover.md is for the
+prior plan_mode-based multi-agent architecture and does not apply here; see CLAUDE.md)
+-- and returns exactly one JSON object on stdout.
+
+The session may return `action: retry` (unchanged params -- a confirmed transient
+cause) or `revise_plan` (concrete `modifications`), not just `stop`. This adapter never
+gains write/execute authority to act on that decision itself -- tool access stays Read
+plus a read-only Bash allowlist, same as before. Whatever `action`/`modifications` are
+returned are only ever applied by the calling engine's own already-bounded, already-
+validated machinery (forbidden-key check, `plan_validator`, `_validate_overrides`,
+`_validate_protocol_relationships`, `MAX_AGENT_DECISIONS`/`MAX_RECOVERY_ATTEMPTS` caps)
+-- this adapter just stops silently discarding the decision. A wrapper/session failure
+(the headless call itself crashing, timing out, or returning unusable output -- not a
+considered decision) is not a diagnosis, so it is never conflated with an agent's real
+`stop`: it maps to `retry` instead, still bounded by the same MAX_AGENT_DECISIONS/
+MAX_RECOVERY_ATTEMPTS=2 caps, so a persistent (non-transient) failure still reaches a
+human -- see `diagnose()`.
+"""
+
+import json
+import sys
+from pathlib import Path
+
+#: A headless `claude -p` session resolves relative paths -- including this repo's own
+#: .claude/ configuration, which is where the /recover playbook lives -- from its working
+#: directory. This adapter used to inherit its caller's cwd: campaign_watchdog.py sets it
+#: (:224), but agent_api.py start/resume run from wherever the operator happened to be. From
+#: a foreign cwd `/recover` is not a resolvable command, so the model receives that line as
+#: plain prose with no playbook behind it and still returns a well-formed decision -- a
+#: wrapper failure laundered into a considered answer, the one thing this module exists to
+#: prevent (see the module docstring). Pinned explicitly, as headless_claude.py already does.
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import headless_claude  # noqa: E402  -- shared `claude -p` mechanics; see _run_headless_claude_once
+
+# A CHECKED COPY of track_registry.STAGE_TRACK, not derived from it: the values are
+# (track, step) and the step is not always the key -- equil-check reports as step "equil", and
+# the macro name "equilibration" is accepted as an alias. This is prompt text for /recover, so a
+# derivation carrying two special cases would be less readable than the table. Agreement with
+# the registry is asserted by tests/test_track_registry_lockstep.py.
+STAGE_TRACK = {
+    "build": ("foundation", "build"),
+    "equilibration": ("foundation", "equil"),
+    "equil": ("foundation", "equil"),
+    "equil-check": ("foundation", "equil"),
+    "cooling": ("cooling", "cool"),
+    "cool": ("cooling", "cool"),
+    "cool-check": ("cooling", "cool"),
+    "tg": ("thermal", "tg"),
+    "analyze-tg": ("thermal", "analyze-tg"),
+    "deform": ("mechanical", "deform"),
+    "murnaghan": ("mechanical", "murnaghan"),
+    "analyze-bm": ("mechanical", "analyze-bm"),
+    "structure": ("structure", "analyze-structure"),
+    "analyze-structure": ("structure", "analyze-structure"),
+    "cohesive": ("cohesive", "vacuum-build"),
+    "vacuum-build": ("cohesive", "vacuum-build"),
+    "vacuum-chain": ("cohesive", "vacuum-chain"),
+    "analyze-solubility": ("cohesive", "analyze-solubility"),
+    "run-summary": ("summary", "run-summary"),
+}
+
+#: Read plus a read-only Bash allowlist. `Bash(<cmd>:*)` matches on the command PREFIX, so a
+#: pattern is only as read-only as every invocation of that command: `Bash(find:*)` also admits
+#: `find . -delete` and `find . -exec rm -rf {} +`, which is not a permission this agent should
+#: ever hold. It is replaced by the native Glob/Grep tools, which have no exec path at all.
+#: `Bash(grep:*)` stays because grep cannot write or execute and recover.md's reattach check
+#: pipes into it (`ps aux | grep run_campaign`), whose every segment must be permitted.
+#: `Bash(tail:*)` likewise admits `tail -f`, which cannot be excluded by prefix and would block
+#: until the 600 s timeout, burning an escalation rung for nothing -- recover.md forbids the
+#: follow flags in prose, which is the only lever the pattern language leaves here.
+READ_ONLY_TOOLS = [
+    "Read", "Glob", "Grep",
+    "Bash(grep:*)", "Bash(ls:*)", "Bash(ps:*)",
+    "Bash(cat:*)", "Bash(tail:*)", "Bash(head:*)", "Bash(wc:*)", "Bash(jq:*)",
+]
+
+DEFAULT_ACTIONS = ("retry", "revise_plan", "stop")
+
+#: One line per action the engine or the outer loop can offer. The enum is always the caller's
+#: menu; this only describes it.
+ACTION_DESCRIPTIONS = {
+    "retry": "re-run the stage unchanged (transient cause, already gone)",
+    "wait_and_retry": "engine waits for disk/GPU to clear (bounded), then re-runs the stage",
+    "revise_plan": "apply modifications (decided_params overrides)",
+    "accept_with_caveat": "accept this property stage as non-reportable so the rest of the "
+                          "run finishes; the value is withheld",
+    "end_run": "close the run; nothing available can produce a valid result worth its cost",
+    "stop": "close the run (outer control-plane loop)",
+}
+
+
+def _closing_action(actions) -> str:
+    return "end_run" if "end_run" in actions else "stop"
+
+
+def _output_schema(actions) -> dict:
+    return {
+        "type": "object",
+        "properties": {
+            "action": {"type": "string", "enum": sorted(actions),
+                       "description": "; ".join(f"{a} = {ACTION_DESCRIPTIONS.get(a, a)}"
+                                                for a in sorted(actions))},
+            "modifications": {"type": "object",
+                              "description": "decided_params overrides; only when action=="
+                                             "revise_plan, else {}"},
+            "rationale": {"type": "string",
+                          "description": "root cause and why this action, citing the specific "
+                                         "recover.md row or evidence"},
+        },
+        "required": ["action", "rationale", "modifications"],
+    }
+
+
+def _trim_payload(payload: dict) -> dict:
+    """Only the problem -- not the full intent/plan dump the outer contract carries.
+
+    Every engine_context field is optional: the OUTER control-plane loop sends a real
+    WorkflowIssue.to_dict() which has none of them, and must keep working unchanged.
+
+    plan_summary.recovery_history is the PLAN-level history, written by the outer loop's
+    apply_recovery. On the inner (WorkflowEngine) path it is always empty, which used to
+    tell the agent nothing had been tried on a run that had just spent both automatic
+    rungs. The engine's own remedy_history, when present, is the truthful one and wins.
+    """
+    issue = payload.get("issue") or {}
+    plan_summary = payload.get("plan_summary") or {}
+    contract = payload.get("output_contract") or {}
+    context = issue.get("engine_context") or {}
+    problem = {
+        "run_name": plan_summary.get("run_name"),
+        "run_dir": context.get("run_dir"),
+        "stage": issue.get("stage"),
+        "code": issue.get("code"),
+        "detail": issue.get("detail", issue.get("details")),
+        "severity": issue.get("severity"),
+        # Why this escalated at all, when the code itself has a registered auto-remedy:
+        # a Finding with confidence="low" never auto-remedies.
+        "confidence": issue.get("confidence") or context.get("confidence"),
+        "recovery_history": (context.get("remedy_history")
+                             or plan_summary.get("recovery_history")),
+        "failed_attempt_manifest": context.get("failed_attempt_manifest"),
+        "escalation_attempt": context.get("escalation_attempt"),
+        "max_agent_decisions": context.get("max_agent_decisions"),
+        "previous_rejection": context.get("previous_rejection"),
+        "autonomous": context.get("autonomous"),
+        "valid_actions": contract.get("action"),
+        "modification_contract": contract.get("modifications"),
+    }
+    return {k: v for k, v in problem.items() if v not in (None, [], {})}
+
+
+_PROMPT_HEADER_KEYS = ("run_name", "run_dir", "stage", "valid_actions",
+                       "modification_contract", "recovery_history",
+                       "escalation_attempt", "max_agent_decisions",
+                       "previous_rejection", "autonomous")
+
+
+def _render_history_entry(entry) -> str:
+    """The two loops keep DIFFERENT history shapes and both reach here.
+
+    The inner engine writes {remedy_id, code, stage, application} -- an automatic rung. The
+    outer control plane's apply_recovery writes {action, rationale, modifications, at} -- a
+    prior agent decision. Rendering one shape's keys against the other produced
+    "None x None on None@None", which reads as a spent rung that never happened.
+    """
+    if not isinstance(entry, dict):
+        return str(entry)
+    if entry.get("remedy_id"):
+        return (f"{entry['remedy_id']} x{entry.get('application')} on "
+                f"{entry.get('code')}@{entry.get('stage')}")
+    if entry.get("action"):
+        mods = entry.get("modifications") or {}
+        return (f"agent decision {entry['action']}"
+                + (f" with {sorted(mods)}" if mods else "")
+                + (f" ({entry['rationale'][:120]})" if entry.get("rationale") else ""))
+    return json.dumps(entry, default=str)
+
+
+def _spent_rungs(problem: dict) -> str:
+    """State the spent ladder in the prompt itself rather than burying it in the symptom
+    blob -- which rung is already used is what decides whether a remedy is still available."""
+    history = problem.get("recovery_history") or []
+    attempt = problem.get("escalation_attempt")
+    cap = problem.get("max_agent_decisions")
+    parts = []
+    if attempt and cap:
+        parts.append(f"This is escalation {attempt} of {cap} for this workflow.")
+    if history:
+        parts.append("Recovery already applied: "
+                     + "; ".join(_render_history_entry(e) for e in history) + ".")
+    else:
+        parts.append("No automatic remedy has been applied on this run.")
+    run_dir = problem.get("run_dir")
+    if run_dir:
+        parts.append(f"Run directory (absolute): {run_dir}.")
+    manifest = problem.get("failed_attempt_manifest")
+    if manifest:
+        parts.append(f"Failing attempt id: {manifest}.")
+    rejection = problem.get("previous_rejection")
+    if rejection:
+        parts.append("The engine REFUSED your previous decision for this failure: "
+                     + json.dumps(rejection, default=str) + ". Choose differently.")
+    return " ".join(parts)
+
+
+def _build_prompt(problem: dict) -> str:
+    run_name = problem.get("run_name") or "unknown"
+    stage = problem.get("stage") or problem.get("code") or "unknown"
+    track, step = STAGE_TRACK.get(stage, ("unknown", stage))
+    symptom = json.dumps({k: v for k, v in problem.items()
+                          if k not in _PROMPT_HEADER_KEYS}, default=str)
+    valid_actions = problem.get("valid_actions") or list(DEFAULT_ACTIONS)
+    modification_contract = problem.get("modification_contract") or {}
+    return (
+        f'/recover run_name={run_name} track={track} step={step} symptom={json.dumps(symptom)}\n\n'
+        f'{_spent_rungs(problem)}\n\n'
+        "Follow recover.md's procedure with the Read/Glob/Grep/Bash tools available (no MCP "
+        "tools here -- reason from files/logs directly, the same way a live session would "
+        "when they are unavailable; never `tail -f` or any following read, it cannot "
+        "return and would spend your whole timeout). You never write, edit, resubmit, or "
+        "claim/release any "
+        "resource yourself -- the calling engine re-validates and applies whatever you "
+        f"decide. Choose one action from {valid_actions}: "
+        + "; ".join(f"`{a}` {ACTION_DESCRIPTIONS.get(a, a)}" for a in valid_actions)
+        + ". `revise_plan` modifications are constrained to this contract: "
+        f"{json.dumps(modification_contract, default=str)}. "
+        + ("No human will review this decision or unblock the run: make the call recover.md "
+           "section 4 supports, weighing GPU time, and put the evidence in the rationale. "
+           if problem.get("autonomous") else
+           "`stop` when the failure is novel, ambiguous, or needs a human judgment call "
+           "recover.md's ladder doesn't cover. ")
+        + "Conclude with exactly one JSON object matching the required schema."
+    )
+
+
+def _answering_model(outer: dict) -> str:
+    """Which model actually produced this decision.
+
+    `--fallback-model sonnet` means a recovery decision may come from a different model than
+    the one the run started with, and a decision that changed a run's parameters should say
+    who made it (CLAUDE.md: code owns provenance). The wrapper JSON has carried this under
+    more than one key across versions, so probe rather than assume, and degrade to a plain
+    "unknown model" instead of asserting a model that may not have answered.
+    """
+    model = outer.get("model")
+    if isinstance(model, str) and model:
+        return model
+    usage = outer.get("modelUsage")
+    if isinstance(usage, dict) and usage:
+        return "+".join(sorted(str(k) for k in usage))
+    return "unknown model"
+
+
+def _run_headless_claude_once(prompt: str, schema: dict, timeout_s: int) -> tuple[dict, str]:
+    """One headless session, plus which model answered it.
+
+    The argv, the structured_output extraction and the wrapper-failure rule live in
+    headless_claude, shared with the LangGraph driver's critic and adjudicator nodes -- they
+    were duplicated, and the copies had already drifted apart on --strict-mcp-config and cwd.
+    What stays HERE is this adapter's own policy: its tool allowlist (Read/Glob/Grep plus a
+    read-only Bash set, deliberately not the driver's) and its budget.
+    """
+    structured, outer = headless_claude.invoke_once_with_meta(
+        prompt, schema, timeout_s=timeout_s, allowed_tools=READ_ONLY_TOOLS,
+        # Same failure as nodes.adjudicate's 1.5 (measured $1.97 for a comparable
+        # prompt+schema, 2026-09-08): too low and `claude` exits 1 with empty stderr.
+        # Worse here -- diagnose() maps a wrapper failure to `retry`, so a budget
+        # exit would be laundered into a considered decision, the exact thing this
+        # module's docstring says it exists to prevent.
+        max_budget_usd=6.0, cwd=REPO_ROOT)
+    return structured, _answering_model(outer)
+
+
+def _run_headless_claude(prompt: str, schema: dict, timeout_s: int = 600,
+                         retries: int = 1) -> tuple[dict, str]:
+    """One retry on any failure (transient streaming aborts observed in testing) before
+    giving up -- matches this codebase's own retry-once convention (workflow_engine.py's
+    transient_retry local_cap=2, scientific_control.py's MAX_RECOVERY_ATTEMPTS=2).
+
+    The lambda resolves _run_headless_claude_once from the module at CALL time, so tests
+    that patch either name still bite.
+    """
+    return headless_claude.retry_once(
+        lambda: _run_headless_claude_once(prompt, schema, timeout_s), retries)
+
+
+def diagnose(payload: dict) -> dict:
+    """Returns a RecoveryDecision-shaped dict: {action, rationale, modifications}."""
+    problem = _trim_payload(payload)
+    valid_actions = problem.get("valid_actions") or list(DEFAULT_ACTIONS)
+    try:
+        structured, model = _run_headless_claude(_build_prompt(problem),
+                                                 _output_schema(valid_actions))
+        action = structured.get("action")
+        if action not in valid_actions:
+            action = _closing_action(valid_actions)
+        modifications = dict(structured.get("modifications") or {}) if action == "revise_plan" else {}
+        # The model goes in the rationale rather than a fourth key because RecoveryDecision
+        # (scientific_control.py:225) is a three-field frozen dataclass whose from_dict drops
+        # anything else -- an extra key would be silently discarded and record nothing. The
+        # rationale is persisted verbatim into recovery_log.jsonl and the control-plane event
+        # trail, so this is the field that actually carries provenance downstream.
+        rationale = f"[recovery-agent diagnosis via {model}] {structured.get('rationale', '')}"
+    except Exception as exc:
+        # The invocation itself failed (subprocess crash, timeout, malformed/missing
+        # structured output) -- this carries no diagnosis of the underlying issue, so it
+        # must not be conflated with an agent's considered `stop`. Ask the caller to
+        # retry the stage instead: WorkflowEngine._escalate/ScientificControlPlane
+        # already bound this at MAX_AGENT_DECISIONS/MAX_RECOVERY_ATTEMPTS=2, so a
+        # persistent (non-transient) underlying failure still reaches
+        # escalation_required/unresolved for a human -- this only spares a human from
+        # unsticking a one-off invocation blip. Falls back to "stop" if the caller's own
+        # contract doesn't offer "retry" as a valid action.
+        action = "retry" if "retry" in valid_actions else _closing_action(valid_actions)
+        modifications = {}
+        rationale = f"[recovery-agent invocation failed, retrying the stage] {exc}"
+    return {"action": action, "rationale": rationale, "modifications": modifications}
+
+
+def main() -> None:
+    payload = json.loads(sys.stdin.read())
+    print(json.dumps(diagnose(payload)))
+
+
+if __name__ == "__main__":
+    main()

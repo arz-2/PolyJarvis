@@ -327,38 +327,32 @@ def test_gaff2_no_autodetect_no_raise(tmp_path):
     assert not any("auto-detected" in str(x.message) for x in w)
 
 
-# ── B2: npt_tg_step guard ─────────────────────────────────────────────────────
+# ── B2: npt_tg_step per-point structural snapshot ──────────────────────────────
 
-def test_npt_tg_step_missing_ramp_raises(tmp_path):
-    """npt_tg_step without T_END and T_STEP raises ValueError immediately."""
-    out = str(tmp_path / "sweep.in")
-    with pytest.raises(ValueError, match="T_END.*T_STEP|T_END and T_STEP"):
-        ScriptGenerator(data_file=str(PCFF_DATA)).generate(
-            "npt_tg_step", output_path=out,
-            params={"use_pcff": True, "T_START": 600.0}
-        )
-
-
-def test_npt_tg_step_missing_only_t_step_raises(tmp_path):
-    """npt_tg_step with T_END but no T_STEP → ValueError."""
-    out = str(tmp_path / "sweep.in")
-    with pytest.raises(ValueError):
-        ScriptGenerator(data_file=str(PCFF_DATA)).generate(
-            "npt_tg_step", output_path=out,
-            params={"use_pcff": True, "T_START": 600.0, "T_END": 200.0}
-        )
-
-
-def test_npt_tg_step_with_ramp_emits_staircase(tmp_path):
-    """npt_tg_step with T_END + T_STEP generates a LAMMPS staircase (variable loop)."""
-    out = str(tmp_path / "sweep.in")
+def test_npt_tg_step_write_per_t_dump_appends_snapshot_block(tmp_path):
+    """WRITE_PER_T_DUMP appends a one-frame, append-mode dump block after the main run."""
+    out = str(tmp_path / "tg_step.in")
     script = ScriptGenerator(data_file=str(PCFF_DATA)).generate(
         "npt_tg_step", output_path=out,
-        params={"use_pcff": True, "T_START": 300.0, "T_END": 200.0, "T_STEP": 20.0,
-                "N_STEPS_PER_T": 100}
+        params={"use_pcff": True, "T_TARGET": 300.0, "N_STEPS": 100,
+                "WRITE_PER_T_DUMP": True, "PER_T_DUMP_FILE": "per_t_structs.dump"}
     )
-    # Staircase uses LAMMPS variable + loop/jump flow control
-    assert "variable temps index" in script or "jump" in script
+    assert "dump per_t_snap all atom 1 per_t_structs.dump" in script
+    assert "dump_modify per_t_snap append yes" in script
+    assert "run 0" in script
+    # Must render BEFORE write_data/quit -- anything after quit never executes.
+    assert script.index("dump per_t_snap") < script.index("write_data")
+    assert script.index("dump per_t_snap") < script.rindex("quit")
+
+
+def test_npt_tg_step_without_per_t_dump_flag_omits_snapshot_block(tmp_path):
+    """Default (WRITE_PER_T_DUMP unset) emits no per-point snapshot block."""
+    out = str(tmp_path / "tg_step.in")
+    script = ScriptGenerator(data_file=str(PCFF_DATA)).generate(
+        "npt_tg_step", output_path=out,
+        params={"use_pcff": True, "T_TARGET": 300.0, "N_STEPS": 100}
+    )
+    assert "per_t_snap" not in script
 
 
 # ── B3: KOKKOS deck regression ────────────────────────────────────────────────
@@ -407,3 +401,27 @@ def test_engine_launch_gpu_flags():
     _, flags = server._engine_launch("gpu", 2)
     assert "-sf gpu" in flags
     assert "-pk gpu 2" in flags
+
+
+def test_a_binary_restart_is_never_classified(tmp_path):
+    """A LAMMPS .restart is binary; read_text(errors="replace") turns it into mojibake that the
+    substring probes match by chance. On 2026-09-09 a PCFF restart was classified
+    {'use_opls': True} -- the opposite of its own sibling .data. It surfaced only because the
+    caller passed an explicit use_pcff and the flag-mismatch guard raised; with no explicit flag
+    it would have silently emitted an OPLS deck for a class2 system.
+    """
+    from script_generator import _detect_ff_from_data_file
+    binary = tmp_path / "npt_melt_hold_out.restart"
+    binary.write_bytes(b"LAMMPS RESTART\x00\x00\x01\x02 pair_style lj/cut/coul/long opls\x00")
+    assert _detect_ff_from_data_file(str(binary)) == {}
+
+
+def test_a_text_data_file_is_still_classified(tmp_path):
+    """The guard must not blind the detector to real data files -- the inline
+    `Pair Coeffs # <style>` comment is how a post-equilibration cell is typed."""
+    from script_generator import _detect_ff_from_data_file
+    data = tmp_path / "npt_melt_hold_out.data"
+    data.write_text(
+        "LAMMPS data file\n\n4 atom types\n2 improper types\n\n"
+        "Masses\n\n1 12.011\n\nPair Coeffs # lj/class2/coul/long\n\n1 0.054 4.01\n")
+    assert _detect_ff_from_data_file(str(data)).get("use_pcff") is True

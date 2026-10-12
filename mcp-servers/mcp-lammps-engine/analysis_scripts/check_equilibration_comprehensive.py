@@ -9,7 +9,8 @@ Runs all convergence and structural checks in one pass and returns:
   - d05_markdown: ready-to-paste D-05 block for run_log.md
 
 Hard gates (block overall_pass):
-  A. Density drift, energy drift, density SEM, energy SEM
+  A. Density drift, energy drift (TotEng + per-term bond/angle/dihedral/vdW/coul/kspace),
+     density SEM, energy SEM
   B. Rg CV across chains (>30%)
   C. P2 nematic order (>0.10), Poisson-corrected density homogeneity CV (>cv_signal_max),
      finite size: minimum image (L >= 2*cutoff_A) and chain self-imaging (L >= 2*Rg)
@@ -19,11 +20,20 @@ Soft warnings (reported, never blocking):
   B. C_inf outside literature range, MSID slope deviation >20%, C(t) not decayed,
      MSD kinetic trap
 
+--dump_file/--data_file carry the ensemble-sensitive checks (MSD/kinetic-trap, C(t)) and must
+be a fixed-volume NVT window (e.g. nvt_kinetic_stability). --struct_dump_file/--struct_data_file
+are optional and, when given, carry the ensemble-insensitive per-frame geometry checks (Rg,
+MSID, R_ee, torsion, P2, density homogeneity, finite-size) instead -- normally npt_final's own
+trajectory, the actual equilibrated parent state. Omitting them falls back to --dump_file for
+everything (single-trajectory legacy behaviour).
+
 Usage:
     python check_equilibration_comprehensive.py \
-        --log_file /path/to/06_nvt_production.log \
-        --dump_file /path/to/06_nvt_production.dump \
-        --data_file /path/to/cell.data \
+        --log_file /path/to/npt_final.log \
+        --dump_file /path/to/nvt_kinetic_stability.dump \
+        --data_file /path/to/nvt_kinetic_stability_out.data \
+        --struct_dump_file /path/to/npt_final.dump \
+        --struct_data_file /path/to/npt_final_out.data \
         --backbone_types 2 3 \
         [--output_dir /path/to/out] \
         [--skip_frames 50] \
@@ -36,7 +46,6 @@ Usage:
 import argparse
 import json
 import math
-import re
 import sys
 import warnings
 from datetime import datetime
@@ -48,6 +57,7 @@ import MDAnalysis.transformations as trans
 from scipy import stats as sp_stats
 from scipy.optimize import curve_fit
 from scipy.special import gamma as sp_gamma
+from scipy.spatial.distance import jensenshannon
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -55,6 +65,7 @@ import matplotlib.pyplot as plt
 from analysis_utils import (compute_tau_eff, effective_sample_size, integrated_act,
                             parse_lammps_log)
 from finite_size import classify_finite_size, parse_data_box_mass_rg
+from backbone_topology import backbone_path, backbone_type_coverage
 
 warnings.filterwarnings("ignore", message="Reader has no dt information")
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -83,6 +94,43 @@ def r(x, n=4):
 # ─── Section A: Thermo convergence ───────────────────────────────────────────
 
 
+def _drift_significance(values, slope, stderr, n, p_naive):
+    """The slope's p-value corrected for the series' own autocorrelation.
+
+    `linregress` assumes independent samples. An MD thermo series is nothing of the sort: the
+    integrated inefficiency of these melts runs 40-120 frames, so a 1500-row window carries on
+    the order of 20 independent samples, not 1500. The naive p is inflated accordingly -- and
+    not marginally. Measured on the stereo_r2 pilot (2026-09-10):
+
+        iPMMA_1/0005 dihedral   p_naive 1.85e-42   tau  68   n_eff   22/1501   p_eff ~0.10
+        iPMMA_1/0005 density    p_naive 9.22e-32   tau  74   n_eff   20/1501   p_eff ~0.18
+        iPMMA_1/0004 density    p_naive 1.35e-78   tau 120   n_eff    8/1001   p_eff ~0.12
+        aPS_1/0007   density    p_naive 9.22e-05   tau  40   n_eff   25/1001   p_eff ~0.54
+
+    Twenty independent points cannot support p = 1e-42. iPMMA_1's equilibration was failed on
+    exactly that: a single slow excursion filled the graded window, the regression read it as a
+    trend, and the p-value certified it. Successive windows of that same series trend in
+    OPPOSITE directions and its mean moves 0.19 sigma between attempts -- a fluctuation, not a
+    relaxation.
+
+    The correction can only RAISE p, so it can only turn a FAIL into a PASS; it cannot newly
+    fail anything that passed before. What it cannot do is notice a drift that persists ACROSS
+    attempts -- that needs a between-attempt comparison, which no gate here performs.
+
+    Returns (p_effective, tau_frames, n_eff).
+    """
+    tau_frames, _ = compute_tau_eff(values)
+    n_eff = effective_sample_size(n, tau_frames)
+    if stderr is None or not np.isfinite(stderr) or stderr <= 0 or n_eff < 3:
+        return p_naive, tau_frames, n_eff
+    t_naive = abs(slope) / stderr
+    # Scaling t by sqrt(n_eff/n) and re-reading it against n_eff-2 dof is the standard
+    # first-order correction for a trend fitted to autocorrelated data.
+    t_eff = t_naive * math.sqrt(n_eff / n)
+    p_eff = float(2.0 * sp_stats.t.sf(t_eff, max(n_eff - 2, 1)))
+    return p_eff, tau_frames, n_eff
+
+
 def _analyse_property(values, name, drift_threshold_pct, drift_pvalue, block_count):
     """Drift + block-average test for a single thermo property."""
     n = len(values)
@@ -90,11 +138,15 @@ def _analyse_property(values, name, drift_threshold_pct, drift_pvalue, block_cou
     res = {"mean": r(mean_val, 6), "n_points": n}
 
     x = np.arange(n, dtype=float)
-    slope, _, _, p_val, _ = sp_stats.linregress(x, values)
+    slope, _, _, p_val, stderr = sp_stats.linregress(x, values)
     total_drift = abs(slope * n)
     drift_pct = (total_drift / abs(mean_val) * 100) if abs(mean_val) > 1e-12 else 0.0
-    d_pass = not (drift_pct > drift_threshold_pct and p_val < drift_pvalue)
-    res["drift"] = {"pass": bool(d_pass), "drift_pct": r(drift_pct, 4), "p_value": r(p_val, 4)}
+    p_eff, tau_frames, n_eff = _drift_significance(values, slope, stderr, n, p_val)
+    d_pass = not (drift_pct > drift_threshold_pct and p_eff < drift_pvalue)
+    # p_value stays the naive one so a reader can compare against runs graded before
+    # 2026-09-10; p_value_eff is what the verdict is actually made on.
+    res["drift"] = {"pass": bool(d_pass), "drift_pct": r(drift_pct, 4), "p_value": r(p_val, 4),
+                    "p_value_eff": r(p_eff, 4), "tau_frames": r(tau_frames, 2), "n_eff": n_eff}
 
     bs = n // block_count
     if bs >= 2:
@@ -108,6 +160,89 @@ def _analyse_property(values, name, drift_threshold_pct, drift_pvalue, block_cou
 
     res["equilibrated"] = bool(d_pass and b_pass)
     return res
+
+
+_ENERGY_COMPONENT_COLS = [
+    ("E_bond", "bond"), ("E_angle", "angle"), ("E_dihed", "dihedral"),
+    ("E_vdwl", "vdw"), ("E_coul", "coul"), ("E_long", "kspace"),
+]
+
+# Every term is judged on its drift relative to its OWN RMS fluctuation, never relative to its
+# mean. drift/sigma asks "is the systematic change over this window at least as large as the
+# term's thermal fluctuation", which is dimensionless, independent of where the term's zero
+# sits, and comparable across terms.
+#
+# Until 2026-09-13 only vdw and coul were scaled this way, because each is a residual of large
+# opposing contributions: the net can sit anywhere relative to its parts, so a drift divided by
+# it depends on where the cancellation lands, not on how far from equilibrium the cell is.
+# Measured across five melt holds, vdw drift/sigma spans 0.02-0.84 where drift-vs-mean spans
+# 0.24%-14.1%. The same objection holds for the terms that were left on drift_pct: a force
+# field's bonded energies carry an arbitrary reference (PCFF's E_dihed is a signed residual,
+# ~-1500 kcal/mol against a ~41,600 TotEng), so "1% of the mean" is a different physical bar
+# for every term and every force field. Two scales inside one gate also meant the same
+# relaxation could pass as vdw and fail as dihedral. One scale for all six removes both.
+#
+# Decided on that argument and frozen before the stereo_r2 regrade, then applied to every run
+# (passing ones included); the regrade reports verdicts under both versions.
+#
+# RadonPy (radonpy/sim/lammps.py check_eq) compares most terms as `sma_sd > abs(mean) * crit`
+# and evdw absolutely (`sma_sd > 30.0`). Neither is copied: the absolute bound never binds on
+# these systems (sma_sd 2.08-11.09 across five melts), and a gate that cannot fail is the
+# fail-open shape this file spent 2026-09-09 removing.
+_SELF_SCALED_COMPONENTS = {label for _, label in _ENERGY_COMPONENT_COLS}
+
+# drift >= 1.0 sigma. Not tuned to a pass/fail split: it is the point where the systematic
+# change stops being small compared with the fluctuation it sits on.
+_SELF_SCALED_DRIFT_SIGMA = 1.0
+
+
+def _analyse_energy_components(prod, drift_threshold_pct, drift_pvalue):
+    """Per-term drift test folded into gate B, alongside the aggregate TotEng drift.
+
+    A canceling drift can hide inside the aggregate: bond energy still relaxing
+    downward while vdW drifts upward can net a flat TotEng while neither term is
+    actually equilibrated. Mirrors RadonPy's own check_eq(), which gates
+    bond/angle/dihedral/vdW/Kspace energies independently rather than only the
+    total (radonpy/sim/lammps.py: analyze_thermo/check_eq) -- same idea, reusing
+    this script's own drift statistic (regression slope + p-value) rather than
+    RadonPy's rolling-SMA-dispersion one. E_impro/E_tail are excluded: many force
+    fields carry no improper term (a constant zero column has no meaningful drift
+    to test) and the tail correction is a near-constant volume-only correction,
+    not an independently-relaxing energy term.
+    """
+    components = {}
+    all_pass = True
+    for col, label in _ENERGY_COMPONENT_COLS:
+        if col not in prod.columns:
+            continue
+        values = prod[col].values
+        n = len(values)
+        mean_val = float(np.mean(values))
+        x = np.arange(n, dtype=float)
+        slope, _, _, p_val, stderr = sp_stats.linregress(x, values)
+        total_drift = abs(slope * n)
+        drift_pct = (total_drift / abs(mean_val) * 100) if abs(mean_val) > 1e-12 else 0.0
+        p_eff, tau_frames, n_eff = _drift_significance(values, slope, stderr, n, p_val)
+        p_val = p_eff
+        entry = {"drift_pct": r(drift_pct, 4), "p_value": r(p_val, 4),
+                 "p_value_naive": r(sp_stats.linregress(x, values).pvalue, 4),
+                 "tau_frames": r(tau_frames, 2), "n_eff": n_eff}
+        if label in _SELF_SCALED_COMPONENTS:
+            sigma = float(np.std(values))
+            drift_sigma = (total_drift / sigma) if sigma > 1e-12 else 0.0
+            d_pass = not (drift_sigma > _SELF_SCALED_DRIFT_SIGMA and p_val < drift_pvalue)
+            # drift_pct is still reported for continuity with runs graded before 2026-09-09,
+            # but it is NOT what this term is judged on -- `criterion` says which is which so
+            # a reader never has to infer it from the numbers.
+            entry.update({"drift_sigma": r(drift_sigma, 4), "sigma": r(sigma, 4),
+                          "criterion": "drift_sigma", "threshold": _SELF_SCALED_DRIFT_SIGMA})
+        else:
+            d_pass = not (drift_pct > drift_threshold_pct and p_val < drift_pvalue)
+            entry.update({"criterion": "drift_pct", "threshold": drift_threshold_pct})
+        entry["pass"] = bool(d_pass)
+        components[label] = entry
+        all_pass = all_pass and d_pass
+    return {"components": components, "pass": bool(all_pass)}
 
 
 def _residual_stress(prod, pressure_cols):
@@ -202,6 +337,14 @@ def check_thermo(log_file, eq_fraction, drift_threshold_pct, drift_pvalue, block
         else:
             results[label] = {"error": f"Column '{col}' not found", "equilibrated": False}
 
+    # Gate B: per-energy-term drift, folded into the aggregate TotEng drift result
+    if "energy" in results and "error" not in results["energy"]:
+        component_drift = _analyse_energy_components(prod, drift_threshold_pct, drift_pvalue)
+        results["energy"]["component_drift"] = component_drift
+        results["energy"]["equilibrated"] = bool(
+            results["energy"]["equilibrated"] and component_drift["pass"]
+        )
+
     # tau_eff and independent-sample count for density
     tau_eff_frac = None
     n_eff_density = None
@@ -244,17 +387,16 @@ def _mass_weighted_rg_sq(positions, masses):
 
 
 def _backbone_atoms_sorted(chain, backbone_set):
-    """Return positions and indices of backbone atoms, sorted by atom index."""
-    try:
-        types = np.array([int(t) for t in chain.types])
-    except Exception:
-        return None, None
-    mask = np.isin(types, list(backbone_set))
-    if mask.sum() < 2:
-        return None, None
-    bb_atoms = chain.atoms[mask]
-    order = np.argsort(bb_atoms.indices)
-    return bb_atoms.positions[order], bb_atoms.indices[order]
+    """Return positions and indices of the chain's backbone, in BONDED order.
+
+    The backbone is the graph diameter of the chain's heavy-atom bond graph (see
+    backbone_topology.backbone_path) — declared types cannot select it reliably (a class can
+    reuse one type between a backbone atom and a pendant branch), and sorting a type selection
+    by atom INDEX silently assumes the backbone is a run of consecutively numbered atoms, true
+    only for a straight aliphatic chain. `backbone_set` no longer selects the path here; it's
+    left as a parameter only so callers can still report backbone_type_coverage as a cross-check.
+    """
+    return backbone_path(chain)
 
 
 def _saupe_p2(bond_vectors):
@@ -279,6 +421,138 @@ def _compute_density_cv(positions, masses, box_lengths, grid_n):
     return float(occ.std() / occ.mean()) if occ.mean() > 0 else 0.0, len(occ)
 
 
+def _voxel_mass_map(positions, masses, box_lengths, grid_n):
+    """Mass per voxel for one frame -- the quantity _compute_density_cv takes the CV of."""
+    pos = positions % box_lengths[np.newaxis, :]
+    idx = np.floor(pos / box_lengths[np.newaxis, :] * grid_n).astype(int)
+    idx = np.clip(idx, 0, grid_n - 1)
+    flat_idx = idx[:, 0] * grid_n * grid_n + idx[:, 1] * grid_n + idx[:, 2]
+    return np.bincount(flat_idx, weights=masses, minlength=grid_n ** 3)
+
+
+HOMOG_METHODS = ("formula", "split_half", "measured_floor")
+HOMOG_METHOD_ALIASES = {"time_averaged": "split_half"}
+"""time_averaged was the first form of the melt method (2026-09-14): CV of the time-averaged map
+minus cv_mean/sqrt(n_eff). Retired the same day because its noise correction depends on
+trajectory length -- aPS_2/aPS_3 pass it on their 6 ns holds (0.058/0.062) and fail it on every
+2 ns window of the same holds (0.081-0.104). Accepted as an alias so a campaign process started
+before the change still gets a valid invocation."""
+
+
+def homogeneity_verdict(maps, cv_per_frame, masses_all, n_atoms, grid_n, *, method="formula",
+                        cv_signal_max=0.11, persist_max=0.11, min_frames=100,
+                        melt_cv_floor=None):
+    """Density-homogeneity verdict from per-frame voxel mass maps (frames x voxels).
+
+    Three ways to separate real heterogeneity from counting noise, chosen by the caller:
+
+    formula         per-frame mass CV minus a compound-Poisson floor that assumes atoms occupy
+                    voxels independently. Wrong when atoms move as bonded groups carrying most of
+                    the mass: PTFE (76% F on C, no H) gets a 0.208 floor against a real one near
+                    0.35 and fails a well-mixed melt (PTFE_AI/noAI, 2026-09-14).
+    split_half      MELT ONLY. Average the voxel map over the first and over the second half of
+                    the trajectory and take the covariance of the two averages. Counting noise is
+                    independent between halves and drops out of the covariance in expectation;
+                    what the two halves share is structure that persisted across the hold -- a
+                    void, an unmixed region, phase separation. persistent_cv = sqrt(cov) / mean.
+                    No model of atoms or groups and no autocorrelation time, so neither the
+                    chemistry nor the trajectory length enters the noise correction.
+                    Calibrated on the gate's own npt_melt_hold trajectories: real melts 0.000-0.050
+                    on full holds and at most 0.096 on 2 ns windows (polystyrene's density pattern
+                    relaxes over nanoseconds, so a short aPS hold reads higher -- aPS_1's 2 ns
+                    continuation is 0.087); a fixed 5% void reads 0.179-0.214 in every system, a
+                    2% void 0.089-0.148. persist_max 0.11 passes every real melt and catches a 5%
+                    void everywhere; a 2% void is caught only in aPS (0.113-0.136) -- PLLA reads
+                    0.107-0.110, sPVC 0.103-0.105 and PTFE 0.089-0.090, all just under. The one
+                    melt it fails is iPMMA_1 (0.147, half-map r 0.72 -- as persistent as its own
+                    2% void), the melt already recorded as hand-accepted while unconverged.
+                    A glass fails it by construction (nothing moves, so both halves are the same
+                    configuration) -- never use it on a glass.
+    measured_floor  for a glass: per-frame CV minus the SAME run's melt per-frame CV on the same
+                    grid, which is that chemistry's noise measured directly. Used only when the
+                    melt itself passed split_half. The caller passes the melt mean plus two
+                    standard deviations of its per-frame CV: a glass is one frozen configuration,
+                    i.e. a single draw from that spread, and the mean alone would fail a sound
+                    glass on an unlucky draw.
+
+    Either non-formula method falls back to the formula when its precondition is missing, and
+    says so in `fallback_reason`.
+    """
+    method = HOMOG_METHOD_ALIASES.get(method, method)
+    if method not in HOMOG_METHODS:
+        raise ValueError(f"unknown homogeneity method {method!r}; expected one of {HOMOG_METHODS}")
+    cv_arr = np.asarray(cv_per_frame, dtype=float)
+    cv_mean = float(cv_arr.mean()) if len(cv_arr) else 0.0
+    atoms_per_voxel = n_atoms / grid_n ** 3
+    # cv_mean is a MASS-density CV (_compute_density_cv bins by mass), so the shot-noise floor
+    # must be the compound-Poisson one: voxel mass is a random sum of atom masses, giving
+    # sqrt(<m^2>)/<m> / sqrt(atoms_per_voxel).  The count floor 1/sqrt(N) is only the special
+    # case of equal masses; on an H-rich cell it sits ~1.3x too low (PS: <m>=6.51,
+    # sqrt(<m^2>)=8.52), so subtracting it from a mass CV manufactured phantom signal.
+    m1 = float(np.mean(masses_all)) if len(masses_all) else 0.0
+    m2 = float(np.mean(np.square(masses_all))) if len(masses_all) else 0.0
+    mass_dispersion = (math.sqrt(m2) / m1) if m1 > 0 else 1.0
+    poisson_cv = (mass_dispersion / math.sqrt(atoms_per_voxel)) if atoms_per_voxel > 0 else 1.0
+    cv_signal = math.sqrt(max(cv_mean ** 2 - poisson_cv ** 2, 0.0))
+    legacy_verdict = "HOMOG_HETEROGENEOUS" if cv_signal > cv_signal_max else "HOMOG_PASS"
+
+    signal, limit, decided_by, fallback_reason = cv_signal, cv_signal_max, "formula", None
+    split_half = None
+    cv_signal_measured = None
+    if method == "split_half":
+        M = np.asarray(maps, dtype=float)
+        nf = len(M)
+        if nf >= min_frames:
+            h = nf // 2
+            first, second = M[:h].mean(axis=0), M[h:2 * h].mean(axis=0)
+            mu = float(M.mean())
+            da, db = first - first.mean(), second - second.mean()
+            cov = float(np.mean(da * db))
+            persistent_cv = math.sqrt(max(cov, 0.0)) / mu if mu > 0 else 0.0
+            denom = float(np.sqrt(np.mean(da * da) * np.mean(db * db)))
+            split_half = {"frames": nf, "persistent_cv": round(persistent_cv, 4),
+                          "persist_max": persist_max,
+                          "half_map_corr": round(cov / denom, 3) if denom > 0 else None,
+                          "min_frames": min_frames}
+            signal, limit, decided_by = persistent_cv, persist_max, "split_half"
+        else:
+            fallback_reason = f"split_half needs >= {min_frames} frames; trajectory has {nf}"
+    elif method == "measured_floor":
+        if melt_cv_floor is not None and melt_cv_floor > 0:
+            cv_signal_measured = math.sqrt(max(cv_mean ** 2 - float(melt_cv_floor) ** 2, 0.0))
+            signal, limit, decided_by = cv_signal_measured, cv_signal_max, "measured_floor"
+        else:
+            fallback_reason = "measured_floor needs the melt's per-frame CV; none supplied"
+
+    verdict = "HOMOG_HETEROGENEOUS" if signal > limit else "HOMOG_PASS"
+    return {
+        "pass": verdict == "HOMOG_PASS",
+        "verdict": verdict,
+        "method_requested": method,
+        "decided_by": decided_by,
+        "fallback_reason": fallback_reason,
+        "signal": round(signal, 4),
+        "signal_max": limit,
+        "cv_mean": round(cv_mean, 4),
+        "cv_max": round(float(cv_arr.max()), 4) if len(cv_arr) else None,
+        # Frame-to-frame scatter of the per-frame CV. A glass is one frozen configuration, so
+        # its CV is a single draw from this spread; the glass gate's floor needs it.
+        "cv_std": round(float(cv_arr.std()), 4) if len(cv_arr) else None,
+        "cv_signal": round(cv_signal, 4),
+        "cv_signal_max": cv_signal_max,
+        "legacy_formula_verdict": legacy_verdict,
+        "grid_n": grid_n,
+        "atoms_per_voxel": round(atoms_per_voxel, 1),
+        "poisson_cv": round(poisson_cv, 3),
+        "mass_dispersion": round(mass_dispersion, 3),
+        "split_half": split_half,
+        "melt_cv_floor": melt_cv_floor,
+        "cv_signal_measured": (round(cv_signal_measured, 4)
+                               if cv_signal_measured is not None else None),
+        "heterogeneous_flag": verdict == "HOMOG_HETEROGENEOUS",
+    }
+
+
 def _fit_power_law(x, y, min_pts=5):
     mask = (x > 0) & (y > 0)
     if mask.sum() < min_pts:
@@ -290,6 +564,113 @@ def _fit_power_law(x, y, min_pts=5):
     ss_tot = ((ly - ly.mean()) ** 2).sum()
     r2 = float(1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
     return float(c[0]), float(np.exp(c[1])), r2
+
+
+def _classify_diffusion_regime(alpha):
+    """MSD power-law exponent -> descriptive regime label.
+
+    This is a scaling-behavior classification only -- it does NOT assert a kinetic-trap
+    verdict. Whether chains are actually trapped is a separate, magnitude-based test
+    (msd_max_A2 vs mean_Rg2_A2, see `kinetic_trap_flag`): a low alpha can equally mean
+    ordinary Rouse-regime sub-diffusion that hasn't yet crossed over to Fickian behavior
+    within the trajectory window, which is expected physics, not arrest. Conflating the two
+    previously mislabeled healthy runs (e.g. PE1: alpha=0.371, kinetic_trap_flag=False,
+    msd_max_A2=1370.3 >> mean_Rg2_A2=672.4) as "kinetically trapped" in this field alone.
+    """
+    if alpha is None:
+        return "insufficient data"
+    if alpha < 0.4:
+        return "strongly sub-diffusive (see kinetic_trap_flag for trap verdict)"
+    if alpha < 0.85:
+        return "sub-diffusive (Rouse/reptation)"
+    if alpha < 1.15:
+        return "Fickian diffusion"
+    return "super-diffusive (non-equilibrated)"
+
+
+def _dihedral_angle(p0, p1, p2, p3):
+    """Signed dihedral angle (degrees) for the four points p0-p1-p2-p3."""
+    b0 = p0 - p1
+    b1 = p2 - p1
+    b2 = p3 - p2
+    b1n = b1 / (np.linalg.norm(b1) + 1e-12)
+    v = b0 - np.dot(b0, b1n) * b1n
+    w = b2 - np.dot(b2, b1n) * b1n
+    x = np.dot(v, w)
+    y = np.dot(np.cross(b1n, v), w)
+    return float(np.degrees(np.arctan2(y, x)))
+
+
+def _backbone_dihedrals(bb_pos_sorted):
+    """Backbone dihedral angles (degrees), one per consecutive 4-atom window."""
+    n = len(bb_pos_sorted)
+    if n < 4:
+        return []
+    return [
+        _dihedral_angle(bb_pos_sorted[i], bb_pos_sorted[i + 1],
+                        bb_pos_sorted[i + 2], bb_pos_sorted[i + 3])
+        for i in range(n - 3)
+    ]
+
+
+def _fit_msid_regime(n_vals, mean_vals, mask):
+    """Power-law fit of MSID(n) over the subset of separations selected by `mask`."""
+    if mask.sum() < 5:
+        return {"available": False, "n_separations": int(mask.sum())}
+    slope, _, r2 = _fit_power_law(n_vals[mask].astype(float), mean_vals[mask])
+    return {
+        "available": slope is not None,
+        "slope": r(slope, 3) if slope is not None else None,
+        "r2": r(r2, 4) if r2 is not None else None,
+        "gaussian_pass": bool(slope is not None and abs(slope - 1.0) <= 0.20),
+        "n_separations": int(mask.sum()),
+        "s_range": [int(n_vals[mask].min()), int(n_vals[mask].max())],
+    }
+
+
+def _torsion_js_stabilization(torsion_per_frame, block_count, js_threshold):
+    """Block the trajectory into `block_count` windows, histogram the pooled backbone-dihedral
+    distribution in each, and return the Jensen-Shannon divergence between consecutive blocks.
+
+    `torsion_per_frame` is a list of 1-D arrays (one per frame, possibly ragged/empty).
+    """
+    n_frames = len(torsion_per_frame)
+    if n_frames < block_count * 2 or not any(len(t) for t in torsion_per_frame):
+        return {"available": False}
+
+    bin_edges = np.linspace(-180.0, 180.0, 37)  # 36 bins, 10 deg each
+    block_size = n_frames // block_count
+    hists = []
+    for b in range(block_count):
+        start = b * block_size
+        end = (b + 1) * block_size if b < block_count - 1 else n_frames
+        block_frames = [torsion_per_frame[i] for i in range(start, end) if len(torsion_per_frame[i])]
+        if not block_frames:
+            hists.append(None)
+            continue
+        block_vals = np.concatenate(block_frames)
+        h, _ = np.histogram(block_vals, bins=bin_edges, density=False)
+        h = h.astype(float) + 1e-9  # avoid zero bins, which break JS divergence
+        h /= h.sum()
+        hists.append(h)
+
+    js_series = []
+    for i in range(1, len(hists)):
+        if hists[i] is None or hists[i - 1] is None:
+            continue
+        # scipy's jensenshannon returns a distance (sqrt of the divergence); square it back
+        # to the divergence itself, base=2 bounds it to [0, 1].
+        js_series.append(float(jensenshannon(hists[i - 1], hists[i], base=2) ** 2))
+
+    js_last = js_series[-1] if js_series else None
+    return {
+        "available": True,
+        "n_blocks": block_count,
+        "js_divergence_series": [r(v, 5) for v in js_series],
+        "js_divergence_last": r(js_last, 5) if js_last is not None else None,
+        "js_threshold": js_threshold,
+        "stable": bool(js_last is not None and js_last <= js_threshold),
+    }
 
 
 def _kww_fit(lags_ps, ct_values):
@@ -317,7 +698,10 @@ def _kww_fit(lags_ps, ct_values):
 def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
                             n_backbone_bonds, bond_length_A, timestep_fs, dump_every,
                             grid_n, trajectory_slice, ct_min_decay=None, graphs_dir=None,
-                            cv_signal_max=0.11):
+                            cv_signal_max=0.11, msid_s_split=None, torsion_block_count=6,
+                            torsion_js_threshold=0.05, homog_method="formula",
+                            homog_persist_max=0.11, homog_min_frames=100,
+                            homog_melt_cv_floor=None):
     """Single-pass over dump frames. Returns raw per-frame arrays for all checks."""
     # Storage
     rg_sq_per_frame = []   # (n_frames, n_chains)
@@ -325,9 +709,9 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     com_per_frame = []     # (n_frames, n_chains, 3)  — CoMs for MSD
     p2_per_frame = []
     cv_per_frame = []
+    voxel_maps = []        # (n_frames, grid_n**3) voxel mass, for the time-averaged verdict
+    torsion_per_frame = []  # list of 1-D arrays (backbone dihedral angles, all chains flattened)
     msid_accum = None      # shape (n_backbone_per_chain - 1,)
-    msid_n = None
-    msid_count = 0
 
     try:
         masses_all = u.atoms.masses.copy()
@@ -336,6 +720,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
 
     # Precompute chain slices and backbone indices (constant across frames)
     chain_data = {}
+    coverages = []
     for cid in chain_ids:
         ch = u.select_atoms(f"resid {cid}")
         try:
@@ -345,6 +730,13 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         bb_pos, bb_ix = _backbone_atoms_sorted(ch, backbone_set)
         chain_data[cid] = {"sel": ch, "masses": masses, "bb_ix": bb_ix,
                            "has_bb": bb_pos is not None}
+        cov = backbone_type_coverage(u, bb_ix, backbone_set)
+        if cov is not None:
+            coverages.append(cov)
+    # Advisory cross-check: does backbone_types (declared) describe the bond-topology-measured
+    # path? Low coverage means backbone_types under- or mis-describes this chain's backbone —
+    # it does not affect the path itself, which comes from bond topology regardless.
+    backbone_type_coverage_mean = float(np.mean(coverages)) if coverages else None
 
     # Initialise MSID accumulator
     first_bb_len = None
@@ -366,6 +758,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
 
         rg_sq_row, ree_row, com_row = [], [], []
         bb_bond_vecs_all = []
+        torsion_row = []
 
         for cid in chain_ids:
             d = chain_data[cid]
@@ -384,7 +777,8 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
 
             # End-to-end vector (from sorted backbone termini)
             if d["has_bb"]:
-                bb_pos_now = ch.positions[
+                # superseded by bb_pos_sorted below; kept because this indexing can raise
+                bb_pos_now = ch.positions[  # noqa: F841
                     np.searchsorted(ch.atoms.indices, d["bb_ix"])
                     if hasattr(ch, "atoms") else np.arange(len(d["bb_ix"]))
                 ]
@@ -399,6 +793,9 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
                 for i in range(len(bb_pos_sorted) - 1):
                     dr = bb_pos_sorted[i + 1] - bb_pos_sorted[i]
                     bb_bond_vecs_all.append(dr)
+
+                # Backbone torsion (dihedral) angles
+                torsion_row.extend(_backbone_dihedrals(bb_pos_sorted))
 
                 # MSID accumulation
                 if msid_n_vals is not None and len(bb_pos_sorted) == first_bb_len:
@@ -420,8 +817,13 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
             p2_per_frame.append(0.0)
 
         # Density homogeneity
-        cv_val, _ = _compute_density_cv(u.atoms.positions.copy(), masses_all, box, grid_n)
-        cv_per_frame.append(cv_val)
+        vmap = _voxel_mass_map(u.atoms.positions.copy(), masses_all, box, grid_n)
+        occ = vmap[vmap > 0]
+        # Same number _compute_density_cv returns: voxel volume is constant within a frame.
+        cv_per_frame.append(float(occ.std() / occ.mean()) if len(occ) and occ.mean() > 0 else 0.0)
+        voxel_maps.append(vmap)
+
+        torsion_per_frame.append(np.array(torsion_row) if torsion_row else np.array([]))
 
         frame_idx += 1
         if frame_idx % 100 == 0:
@@ -457,6 +859,14 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     }
 
     # ── MSID ──
+    # Two regimes are fit: the combined whole-range fit (unchanged, for backward
+    # compatibility with existing consumers of msid.slope/r2/gaussian_pass), plus a
+    # small/intermediate-s vs large-s split. A single whole-range fit can look Gaussian
+    # on average while masking a large-s-only distortion (a badly initialized
+    # long-wavelength chain configuration -- see GLOBAL_CHAIN_CONFIGURATION_NOT_RELAXED)
+    # or a small-s-only one (local packing defects); the split separates what's
+    # accessible to ordinary MD (small/intermediate s) from what may reflect an
+    # initialization problem no amount of annealing will fix (large s).
     msid_result = {"available": False}
     if msid_n_vals is not None and msid_count_arr[0] > 0:
         msid_mean = msid_accum / msid_count_arr
@@ -469,6 +879,16 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
             "gaussian_pass": bool(gaussian_pass),
             "n_separations": int(len(msid_n_vals)),
         }
+
+        # s_split default is a starting point (not benchmarked against the archive yet):
+        # roughly the first third of the available separation range is treated as
+        # "small/intermediate", the rest as "large".
+        s_split = msid_s_split if msid_s_split is not None else max(4, len(msid_n_vals) // 3 + 1)
+        small_mask = msid_n_vals <= s_split
+        large_mask = ~small_mask
+        msid_result["s_split"] = int(s_split)
+        msid_result["small_intermediate"] = _fit_msid_regime(msid_n_vals, msid_mean, small_mask)
+        msid_result["large_s"] = _fit_msid_regime(msid_n_vals, msid_mean, large_mask)
 
     # ── C(t) end-to-end autocorrelation ──
     ct_result = {"available": False}
@@ -541,17 +961,7 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     msd_max = float(msd_vals.max()) if len(msd_vals) > 0 else 0.0
     kinetic_trap = bool(msd_max < overall_mean_rg2) if overall_mean_rg2 > 0 else False
 
-    if alpha is not None:
-        if alpha < 0.4:
-            regime = "sub-diffusive / kinetically trapped"
-        elif alpha < 0.85:
-            regime = "sub-diffusive (Rouse/reptation)"
-        elif alpha < 1.15:
-            regime = "Fickian diffusion"
-        else:
-            regime = "super-diffusive (non-equilibrated)"
-    else:
-        regime = "insufficient data"
+    regime = _classify_diffusion_regime(alpha)
 
     msd_result = {
         "alpha": r(alpha, 3) if alpha is not None else None,
@@ -560,6 +970,14 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         "msd_max_A2": r(msd_max, 2),
         "kinetic_trap_flag": kinetic_trap,
     }
+
+    # ── Torsion (backbone dihedral) distribution stabilization ──
+    # Intended as an anneal-loop stopping signal: once the pooled backbone-dihedral
+    # distribution stops changing between consecutive trajectory blocks (JS divergence
+    # at/below threshold), further high-T sampling is not changing accessible torsional
+    # states.
+    torsion_result = _torsion_js_stabilization(torsion_per_frame, torsion_block_count,
+                                               torsion_js_threshold)
 
     # ── P2 ──
     p2_mean = float(p2_arr.mean())
@@ -574,46 +992,36 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
     }
 
     # ── Density homogeneity ──
-    # The raw voxel CV mixes real heterogeneity with counting shot noise, and the
-    # noise floor moves with cell size (integer rounding of the adaptive grid leaves
-    # 20-33 atoms/voxel, i.e. poisson_cv 0.17-0.22).  Gate on the noise-subtracted
-    # signal CV so the criterion means the same thing at every cell size.
-    cv_mean = float(cv_arr.mean())
-    atoms_per_voxel = n_atoms / grid_n ** 3
-    # cv_mean is a MASS-density CV (_compute_density_cv bins by mass), so the shot-noise floor
-    # must be the compound-Poisson one: voxel mass is a random sum of atom masses, giving
-    # sqrt(<m^2>)/<m> / sqrt(atoms_per_voxel).  The count floor 1/sqrt(N) is only the special
-    # case of equal masses; on an H-rich cell it sits ~1.3x too low (PS: <m>=6.51,
-    # sqrt(<m^2>)=8.52), so subtracting it from a mass CV manufactured phantom signal.
-    m1 = float(np.mean(masses_all)) if len(masses_all) else 0.0
-    m2 = float(np.mean(np.square(masses_all))) if len(masses_all) else 0.0
-    mass_dispersion = (math.sqrt(m2) / m1) if m1 > 0 else 1.0
-    poisson_cv = (mass_dispersion / math.sqrt(atoms_per_voxel)) if atoms_per_voxel > 0 else 1.0
-    cv_signal = math.sqrt(max(cv_mean ** 2 - poisson_cv ** 2, 0.0))
-    # The adaptive grid targets ~25 atoms/voxel and is clamped to [3,10], so occupancy
-    # never drops far below that -- poisson_cv only exceeds 0.30 below ~300 atoms, which
-    # no buildable polymer cell reaches. Cell-size adequacy is therefore NOT expressed
-    # here; it is a physics question answered by check_finite_size() (minimum image and
-    # chain self-imaging), which does fire on real cells.
-    if cv_signal > cv_signal_max:
-        verdict = "HOMOG_HETEROGENEOUS"
-        heterogeneous_flag = True
+    # See homogeneity_verdict for the three methods and why the per-frame formula alone is not
+    # enough. The caller picks the method: the melt gate compares the two halves of its hold,
+    # the glass gate subtracts the melt's own measured noise, anything else keeps the formula.
+    dh_result = homogeneity_verdict(
+        voxel_maps, cv_arr, masses_all, n_atoms, grid_n, method=homog_method,
+        cv_signal_max=cv_signal_max, persist_max=homog_persist_max,
+        min_frames=homog_min_frames, melt_cv_floor=homog_melt_cv_floor)
+    # unused here, but each lookup asserts the key is present (KeyError otherwise)
+    cv_mean = dh_result["cv_mean"]  # noqa: F841
+    cv_signal = dh_result["cv_signal"]  # noqa: F841
+    verdict = dh_result["verdict"]  # noqa: F841
+    heterogeneous_flag = dh_result["heterogeneous_flag"]  # noqa: F841
+
+    # Chain displacement in the system's OWN units -- the per-system melt-equilibration
+    # criterion (Auhl/Kremer): a melt is equilibrated when chain centres of mass have
+    # displaced at least their own size, g3(t) >= Rg^2. Computed here rather than in
+    # enforce_gate.py because both terms are measured in this pass, and reported as a ratio so
+    # the gate needs no table and no per-class constant. Ree^2 is the stricter form of the same
+    # statement and is left to the reader: measured over 36 round-1 campaigns it ranged
+    # 0.017-0.861, i.e. never reached, so gating on it would reject every melt this platform
+    # has ever built.
+    _rg2 = rg_result.get("mean_Rg2_A2")
+    _msd_max = msd_result.get("msd_max_A2")
+    if isinstance(_rg2, (int, float)) and _rg2 > 0 and isinstance(_msd_max, (int, float)):
+        msd_result["msd_over_rg2"] = r(_msd_max / _rg2, 3)
+        _ree = (ree_result or {}).get("mean_R_ee_A")
+        if isinstance(_ree, (int, float)) and _ree > 0:
+            msd_result["msd_over_ree2"] = r(_msd_max / (_ree * _ree), 4)
     else:
-        verdict = "HOMOG_PASS"
-        heterogeneous_flag = False
-    dh_result = {
-        "pass": verdict == "HOMOG_PASS",
-        "verdict": verdict,
-        "cv_mean": r(cv_mean, 4),
-        "cv_max": r(float(cv_arr.max()), 4),
-        "cv_signal": r(cv_signal, 4),
-        "cv_signal_max": cv_signal_max,
-        "grid_n": grid_n,
-        "atoms_per_voxel": r(atoms_per_voxel, 1),
-        "poisson_cv": r(poisson_cv, 3),
-        "mass_dispersion": r(mass_dispersion, 3),
-        "heterogeneous_flag": heterogeneous_flag,
-    }
+        msd_result["msd_over_rg2"] = None
 
     return {
         "rg": rg_result,
@@ -621,8 +1029,11 @@ def run_structural_analysis(u, chain_ids, backbone_set, n_atoms, skip_frames,
         "msid": msid_result,
         "ct": ct_result,
         "msd": msd_result,
+        "torsion": torsion_result,
         "p2": p2_result,
         "density_homogeneity": dh_result,
+        "backbone_type_coverage": r(backbone_type_coverage_mean, 3)
+                                   if backbone_type_coverage_mean is not None else None,
     }
 
 
@@ -632,7 +1043,7 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
                        skip_frames, n_eff_min=20, finite_size=None):
     verdict = "PASS" if overall_pass else "FAIL"
     lines = [
-        f"## D-05 CONVERGENCE DETAIL",
+        "## D-05 CONVERGENCE DETAIL",
         f"`check_equilibration_comprehensive` · T={thermo['meta'].get('T_mean', '?')} K · "
         f"{n_frames} frames analysed (skip={skip_frames}) · {timestamp}",
         "",
@@ -655,6 +1066,13 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
     lines.append(f"| Density drift | {dd.get('drift_pct','?')}% (p={dd.get('p_value','?')}) | <1%, p<0.01 | {density_drift_result} |")
     ed = e.get("drift", {})
     lines.append(f"| Energy drift | {ed.get('drift_pct','?')}% (p={ed.get('p_value','?')}) | <1%, p<0.01 | {_gate(ed.get('pass',False))} |")
+    cd = e.get("component_drift", {})
+    if cd:
+        comp_detail = ", ".join(
+            f"{label}={c.get('drift_pct','?')}%{'✗' if not c.get('pass', True) else ''}"
+            for label, c in cd.get("components", {}).items()
+        )
+        lines.append(f"| Energy component drift | {comp_detail or 'n/a'} | <1%, p<0.01 each | {_gate(cd.get('pass', False))} |")
     db = d.get("block_sem", {})
     density_sem_result = _gate(db.get('pass', False)) if is_npt else "N/A (NVT — fixed volume)"
     lines.append(f"| Density block-SEM | {db.get('sem_pct','?')}% | <1% | {density_sem_result} |")
@@ -693,9 +1111,21 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
         r2 = msid.get("r2")
         g_pass = msid.get("gaussian_pass", True)
         label = "OK" if g_pass else "⚠ non-Gaussian"
-        lines.append(f"| MSID slope | {slope} (R²={r2}) | 1.0 ±20% | {label} |")
+        lines.append(f"| MSID slope (combined) | {slope} (R²={r2}) | 1.0 ±20% | {label} |")
+        large_s = msid.get("large_s", {})
+        if large_s.get("available"):
+            ls_label = "OK" if large_s.get("gaussian_pass", True) else "⚠ non-Gaussian (large-s)"
+            lines.append(f"| MSID slope (large-s, n={large_s.get('s_range')}) | "
+                        f"{large_s.get('slope')} (R²={large_s.get('r2')}) | 1.0 ±20% | {ls_label} |")
     else:
         lines.append("| MSID slope | — | 1.0 ±20% | skipped (short backbone) |")
+
+    torsion = structural.get("torsion", {})
+    if torsion.get("available"):
+        js = torsion.get("js_divergence_last")
+        thr = torsion.get("js_threshold")
+        label = "OK (stable)" if torsion.get("stable") else "still changing"
+        lines.append(f"| Torsion JS-divergence (last block-pair) | {js} | ≤{thr} | {label} |")
 
     ct = structural.get("ct", {})
     if ct.get("available"):
@@ -734,8 +1164,9 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
     grid_n = dh.get("grid_n")
     cv = dh.get("cv_mean")
     apv = dh.get("atoms_per_voxel")
-    sig = dh.get("cv_signal")
-    sig_max = dh.get("cv_signal_max")
+    sig = dh.get("signal", dh.get("cv_signal"))
+    sig_max = dh.get("signal_max", dh.get("cv_signal_max"))
+    decided_by = dh.get("decided_by", "formula")
     label = _gate(dh.get("pass", False))
     fs = finite_size or {}
     if fs.get("available"):
@@ -751,9 +1182,15 @@ def build_d05_markdown(thermo, structural, warnings_list, overall_pass, timestam
         )
 
     lines.append(
-        f"| Density homogeneity CV (signal) | {sig:.1%} "
-        f"(raw {cv:.1%} − Poisson {dh.get('poisson_cv', 0):.1%}; {grid_n}³ grid, {apv} atoms/voxel) "
-        f"| <{sig_max:.0%} | {label} |"
+        f"| Density homogeneity CV (signal, {decided_by}) | {sig:.1%} "
+        + (f"(structure shared by both halves of the hold, half-map r="
+           f"{(dh.get('split_half') or {}).get('half_map_corr')}; "
+           if decided_by == "split_half" else
+           f"(raw {cv:.1%} − melt floor {dh.get('melt_cv_floor') or 0:.1%}; "
+           if decided_by == "measured_floor" else
+           f"(raw {cv:.1%} − Poisson {dh.get('poisson_cv', 0):.1%}; ")
+        + f"{grid_n}³ grid, {apv} atoms/voxel) | <{sig_max:.0%} | {label} |"
+        + (f" fallback: {dh['fallback_reason']}" if dh.get("fallback_reason") else "")
     )
 
     if warnings_list:
@@ -794,6 +1231,127 @@ def collect_warnings(thermo, structural):
     return w
 
 
+# ─── Trajectory loading ───────────────────────────────────────────────────────
+
+def thermo_section(thermo: dict, n_eff_min: int) -> dict:
+    """The `thermo` block of the gate file, flattened the way enforce_gate.collect_gates reads it.
+
+    A function rather than inline in main() so an offline regrade of a stored log builds the
+    gate input with exactly the code the live check uses.
+    """
+    return {
+        "equilibrated": thermo.get("equilibrated"),
+        "density_drift": thermo.get("density", {}).get("drift"),
+        "energy_drift": thermo.get("energy", {}).get("drift"),
+        # The per-term drift verdict, surfaced at the top level so enforce_gate can bind on
+        # it. It was computed and folded into thermo["energy"]["equilibrated"] from the day
+        # _analyse_energy_components was written, and printed in d05_block.md, but the
+        # aggregate "energy_drift" above is what collect_gates read -- so the one case this
+        # check exists to catch (a canceling drift that nets a flat TotEng) was invisible to
+        # the gate. aPS_1, 2026-09-09: TotEng drift 0.023% PASS while vdW drifted 1.691%.
+        "energy_component_drift": thermo.get("energy", {}).get("component_drift"),
+        "density_sem": thermo.get("density", {}).get("block_sem"),
+        "energy_sem": thermo.get("energy", {}).get("block_sem"),
+        "tau_eff_density_fraction": thermo.get("tau_eff_density_fraction"),
+        "n_eff_density": {
+            "pass": (thermo.get("n_eff_density") is None
+                     or thermo["n_eff_density"] >= n_eff_min),
+            "n_eff": thermo.get("n_eff_density"),
+            "n_eff_min": n_eff_min,
+        },
+        "residual_stress": thermo.get("residual_stress"),
+        "meta": thermo.get("meta"),
+    }
+
+
+def _load_and_analyze(data_file, dump_file, atom_style, backbone_set, skip_frames,
+                      n_backbone_bonds, bond_length_A, timestep_fs, dump_every_arg,
+                      ct_min_decay, graphs_dir, cv_signal_max, msid_s_split,
+                      torsion_block_count, torsion_js_threshold, label, homog_kwargs=None):
+    """Load one LAMMPS trajectory (data_file for topology, dump_file for frames) and run
+    run_structural_analysis's single-pass checks over it. Returns (structural, n_frames_used);
+    structural is None (n_frames_used still reported) when fewer than 10 frames remain after
+    skip_frames -- the caller decides how to fail on that."""
+    print(f"Loading {label} trajectory for structural checks...", flush=True)
+    u = mda.Universe(data_file, dump_file, format="LAMMPSDUMP", atom_style=atom_style)
+    n_atoms = u.atoms.n_atoms
+    n_frames_total = u.trajectory.n_frames
+    print(f"  [{label}] n_atoms={n_atoms}, n_frames={n_frames_total}", flush=True)
+
+    chain_ids = sorted(set(int(r) for r in u.atoms.resids))
+    print(f"  [{label}] {len(chain_ids)} chains", flush=True)
+
+    try:
+        u.trajectory.add_transformations(trans.unwrap(u.atoms))
+        print(f"  [{label}] Coordinate unwrapping applied", flush=True)
+    except Exception as e:
+        print(f"  [{label}] WARNING: unwrap failed ({e})", flush=True)
+
+    # Adaptive grid_n: target ~25 atoms/voxel, clamp [3, 10]
+    grid_n = max(3, min(10, int(round((n_atoms / 25) ** (1 / 3)))))
+    print(f"  [{label}] Adaptive grid_n={grid_n} ({n_atoms/grid_n**3:.1f} atoms/voxel)", flush=True)
+
+    # Try to auto-detect dump_every from timestep spacing
+    dump_every = dump_every_arg
+    if n_frames_total >= 2:
+        try:
+            steps = []
+            for ts in u.trajectory[:5]:
+                steps.append(int(ts.data.get("step", -1)))
+            if len(steps) >= 2 and steps[1] > steps[0] > 0:
+                dump_every = steps[1] - steps[0]
+                print(f"  [{label}] Auto-detected dump_every={dump_every}", flush=True)
+        except Exception:
+            pass
+
+    traj_slice = u.trajectory[skip_frames:]
+    n_frames_used = n_frames_total - skip_frames
+    if n_frames_used < 10:
+        return None, n_frames_used
+
+    print(f"  [{label}] Analysing {n_frames_used} frames (skip={skip_frames})", flush=True)
+    structural = run_structural_analysis(
+        u=u,
+        chain_ids=chain_ids,
+        backbone_set=backbone_set,
+        n_atoms=n_atoms,
+        skip_frames=skip_frames,
+        n_backbone_bonds=n_backbone_bonds,
+        bond_length_A=bond_length_A,
+        timestep_fs=timestep_fs,
+        dump_every=dump_every,
+        grid_n=grid_n,
+        trajectory_slice=traj_slice,
+        ct_min_decay=ct_min_decay,
+        graphs_dir=graphs_dir,
+        cv_signal_max=cv_signal_max,
+        msid_s_split=msid_s_split,
+        torsion_block_count=torsion_block_count,
+        torsion_js_threshold=torsion_js_threshold,
+        **(homog_kwargs or {}),
+    )
+    return structural, n_frames_used
+
+
+_STRUCT_SOURCED_KEYS = ("rg", "ree", "msid", "torsion", "p2", "density_homogeneity",
+                       "backbone_type_coverage")
+
+
+def _merge_structural(structural_primary, structural_struct):
+    """Combine two run_structural_analysis() results into the one dict main() reports.
+
+    Per-frame relative-geometry checks (rg/ree/msid/torsion/p2/density_homogeneity/
+    backbone_type_coverage) have no ensemble dependence -- take them from the struct
+    trajectory (typically npt_final, the actual equilibrated parent state). MSD/kinetic-trap
+    and C(t) stay on the primary trajectory: a barostatted trajectory affine-scales
+    coordinates every step and would contaminate cumulative CoM displacement / end-to-end-
+    vector autocorrelation."""
+    structural = dict(structural_primary)
+    for key in _STRUCT_SOURCED_KEYS:
+        structural[key] = structural_struct[key]
+    return structural
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -801,10 +1359,29 @@ def main():
         description="Comprehensive polymer equilibration validator: thermo + structural checks in one call."
     )
     parser.add_argument("--log_file",          required=True)
-    parser.add_argument("--dump_file",         required=True)
+    parser.add_argument("--dump_file",         required=True,
+                        help="Trajectory for the ensemble-sensitive checks (MSD/kinetic-trap, "
+                             "C(t) end-to-end autocorrelation) -- must be a fixed-volume NVT "
+                             "window (e.g. nvt_kinetic_stability); a barostatted trajectory "
+                             "affine-scales coordinates every step and contaminates cumulative "
+                             "CoM displacement.")
     parser.add_argument("--data_file",         required=True)
+    parser.add_argument("--struct_dump_file",  default=None,
+                        help="Optional second trajectory for the ensemble-INsensitive per-frame "
+                             "geometry checks (Rg, MSID, R_ee, torsion, P2, density homogeneity, "
+                             "finite-size) -- normally npt_final's own trajectory, the actual "
+                             "equilibrated parent state. Omit to fall back to --dump_file for "
+                             "everything (single-trajectory legacy behaviour). Must be paired "
+                             "with --struct_data_file.")
+    parser.add_argument("--struct_data_file",  default=None,
+                        help="Topology file paired with --struct_dump_file. Required iff "
+                             "--struct_dump_file is given.")
     parser.add_argument("--backbone_types",    type=int, nargs="+", required=True)
     parser.add_argument("--output_dir",        default=None)
+    parser.add_argument("--output_name",       default="equilibration.json",
+                        help="Filename for the merged gate JSON inside --output_dir. "
+                             "equilibration.json = the melt hold; cooling.json = the "
+                             "assessment cell at final_T_K.")
     parser.add_argument("--graphs_dir",        default=None,
                         help="Directory for PNG figures (accepted for interface parity; currently unused).")
     parser.add_argument("--skip_frames",       type=int,   default=50)
@@ -835,10 +1412,41 @@ def main():
                         help="Max Poisson-corrected density-homogeneity CV. Calibrated on the "
                              "36-run archive: heterogeneous-underpack families span 0.120-0.192, "
                              "all others 0.000-0.094.")
+    parser.add_argument("--homog_method",
+                        choices=HOMOG_METHODS + tuple(HOMOG_METHOD_ALIASES), default="formula",
+                        help="How density homogeneity separates heterogeneity from counting "
+                             "noise: formula (per-frame compound-Poisson floor), split_half "
+                             "(melt only: structure shared by the two halves of the hold), "
+                             "measured_floor (glass: minus --homog_melt_cv_floor). "
+                             "time_averaged is a retired alias of split_half. "
+                             "See homogeneity_verdict().")
+    parser.add_argument("--homog_persist_max", type=float, default=0.11,
+                        help="split_half threshold on persistent_cv.")
+    parser.add_argument("--homog_min_frames",  type=int, default=100,
+                        help="split_half needs this many frames, else it falls back to the "
+                             "formula.")
+    # Retired with time_averaged. Still accepted so a campaign process that loaded the previous
+    # server module can invoke this script; the values are ignored.
+    parser.add_argument("--homog_signal_ta_max", type=float, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--homog_min_n_eff",   type=int, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--homog_melt_cv_floor", type=float, default=None,
+                        help="measured_floor: the melt's per-frame mass CV on the same grid.")
     parser.add_argument("--ct_min_decay",      type=float, default=None,
                         help="Minimum C(t) decay fraction to pass hard gate (0–1). "
                              "Omit for soft-warning-only behaviour (backwards compat). "
                              "Use 0.25 for melt equilibration checks.")
+    parser.add_argument("--msid_s_split",      type=int, default=None,
+                        help="Backbone separation n splitting the MSID fit into "
+                             "small/intermediate-s vs large-s regimes. Default: "
+                             "max(4, n_separations // 3 + 1) — an unbenchmarked starting "
+                             "point, not a physical constant.")
+    parser.add_argument("--torsion_block_count", type=int, default=6,
+                        help="Number of contiguous trajectory blocks for the backbone "
+                             "torsion-distribution Jensen-Shannon-divergence stabilization "
+                             "check.")
+    parser.add_argument("--torsion_js_threshold", type=float, default=0.05,
+                        help="Max JS divergence (base-2, in [0,1]) between the last two "
+                             "torsion-distribution blocks to call the distribution stable.")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir) if args.output_dir else Path(args.dump_file).parent / "eq_comprehensive"
@@ -865,67 +1473,65 @@ def main():
         sys.exit(0)
 
     # ── Section B + C ──
-    print("Loading trajectory for structural checks...", flush=True)
-    u = mda.Universe(args.data_file, args.dump_file,
-                     format="LAMMPSDUMP", atom_style=args.atom_style)
-    n_atoms = u.atoms.n_atoms
-    n_frames_total = u.trajectory.n_frames
-    print(f"  n_atoms={n_atoms}, n_frames={n_frames_total}", flush=True)
+    if bool(args.struct_dump_file) != bool(args.struct_data_file):
+        print(json.dumps({"status": "failed",
+                          "error": "--struct_dump_file and --struct_data_file must be given together."}))
+        sys.exit(0)
+    use_split = bool(args.struct_dump_file)
 
-    chain_ids = sorted(set(int(r) for r in u.atoms.resids))
-    print(f"  {len(chain_ids)} chains, backbone_types={args.backbone_types}", flush=True)
-
-    try:
-        u.trajectory.add_transformations(trans.unwrap(u.atoms))
-        print("  Coordinate unwrapping applied", flush=True)
-    except Exception as e:
-        print(f"  WARNING: unwrap failed ({e})", flush=True)
-
-    # Adaptive grid_n: target ~25 atoms/voxel, clamp [3, 10]
-    grid_n = max(3, min(10, int(round((n_atoms / 25) ** (1 / 3)))))
-    print(f"  Adaptive grid_n={grid_n} ({n_atoms/grid_n**3:.1f} atoms/voxel)", flush=True)
-
-    # Try to auto-detect dump_every from timestep spacing
-    dump_every = args.dump_every
-    if n_frames_total >= 2:
-        try:
-            steps = []
-            for ts in u.trajectory[:5]:
-                steps.append(int(ts.data.get("step", -1)))
-            if len(steps) >= 2 and steps[1] > steps[0] > 0:
-                dump_every = steps[1] - steps[0]
-                print(f"  Auto-detected dump_every={dump_every}", flush=True)
-        except Exception:
-            pass
-
-    traj_slice = u.trajectory[args.skip_frames:]
-    n_frames_used = n_frames_total - args.skip_frames
-
-    if n_frames_used < 10:
-        print(json.dumps({"status": "failed", "error": f"Only {n_frames_used} frames after skip — need ≥10."}))
+    homog_kwargs = {"homog_method": args.homog_method,
+                    "homog_persist_max": args.homog_persist_max,
+                    "homog_min_frames": args.homog_min_frames,
+                    "homog_melt_cv_floor": args.homog_melt_cv_floor}
+    structural_primary, n_frames_primary = _load_and_analyze(
+        data_file=args.data_file, dump_file=args.dump_file, atom_style=args.atom_style,
+        backbone_set=backbone_set, skip_frames=args.skip_frames,
+        n_backbone_bonds=args.n_backbone_bonds, bond_length_A=args.bond_length_A,
+        timestep_fs=args.timestep_fs, dump_every_arg=args.dump_every,
+        ct_min_decay=args.ct_min_decay,
+        # When a struct trajectory is supplied, its own analysis pass (below) owns the R_ee
+        # histogram PNG -- passing graphs_dir here too would silently overwrite it with the
+        # ensemble-sensitive trajectory's (usually shorter, fixed-volume) version.
+        graphs_dir=None if use_split else args.graphs_dir,
+        cv_signal_max=args.cv_signal_max, msid_s_split=args.msid_s_split,
+        torsion_block_count=args.torsion_block_count,
+        torsion_js_threshold=args.torsion_js_threshold,
+        label="primary (MSD/C(t))" if use_split else "primary",
+        homog_kwargs=homog_kwargs,
+    )
+    if structural_primary is None:
+        print(json.dumps({"status": "failed",
+                          "error": f"Only {n_frames_primary} frames after skip in --dump_file — need ≥10."}))
         sys.exit(0)
 
-    print(f"  Analysing {n_frames_used} frames (skip={args.skip_frames})", flush=True)
-    structural = run_structural_analysis(
-        u=u,
-        chain_ids=chain_ids,
-        backbone_set=backbone_set,
-        n_atoms=n_atoms,
-        skip_frames=args.skip_frames,
-        n_backbone_bonds=args.n_backbone_bonds,
-        bond_length_A=args.bond_length_A,
-        timestep_fs=args.timestep_fs,
-        dump_every=dump_every,
-        grid_n=grid_n,
-        trajectory_slice=traj_slice,
-        ct_min_decay=args.ct_min_decay,
-        graphs_dir=args.graphs_dir,
-        cv_signal_max=args.cv_signal_max,
-    )
+    if use_split:
+        structural_struct, n_frames_struct = _load_and_analyze(
+            data_file=args.struct_data_file, dump_file=args.struct_dump_file,
+            atom_style=args.atom_style, backbone_set=backbone_set, skip_frames=args.skip_frames,
+            n_backbone_bonds=args.n_backbone_bonds, bond_length_A=args.bond_length_A,
+            timestep_fs=args.timestep_fs, dump_every_arg=args.dump_every,
+            ct_min_decay=None,  # C(t) from the struct trajectory is never consumed below
+            graphs_dir=args.graphs_dir, cv_signal_max=args.cv_signal_max,
+            msid_s_split=args.msid_s_split, torsion_block_count=args.torsion_block_count,
+            torsion_js_threshold=args.torsion_js_threshold,
+            label="struct (Rg/MSID/packing)",
+            homog_kwargs=homog_kwargs,
+        )
+        if structural_struct is None:
+            print(json.dumps({"status": "failed",
+                              "error": f"Only {n_frames_struct} frames after skip in --struct_dump_file — need ≥10."}))
+            sys.exit(0)
+        structural = _merge_structural(structural_primary, structural_struct)
+        finite_size_data_file = args.struct_data_file
+        n_frames_used = n_frames_struct
+    else:
+        structural = structural_primary
+        finite_size_data_file = args.data_file
+        n_frames_used = n_frames_primary
 
     # ── Finite-size (periodic self-imaging) ──
     finite_size = check_finite_size(
-        data_file=args.data_file,
+        data_file=finite_size_data_file,
         cutoff_A=args.cutoff_A,
         mean_rg_A=(structural.get("rg") or {}).get("mean_Rg_A"),
         mean_ree_A=(structural.get("ree") or {}).get("mean_R_ee_A"),
@@ -963,28 +1569,15 @@ def main():
     result = to_native({
         "status": "success",
         "overall_pass": overall_pass,
-        "thermo": {
-            "equilibrated": thermo.get("equilibrated"),
-            "density_drift": thermo.get("density", {}).get("drift"),
-            "energy_drift": thermo.get("energy", {}).get("drift"),
-            "density_sem": thermo.get("density", {}).get("block_sem"),
-            "energy_sem": thermo.get("energy", {}).get("block_sem"),
-            "tau_eff_density_fraction": thermo.get("tau_eff_density_fraction"),
-            "n_eff_density": {
-                "pass": (thermo.get("n_eff_density") is None
-                         or thermo["n_eff_density"] >= args.n_eff_min),
-                "n_eff": thermo.get("n_eff_density"),
-                "n_eff_min": args.n_eff_min,
-            },
-            "residual_stress": thermo.get("residual_stress"),
-            "meta": thermo.get("meta"),
-        },
+        "thermo": thermo_section(thermo, args.n_eff_min),
         "chain": {
             "rg": structural["rg"],
             "ree": structural["ree"],
             "msid": structural["msid"],
             "ct": structural["ct"],
             "msd": structural["msd"],
+            "torsion": structural["torsion"],
+            "backbone_type_coverage": structural["backbone_type_coverage"],
         },
         "spatial": {
             "p2": structural["p2"],
@@ -996,13 +1589,32 @@ def main():
         "log_file": args.log_file,
         "dump_file": args.dump_file,
         "data_file": args.data_file,
+        "struct_dump_file": args.struct_dump_file,
+        "struct_data_file": args.struct_data_file,
         "backbone_types": args.backbone_types,
         "timestamp": timestamp,
     })
 
-    json_path = str(output_dir / "equilibration_comprehensive.json")
-    with open(json_path, "w") as jf:
-        json.dump(result, jf, indent=2)
+    # The gate file is shared with extract_equilibrated_density.py ("density" key) and
+    # enforce_gate ("gate" key) -- read-merge-write, so each producer replaces only its own
+    # section. --output_name selects WHICH cell's file this is: the melt gate writes
+    # equilibration.json (the melt hold at T_melt_hold_K), the assessment gate writes
+    # cooling.json (npt_final at final_T_K). Same keys, two different cells; a single filename
+    # would have one silently overwrite the other's meaning.
+    # enforce_equilibration_gate's _save_gate_verdict ("gate" key) -- read-merge-write so this
+    # producer's own top-level keys (below) replace wholesale on each EXTEND re-check without
+    # clobbering whichever of those two sibling sections already landed from a prior pass.
+    equilibration_json = output_dir / (getattr(args, "output_name", None)
+                                       or "equilibration.json")
+    merged = {}
+    if equilibration_json.exists():
+        try:
+            merged = json.loads(equilibration_json.read_text())
+        except (OSError, json.JSONDecodeError):
+            merged = {}
+    merged.update(result)
+    equilibration_json.write_text(json.dumps(merged, indent=2))
+    json_path = str(equilibration_json)
     result["summary_json"] = json_path
 
     d05_path = str(output_dir / "d05_block.md")

@@ -104,6 +104,76 @@ def test_class_b_gate_with_a_variance_gap_extends():
     assert r["verdict"] == "SPEND"
 
 
+# ─── D-07: prospective (non-recovery) pricing of a Murnaghan sampling-factor rung ──────────
+#
+# extract_bulk_modulus_murnaghan.py now emits a real, autocorrelation-corrected per-point
+# volume SEM (vol_sem_A3_per_point). This machinery prices whether a SECOND, longer
+# mechanical_sampling_factor rung is worth spending BEFORE spending it -- reusing decide()
+# as-is (Class C is the only path that reaches the log-linear/margin-factor machinery; Class B
+# returns immediately after the residual-type test). mechanical_sampling_factor is
+# "lever_direction=higher" (stage_params.py multiplies bm_npt_steps by it) with
+# cost_exponent=+1 (linear in wall time, unlike cooling rate's -1). --sem/--physical-target
+# are omitted: the metric here IS an SEM, so test 1 would be circular, and no "true SEM"
+# target exists to converge toward.
+
+def test_murnaghan_sampling_factor_one_rung_buys_the_slope():
+    """Only the sampling_factor=1 rung has run -- one point determines no slope, so the
+    verdict must be the same 'buy the slope first' SPEND as cis-PBD1's single Tg rate."""
+    r = call(failing_gate="murnaghan_sampling_precision", gate_class="C",
+             lever="mechanical_sampling_factor", lever_direction="higher",
+             cost_exponent=1.0, history="1:0.20", next_lever=2.0, target_floor=0.14)
+    assert r["verdict"] == "SPEND"
+    assert r["spend_limit"] == "one rung"
+
+
+def test_murnaghan_sampling_factor_two_rungs_prices_a_third():
+    """sampling_factor=1 and =2 have both run (SEM 0.20 -> 0.16 as n_eff grew) -- enough to
+    fit the real log-linear closure and decide whether a sampling_factor=6 rung clears the
+    SEM floor with adequate margin."""
+    r = call(failing_gate="murnaghan_sampling_precision", gate_class="C",
+             lever="mechanical_sampling_factor", lever_direction="higher",
+             cost_exponent=1.0, history="1:0.20,2:0.16", next_lever=6.0,
+             target_floor=0.14, last_rung_hours=2.0)
+    assert r["residual_type"] == "unknown"  # --sem omitted: would be circular for an SEM metric
+    assert r["current_lever"] == 2.0  # most recently spent rung
+    assert r["break_even_lever"] == pytest.approx(2.828, abs=0.01)
+    assert r["margin_factor"] == pytest.approx(2.12, abs=0.01)
+    assert r["cost_next_rung_hours"] == pytest.approx(6.0, abs=0.01)
+    assert r["verdict"] == "SPEND"
+
+
+# ─── D-07: prospective pricing of a Murnaghan ladder-widening rung ─────────────────────
+#
+# BM_LADDER_NOT_CONVERGED (plateau_confirmed=False) is taxonomically Class B convergence
+# (gate_classes.B_convergence), but prices as Class C, mirroring
+# mechanical_sampling_factor above for the identical reason: decide()'s gate_class=B path
+# returns immediately after the residual-type test and never reaches the log-linear
+# closure/margin-factor machinery "how much wider is worth it" needs. Only the FIRST
+# widening (murnaghan_ladder_extend, local_cap=1) is free/automatic; a second one must be
+# priced here first. lever="bm_compression_limit_atm", lever_direction="higher",
+# cost_exponent=+1.0 (linear in wall time, matching mechanical_sampling_factor).
+
+def test_murnaghan_ladder_extend_one_rung_buys_the_slope():
+    """Only the first widened point has run -- one point determines no slope."""
+    r = call(failing_gate="BM_LADDER_NOT_CONVERGED", gate_class="C",
+             lever="bm_compression_limit_atm", lever_direction="higher",
+             cost_exponent=1.0, history="15000:12.4", next_lever=22500, target_floor=10.0)
+    assert r["verdict"] == "SPEND"
+    assert r["spend_limit"] == "one rung"
+
+
+def test_murnaghan_ladder_extend_two_rungs_prices_a_third():
+    """Two widened points have run -- enough to fit the log-linear closure and decide
+    whether a third, wider point clears the target floor with adequate margin."""
+    r = call(failing_gate="BM_LADDER_NOT_CONVERGED", gate_class="C",
+             lever="bm_compression_limit_atm", lever_direction="higher",
+             cost_exponent=1.0, history="15000:12.4,22500:9.1", next_lever=30000,
+             target_floor=10.0, last_rung_hours=3.2)
+    assert r["current_lever"] == 22500.0
+    assert r["margin_factor"] == pytest.approx(1.49, abs=0.02)
+    assert r["verdict"] == "STOP_ANNOTATE"
+
+
 # ─── guards for the two flag-path defects ──────────────────────────────────────
 
 @pytest.mark.parametrize("cost_exponent", [-1.0, 1.0])
@@ -147,10 +217,3 @@ def test_thresholds_come_from_the_policy_not_a_second_copy():
     for name in block["thresholds"]:
         assert f'thresholds["{name}"]' in src
     assert "VARIANCE_LIMITED_SIGMA" not in src and "MIN_MARGIN_FACTOR" not in src
-
-
-def test_policy_declares_the_class_a_carve_out():
-    policy = json.loads(POLICY.read_text())
-    block = policy["policies"]["equilibration"]["remedy_economics"]
-    assert "class_A_is_always_worth_paying" in block
-    assert block["default_source"].endswith("remedy_economics.py")

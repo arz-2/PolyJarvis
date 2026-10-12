@@ -1,0 +1,34 @@
+LAMMPS (22 Jul 2025 - Update 3)
+KOKKOS mode with Kokkos version 4.6.2 is enabled
+  will use up to 1 GPU(s) per node
+  using 1 OpenMP thread(s) per MPI task
+package kokkos
+package kokkos
+# ============================================================
+# PolyJarvis LAMMPS Engine - Minimization Template
+# ============================================================
+# Stage: Energy minimization (step 0 of equilibration)
+# Purpose: Relax bad contacts in newly generated amorphous cells
+#
+# Tunable parameters (injected by script_generator.py):
+#   DATA_FILE       - path to .data file
+#   LOG_FILE        - log output filename
+#   DUMP_FILE       - trajectory dump filename
+#   WRITE_DATA_FILE - output .data file after minimization
+#   LAST_DUMP_FILE  - final snapshot dump filename
+#   PAIR_STYLE_BLOCK- pair + kspace style lines (soft-core for dense systems)
+#   BOND_STYLE      - e.g. harmonic
+#   ANGLE_STYLE     - e.g. harmonic
+#   DIHEDRAL_STYLE  - e.g. fourier
+#   IMPROPER_STYLE  - e.g. cvff
+#   GPU_PACKAGE     - "package gpu 1 neigh no" or empty string
+#   MIN_STYLE       - cg (conjugate gradient) or hftn
+#   ETOL            - energy convergence tolerance (e.g. 1e-6)
+#   FTOL            - force convergence tolerance (e.g. 1e-6)
+#   MAXITER         - max iterations (e.g. 50000)
+#   MAXEVAL         - max force evaluations (e.g. 100000)
+#   THERMO_FREQ     - thermo output frequency
+#   DUMP_FREQ       - dump output frequency
+# ============================================================
+
+log minimize.log

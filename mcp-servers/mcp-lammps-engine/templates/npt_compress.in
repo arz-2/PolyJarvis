@@ -60,6 +60,7 @@ thermo {THERMO_FREQ}
 
 # --- Trajectory ---
 dump dump_comp all custom {DUMP_FREQ} {DUMP_FILE} id type mol x y z ix iy iz vx vy vz
+{DUMP_APPEND_BLOCK}
 
 {RESTART_BLOCK}
 {INIT_VELOCITY_BLOCK}
@@ -79,6 +80,7 @@ undump dump_comp
 
 write_dump all custom {LAST_DUMP_FILE} id type mol x y z xu yu zu vx vy vz modify sort id
 write_data {WRITE_DATA_FILE}
+write_restart {WRITE_RESTART_FILE}
 
 print "STAGE COMPLETE: NPT compression P={P_START}->{P_FINAL}atm density target reached"
 quit

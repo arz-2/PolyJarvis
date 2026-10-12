@@ -9,7 +9,12 @@ the schema directly.
 import json
 from pathlib import Path
 
+import sys
+from types import SimpleNamespace
+
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "orchestration" / "scripts"))
 
 RULES_PATH = Path(__file__).resolve().parent.parent / "guides" / "polymer_rules.json"
 RULES = json.loads(RULES_PATH.read_text())
@@ -20,18 +25,21 @@ CLASSES = RULES["classes"]
 REQUIRED_KEYS = [
     "name",
     "preferred_builder",
-    "preferred_ff",
-    "forcefield",
+    "ff_accuracy_prior",
     "charge_method",
-    "dp_typical",
-    "dp_min",
-    "nchain",
+    # dp_typical / nchain / dp_min ALL REMOVED 2026-09-02: cell size is derived per-SMILES
+    # from select_system_size's system-mass floor, not stored per class. None of the 21 classes
+    # ever carried a note justifying dp_typical/nchain, and repeat mass varies up to 3x WITHIN a
+    # class, so one number per class cannot be right for its own members. dp_min was removed in
+    # the same pass once it turned out to be the SAME retired Fox-Flory/Patrone floor under a
+    # different key -- and the binding one: it forced PEEK to DP=50 and PSU to DP=50 long after
+    # the constants it duplicated were deleted from the code.
     "density_initial_gcm3",
     "electrostatics",
     "cutoff_A",
     "dt_fs",
     "T_equil_K",
-    "tg_t_high_K",
+    "md_tg_ceiling_K",
     "tg_t_low_K",
     "tg_t_step_K",
 ]
@@ -47,12 +55,28 @@ def test_required_keys_present(cid):
     assert not missing, f"{cid} missing required keys: {missing}"
 
 
+def test_no_class_stores_a_cell_size():
+    """Cell size is derived per-SMILES (select_system_size.derive_cell), never stored per class.
+    A reinstated dp_typical/nchain would silently take precedence over the derivation and
+    reintroduce the one-number-per-class error the mass floor exists to fix."""
+    size_keys = ("dp_typical", "nchain", "dp_min")
+    offenders = {cid: [k for k in size_keys if k in e]
+                 for cid, e in CLASSES.items() if any(k in e for k in size_keys)}
+    assert not offenders, offenders
+
+
+def test_global_defaults_stores_no_cell_size():
+    """global_defaults carried dp_min=20 as a catch-all floor. Same retired rule, same removal:
+    an unmatched class must fall through to the per-SMILES derivation, not to a stored number."""
+    gd = RULES.get("global_defaults", {})
+    offenders = [k for k in ("dp_typical", "nchain", "dp_min") if k in gd]
+    assert not offenders, offenders
+
+
 @pytest.mark.parametrize("cid", sorted(CLASSES))
 def test_numeric_fields_in_range(cid):
     e = CLASSES[cid]
     assert 0.1 <= e["density_initial_gcm3"] <= 2.5, "initial density out of plausible range"
-    assert e["dp_min"] <= e["dp_typical"], "dp_min must not exceed dp_typical"
-    assert e["nchain"] >= 1
     assert e["T_equil_K"] > 0
     assert e["dt_fs"] > 0
     assert e["cutoff_A"] > 0
@@ -60,10 +84,14 @@ def test_numeric_fields_in_range(cid):
 
 @pytest.mark.parametrize("cid", sorted(CLASSES))
 def test_tg_sweep_window_is_valid(cid):
+    """The sweep runs from the MELT HOLD down to tg_t_low_K -- there is no separate class top
+    any more, so the span is checked against the resolved schedule rather than a pair of class
+    constants."""
     e = CLASSES[cid]
-    assert e["tg_t_low_K"] < e["tg_t_high_K"], "Tg sweep low bound must be below high bound"
+    sched = _sched(cid)
+    assert e["tg_t_low_K"] < sched["T_melt_hold_K"], "sweep low bound must be below the melt hold"
     assert e["tg_t_step_K"] > 0
-    span = e["tg_t_high_K"] - e["tg_t_low_K"]
+    span = sched["T_melt_hold_K"] - e["tg_t_low_K"]
     assert e["tg_t_step_K"] <= span, "step size larger than the whole sweep window"
 
 
@@ -80,46 +108,564 @@ def test_routing_fields_are_known(cid):
 # than an obvious data error. This is a *structural* invariant only: it pins each
 # class to one of the two routes and rejects a QM charge job on EMC. The exact
 # per-class force field and embedded-charge token (pcff→bond-increment,
-# opls→opls-library, trappe→none) are the authority of test_ff_routing.py, which is
-# sourced from the same JSON; duplicating those exact values here only invites the
+# opls→opls-library, trappe→embedded) are the authority of test_ff_routing.py, which
+# is sourced from the same JSON; duplicating those exact values here only invites the
 # two tests to contradict each other.
-EMC_FF_FAMILIES = ("pcff", "opls", "trappe")   # substring families (both opls spellings)
+EMC_FF_FAMILIES = ("pcff", "opls", "trappe", "compass")   # substring families (both opls spellings)
+# compass added 2026-08-26: it is a legal ENUM_OVERRIDES["preferred_ff"] value
+# (scientific_control.py), stage_params.py already treats it as pcff-equivalent
+# (class_ii = 'pcff' in ff or ff in ('compass', 'pcff_ore')), and it is mechanically
+# EMC-admissible for at least one class (POXI) -- the tuple was simply incomplete,
+# this closes a real test gap even though it doesn't itself unlock any currently
+# non-admissible class (compass fails admissibility for PEST/PURT independently).
 QM_CHARGE_JOBS = {"resp", "am1-bcc", "am1bcc", "gasteiger"}
 
 
 @pytest.mark.parametrize("cid", sorted(CLASSES))
 def test_build_route_consistency(cid):
     e = CLASSES[cid]
-    builder, pref_ff = e["preferred_builder"], e["preferred_ff"]
+    builder, pref_ff = e["preferred_builder"], e["ff_accuracy_prior"]
     if builder == "emc":
         # EMC builds with one of its own all-atom/UA fields and embeds the
         # force field's charges directly — it never schedules a QM charge job.
         assert any(fam in pref_ff.lower() for fam in EMC_FF_FAMILIES), (
             f"{cid}: EMC build requires an EMC FF family {EMC_FF_FAMILIES}, "
-            f"got preferred_ff={pref_ff!r}"
+            f"got ff_accuracy_prior={pref_ff!r}"
         )
         assert e["charge_method"].lower() not in QM_CHARGE_JOBS, (
             f"{cid}: EMC embeds force-field charges → must not run a QM charge job, "
             f"got charge_method={e['charge_method']!r}"
         )
-    else:  # radonpy — runs a real charge-assignment job with a GAFF2 field
-        assert pref_ff in {"GAFF2", "GAFF2_mod"}, (
-            f"{cid}: RadonPy route expects a GAFF2 field, got preferred_ff={pref_ff!r}"
+    else:  # radonpy — runs a real charge-assignment job with a GAFF2 or Dreiding field
+        # Dreiding added 2026-08-26: mcp-mol-builder-server's assign_forcefield/
+        # submit_copolymerize_job now support it (radonpy.ff.dreiding.Dreiding, confirmed
+        # installed and build-tested end-to-end after patching a dict-vs-list bug in that
+        # module's assign_atypes/assign_dtypes/assign_itypes — see docs/ff_capability_gaps.json).
+        assert pref_ff in {"gaff2", "gaff2_mod", "dreiding"}, (
+            f"{cid}: RadonPy route expects a GAFF2 or Dreiding field, got "
+            f"ff_accuracy_prior={pref_ff!r}"
         )
-        assert e["forcefield"] in {"GAFF2", "GAFF2_mod"}
         assert e["charge_method"] in {"RESP", "AM1-BCC"}, (
             f"{cid}: RadonPy runs a charge job → charge_method must be RESP/AM1-BCC, "
             f"got {e['charge_method']!r}"
         )
 
 
-def test_tg_slope_gate_fallback_valid():
-    """tg_slope_gate_fallback marks classes whose highest configured Tg rate is
-    documented as unreliable (degenerate/inverted fit); value names which rate
-    the thermal track sweeps by default instead of the highest-rate default."""
-    expected = {"PEST": "highest_rate", "PKTN": "slowest_rate", "PSFO": "slowest_rate"}
+# D-03_electrostatics is mechanized by electrostatics_decision_guide's own class
+# lists, not a separate script (unlike D-01/D-08) -- nothing previously checked that
+# each class's electrostatics field actually agrees with the guide it is supposed to
+# be implementing.
+def test_electrostatics_matches_its_own_decision_guide():
+    guide = RULES["electrostatics_decision_guide"]
+    lj_classes = set(guide["use_lj_cut"]["classes"])
+    pppm_classes = set(guide["use_pppm"]["classes"])
+    assert lj_classes | pppm_classes == set(CLASSES), (
+        "electrostatics_decision_guide's class lists have drifted from classes{}"
+    )
+    for cid, e in CLASSES.items():
+        expected = "lj_cut" if cid in lj_classes else "pppm"
+        assert e["electrostatics"] == expected, (
+            f"{cid}: electrostatics_decision_guide says {expected!r}, "
+            f"classes.{cid}.electrostatics is {e['electrostatics']!r}"
+        )
+
+
+# The retired test here was test_dp_min_clears_its_own_fox_flory_floor: it asserted every
+# class's dp_min cleared DP>=20, or DP>=50 for a hardcoded {PIMD, PKTN, PSFO} stiff allowlist.
+# Both the allowlist and the 20/50 constants were deleted from select_system_size.py when the
+# Fox-Flory rule was retired (its cited source, Patrone 2016, studies crosslinked epoxies that
+# have no degree of polymerization and prescribes no floor) -- but the test kept asserting them
+# against a data field that also survived, so the rule went on binding. Replaced by
+# test_no_class_stores_a_cell_size / test_global_defaults_stores_no_cell_size above: the
+# invariant is now that NO per-class DP floor exists to clear.
+
+
+def test_no_class_carries_tg_slope_gate_fallback():
+    """The key is retired: it named which entry of a rate LIST to sweep, and there is no list.
+
+    PKTN and PSFO carried "slowest_rate" until 2026-09-01, for an inversion diagnosed as a
+    cold-start artifact and fixed at the root by the melt-start sweep. PEST then carried
+    "highest_rate" until 2026-09-04 -- a value NEITHER reader recognised (both tested
+    == "slowest_rate"), so it silently did nothing while docs/PROPERTIES.md stated no class
+    carried the key at all. It is gone with the
+    single-rate collapse; the remedy for a class whose fit will not resolve is to LOWER
+    tg_rate_K_per_ns, which _assert_tg_rate_feasible bounds."""
     found = {cid: c["tg_slope_gate_fallback"] for cid, c in CLASSES.items()
              if "tg_slope_gate_fallback" in c}
-    assert found == expected
-    for cid in found:
-        assert isinstance(CLASSES[cid].get("_tg_slope_gate_note"), str), cid
+    assert found == {}, f"retired key still present: {found}"
+
+
+# The staircase has to bracket the MD Tg, which is NOT the experimental Tg: at the
+# 10-100 K/ns rates MD can reach, the transition is frozen in 80-120 K high (see
+# PROPERTIES.md's tg_offset_corrected_K, reported as an annotation and never folded
+# into PASS/FAIL). A window that brackets only the experimental value can start below
+# the transition, leaving the bilinear fit with no breakpoint to find.
+MD_TG_OFFSET_K = 120.0
+
+
+def _member_tgs(entry):
+    """Numeric member Tg values, dropping the prose 'notes'/'note' siblings."""
+    raw = entry.get("experimental_tg_K")
+    if isinstance(raw, dict):
+        return [v for v in raw.values() if isinstance(v, (int, float))]
+    return [raw] if isinstance(raw, (int, float)) else []
+
+
+@pytest.mark.parametrize("cid", sorted(CLASSES))
+def test_tg_window_brackets_the_md_tg_not_just_the_experimental_one(cid):
+    """Every class's sweep must clear the MD Tg of its own CURATED members.
+
+    Scope limit, stated because it is easy to over-trust this test: it can only see
+    the members in experimental_tg_K. It does NOT catch a window that is too narrow
+    for the class's wider chemical space. POXI is the worked example -- its curated
+    members (PEO/PPO/PVME, exp Tg 198-242 -> MD ~362 K) cleared even the old 440 K
+    top, so this test passed, while 24 of the 66 POXI entries in RadonPy's PI1070 set
+    had an estimated MD Tg above 440 K. Detecting that required scoring the class's
+    actual chemical space with rdkit_cli.py tg-estimate, and the real fix is
+    to resolve the window per-SMILES from that estimator rather than per class.
+    """
+    entry = CLASSES[cid]
+    tgs = _member_tgs(entry)
+    if not tgs:
+        pytest.skip(f"{cid} has no numeric member Tg to bracket")
+    md_upper = max(tgs) + MD_TG_OFFSET_K
+    assert entry["md_tg_ceiling_K"] > md_upper, (
+        f"{cid}: md_tg_ceiling_K {entry['md_tg_ceiling_K']} K does not clear the MD Tg upper "
+        f"estimate {md_upper:.0f} K (max member exp Tg {max(tgs):.0f} + "
+        f"{MD_TG_OFFSET_K:.0f} K rate offset). This constant is the MELT HOLD floor for a "
+        "SMILES whose Tg cannot be trusted to size a protocol; below the MD transition it "
+        "would put the melt inside the glass and the staircase would find no breakpoint"
+    )
+    assert entry["tg_t_low_K"] < min(tgs), (
+        f"{cid}: sweep bottom {entry['tg_t_low_K']} K is not below the lowest member "
+        f"exp Tg {min(tgs):.0f} K -- no glassy branch to fit"
+    )
+
+
+# A force field's LJ cutoff is part of its parameterization, not a free knob.
+# Truncating dispersion earlier than the field was fit with systematically
+# under-counts attraction and biases density low (pair_modify tail yes bounds the
+# error but does not remove it; PPPM makes electrostatics cutoff-independent, so
+# this is dispersion-only). 9.5 A is the EMC/Materials-Studio Class II convention
+# and is correct for PCFF -- it is wrong when inherited by an OPLS-AA class.
+FF_CUTOFF_FLOOR_A = {
+    "opls/2024/opls-aa": 11.0,   # Jorgensen 1996: 11-13 A + switching function
+    "opls/2012/opls-aa": 11.0,
+    "trappe-ua": 14.0,           # 14 A is part of the TraPPE definition itself
+}
+
+
+@pytest.mark.parametrize("cid", sorted(CLASSES))
+def test_cutoff_respects_its_force_fields_parameterization(cid):
+    entry = CLASSES[cid]
+    floor = FF_CUTOFF_FLOOR_A.get(entry.get("ff_accuracy_prior"))
+    if floor is None:
+        pytest.skip(f"{cid}: no published cutoff floor pinned for "
+                    f"{entry.get('ff_accuracy_prior')!r}")
+    assert entry["cutoff_A"] >= floor, (
+        f"{cid}: cutoff_A={entry['cutoff_A']} A is below the {floor} A its own "
+        f"force field ({entry['ff_accuracy_prior']}) was parameterized with"
+    )
+
+
+# ─── temperature_schedule(): adapts to Tg and the requested assessment temperature ──
+
+def _sched(cid, smiles=None, **overrides):
+    import stage_params as sp
+    entry = RULES["classes"][cid]
+    args = SimpleNamespace(smiles=smiles, exp_tg_K=None, final_T_K=None,
+                           T_equil_K=None, T_anneal_high_K=None)
+    for k, v in overrides.items():
+        setattr(args, k, v)
+    return sp.temperature_schedule(args, entry)
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_curated_members_keep_their_class_temperatures(cid):
+    """The class T_equil_K was chosen to clear the melting points of the members the class
+    curated -- the notes name those Tm values explicitly. A +/-80 K group-contribution estimate
+    must never second-guess that. Under the Boyer rule 10 of 43 curated members would otherwise
+    shift (PMMA +28 K, PSU/PES +40 K, PPNL +70 K); this pins that none of them do."""
+    entry = RULES["classes"][cid]
+    for _name, smis in (entry.get("member_smiles") or {}).items():
+        if not smis:
+            continue
+        sched = _sched(cid, smiles=smis[0])
+        assert sched["T_equil_K"] == entry["T_equil_K"], (
+            f"{cid}/{_name}: curated member's T_equil moved "
+            f"{entry['T_equil_K']} -> {sched['T_equil_K']}"
+        )
+        assert sched["schedule_source"] == "class_default"
+
+
+def test_novel_stiff_smiles_can_raise_t_equil():
+    """A SMILES the class never curated is an extrapolation: the class constant was sized for
+    other members and a stiffer novel one can need a hotter melt. Only ever raises."""
+    import stage_params as sp
+    entry = dict(RULES["classes"]["POXI"])          # class T_equil = 500 K
+    args = SimpleNamespace(smiles="*CC(c1ccccc1)(c1ccccc1)O*", exp_tg_K=600.0,
+                           final_T_K=None, T_equil_K=None, T_anneal_high_K=None)
+    sched = sp.temperature_schedule(args, entry)
+    assert sched["tg_is_curated"] is False
+    assert sched["schedule_source"] == "raised_for_novel_smiles"
+    assert sched["T_equil_K"] == max(600.0 + 200.0, 1.5 * 600.0)   # Boyer wins above Tg=400
+    assert sched["T_equil_K"] > entry["T_equil_K"]
+
+
+def test_novel_floppy_smiles_never_lowers_t_equil():
+    """Lowering risks under-melting on a low-confidence estimate; the class constant floors."""
+    import stage_params as sp
+    entry = dict(RULES["classes"]["PKTN"])          # class T_equil = 770 K
+    args = SimpleNamespace(smiles="*CC*", exp_tg_K=150.0, final_T_K=None,
+                           T_equil_K=None, T_anneal_high_K=None)
+    sched = sp.temperature_schedule(args, entry)
+    assert sched["T_equil_K"] == entry["T_equil_K"]
+    assert sched["schedule_source"] == "class_default"
+
+
+def test_anneal_ceiling_clears_the_requested_assessment_temperature():
+    """A run assessed at or above its own melt temperature would otherwise leave cool_block a
+    non-positive span to ramp through."""
+    sched = _sched("POXI", smiles="*CCO*", final_T_K=900.0)
+    assert sched["T_anneal_high_K"] >= 900.0 + 100.0
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_anneal_ceiling_always_clears_the_margin(cid):
+    """The invariant generate_equilibration_workflow enforces as a hard validation error."""
+    sched = _sched(cid)
+    assert sched["T_anneal_high_K"] >= sched["T_equil_K"] + 100.0
+    assert sched["T_anneal_high_K"] >= sched["final_T_K"] + 100.0
+
+
+def test_final_T_defaults_to_300_but_is_not_defined_by_it():
+    assert _sched("POXI", smiles="*CCO*")["final_T_K"] == 300.0
+    assert _sched("POXI", smiles="*CCO*", final_T_K=450.0)["final_T_K"] == 450.0
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_curated_member_window_derives_from_its_own_measured_tg(cid):
+    """The sweep window is ALWAYS derived from a Tg, never from the class constant -- and for
+    a curated member from that member's own exact experimental value, which is better than
+    both the class window and an estimate.
+
+    A class window is sized for whichever member is most extreme, so every other member pays
+    for chemistry it does not have, and any member outside the curated spread is not covered
+    at all (POXI's 440 K top missed 24 of its 66 PI1070 entries). Across the 43 curated
+    members this narrows the mean sweep from 24.2 to 20.6 T-bins with none failing to bracket.
+    """
+    import stage_params as sp
+    entry = RULES["classes"][cid]
+    for name, smis in (entry.get("member_smiles") or {}).items():
+        if not smis:
+            continue
+        sched = _sched(cid, smiles=smis[0])
+        tg = sched["tg_K"]
+        if not isinstance(tg, (int, float)):
+            continue
+        assert sched["window_source"] == "curated_tg", (
+            f"{cid}/{name}: curated member should size its window from its own Tg, "
+            f"got {sched['window_source']}"
+        )
+        md_tg = tg + sp.MD_TG_OFFSET_K
+        assert sched["tg_t_low_K"] < md_tg < sched["T_melt_hold_K"], (
+            f"{cid}/{name}: window {sched['tg_t_low_K']}-{sched['T_melt_hold_K']} "
+            f"misses the MD Tg {md_tg:.0f}"
+        )
+        assert sched["tg_t_low_K"] < tg, "no glassy branch below the transition to fit"
+
+
+def test_an_explicit_window_override_is_never_second_guessed(cid="POXI"):
+    """A plan that pins tg_t_low_K means it; the derivation must stand down.
+
+    Only the COLD bound is a knob now. The sweep's top is T_melt_hold_K by construction -- the
+    staircase starts at the gated melt cell -- so there is no tg_t_high_K to pin, and with it
+    goes the invalidation trap that key carried (it hashed to the thermal stage while shaping
+    the equilibration chain)."""
+    sched = _sched(cid, smiles="*CCO*", tg_t_low_K=111)
+    assert sched["tg_t_low_K"] == 111
+    assert sched["window_source"] == "class_default"
+
+
+def test_novel_smiles_window_brackets_the_md_tg():
+    """A novel SMILES gets a Tg-derived window, and it must still CONTAIN the transition --
+    the sweep is sized around the MD Tg (estimate + ~120 K), not the experimental one.
+    Unlike T_equil this may narrow: a missed window fails loudly (no breakpoint ->
+    TG_NOT_REPORTABLE) rather than silently, as an under-melted cell would."""
+    import stage_params as sp
+    entry = dict(RULES["classes"]["POXI"])
+    for tg in (150.0, 250.0, 350.0, 500.0):
+        args = SimpleNamespace(smiles="*CC(c1ccccc1)(c1ccccc1)O*", exp_tg_K=tg,
+                               final_T_K=None, T_equil_K=None, T_anneal_high_K=None,
+                               tg_t_low_K=None)
+        sched = sp.temperature_schedule(args, entry)
+        assert sched["window_source"] == "estimated_tg"
+        md_tg = tg + sp.MD_TG_OFFSET_K
+        assert sched["tg_t_low_K"] < md_tg < sched["T_melt_hold_K"], (
+            f"Tg={tg}: window {sched['tg_t_low_K']}-{sched['T_melt_hold_K']} misses MD Tg {md_tg}"
+        )
+        assert sched["tg_t_low_K"] < tg, "no glassy branch below the transition to fit"
+
+
+def test_a_low_confidence_estimate_never_sizes_the_protocol(monkeypatch):
+    """The estimator flags confidence='very_low' with an explicit "leave global_defaults
+    unchanged" warning once >30% of heavy atoms match no motif -- and 633 of the 1077 polymers
+    in RadonPy's PI1070 set trip that, 59% of the real chemical space. Sizing a sweep window or
+    a melt temperature from one of those would be worse than the class constant, which is at
+    least a considered value for related chemistry."""
+    import stage_params as sp
+    entry = RULES["classes"]["PKTN"]
+    monkeypatch.setattr(sp, "_estimate_tg_group_contribution",
+                        lambda smi, timeout=30: {"tg_estimated_K": 250,
+                                                 "confidence": "very_low",
+                                                 "warning": "55% of heavy atoms unmatched"})
+    sched = _sched("PKTN", smiles="*NOVEL*")
+    assert sched["tg_trustworthy"] is False
+    assert sched["schedule_source"] == "class_default"
+    assert sched["window_source"] == "class_default"
+    assert sched["T_equil_K"] == entry["T_equil_K"]
+    assert sched["tg_t_low_K"] == entry["tg_t_low_K"]
+    # An untrustworthy Tg cannot size the melt either -- it falls back to the class's own
+    # md_tg_ceiling_K, which is what that constant exists for now.
+    assert sched["T_melt_hold_K"] == max(entry["T_equil_K"], entry["md_tg_ceiling_K"])
+
+    monkeypatch.setattr(sp, "_estimate_tg_group_contribution",
+                        lambda smi, timeout=30: {"tg_estimated_K": 250,
+                                                 "confidence": "low", "warning": None})
+    ok = _sched("PKTN", smiles="*NOVEL*")
+    assert ok["tg_trustworthy"] is True
+    assert ok["window_source"] == "estimated_tg"
+
+
+def test_regime_still_uses_a_low_confidence_estimate(monkeypatch):
+    """Deliberate asymmetry: the regime only needs to know which side of Tg the assessment
+    sits on, the estimate is already padded toward glassy by TG_ESTIMATE_UNCERTAINTY_K, and an
+    unresolvable answer falls to the stricter gate set. The number is not the protocol there."""
+    import stage_params as sp
+    monkeypatch.setattr(sp, "_estimate_tg_group_contribution",
+                        lambda smi, timeout=30: {"tg_estimated_K": 120,
+                                                 "confidence": "very_low", "warning": "x"})
+    args = SimpleNamespace(smiles="*NOVEL*", exp_tg_K=None, final_T_K=None)
+    # Tg 120 + 80 K padding = 200 < 300 K assessment -> rubbery, from a very_low estimate
+    assert sp._regime(args, RULES["classes"]["PKTN"]) == "rubbery"
+
+
+# ─── The anneal ceiling must clear the melt hold ───────────────────────────────────
+#
+# The core equilibration chain ends at the melt hold, and npt_melt_ramp descends to it from
+# the anneal ceiling. So the ceiling has to sit at or above T_melt_hold_K or the "ramp" is an
+# ascent -- an incoherent chain rather than a merely suboptimal one.
+#
+# No headroom term is required beyond that. The soak's job is to sit above the MELT-
+# EQUILIBRATION temperature, and the ceiling already clears T_equil_K by ANNEAL_MARGIN_K.
+# The old one-cool-block headroom existed only to guarantee the cooldown tagged a waypoint the
+# sweep could start from; the sweep starts from a named, gated stage now, so that term is gone.
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_class_ceiling_clears_its_own_class_melt_hold(cid):
+    """The class-constant path -- what a SMILES with an untrustworthy Tg estimate takes, which
+    is 59% of RadonPy's PI1070 set. There the melt hold falls back to md_tg_ceiling_K, which
+    for 14 of the 21 classes sits ABOVE T_equil_K, so this is not automatically satisfied by
+    the T_equil + ANNEAL_MARGIN term."""
+    sched = _sched(cid)
+    assert sched["window_source"] == "class_default", "no SMILES -> no Tg -> class window"
+    assert sched["T_melt_hold_K"] <= sched["T_anneal_high_K"], (
+        f"{cid}: melt hold {sched['T_melt_hold_K']} K is above the ceiling "
+        f"{sched['T_anneal_high_K']} K -- npt_melt_ramp would have to heat"
+    )
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_class_ceilings_are_self_consistent_without_being_auto_raised(cid):
+    """Stronger than the test above, and the reason the five class ceilings were edited by hand
+    rather than left to the sweep term. The term is a backstop for a class whose window is later
+    widened without its ceiling following; if it BINDS today it means the shipped constants are
+    still internally inconsistent and something is being silently patched at runtime."""
+    sched = _sched(cid)
+    assert sched["ceiling_source"] != "melt_hold_floor", (
+        f"{cid}: the class ceiling is being auto-raised to "
+        f"{sched['T_anneal_high_K']} K at runtime -- fix annealing_T_high_K in the data file"
+    )
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_curated_member_ceiling_clears_its_derived_melt_hold(cid):
+    """The per-SMILES path. A curated member's melt hold is max(class T_equil_K, Tg+200), so a
+    member whose Tg runs hot for its class lifts it above the class value -- 11 of the 51
+    curated members do (PMMA, PAA, PS, P2VP, PVC, BPA-PC, PPO/PPE, PMHS, Ultem, both PIMD
+    members). The ceiling must still clear it, and does: none of them binds melt_hold_floor."""
+    entry = RULES["classes"][cid]
+    for name, smis in (entry.get("member_smiles") or {}).items():
+        if not smis:
+            continue
+        sched = _sched(cid, smiles=smis[0])
+        assert sched["T_melt_hold_K"] <= sched["T_anneal_high_K"], (
+            f"{cid}/{name}: melt hold {sched['T_melt_hold_K']} K exceeds ceiling "
+            f"{sched['T_anneal_high_K']} K"
+        )
+
+
+def test_the_sweep_top_is_the_melt_hold_and_has_no_override():
+    """The trap this replaces: tg_t_high_K was hashed to the THERMAL stage while feeding the
+    anneal ceiling, so an explicit override would rewrite the EQUILIBRATION chain under an
+    unchanged equilibration _input_hash -- a store serving one run's cell for another's. The
+    fix is structural rather than a carve-out: the sweep's top is not a knob at all any more,
+    it is wherever the melt gate certified the cell. md_tg_ceiling_K, which inherited the old
+    key's value, is equilibration-hashed precisely because it CAN move the melt."""
+    import workflow_engine as we
+    sched = _sched("PIMN", smiles="*CCN*")
+    assert "tg_t_high_K" not in sched
+    assert sched["T_melt_hold_K"] > sched["tg_t_low_K"]
+    assert we.PARAMETER_STAGE["md_tg_ceiling_K"] == "equilibration"
+    assert we.PARAMETER_STAGE["tg_t_low_K"] == "thermal"
+
+
+# ─── the cooldown runs at this class's own Tg-sweep rate ──────────────────────────
+#
+# cool_block and the Tg staircase are ONE continuous descent since the melt-start sweep
+# (2026-09-01): cool_block ramps the annealed melt down to tg_t_high_K and writes the cell the
+# staircase starts from, and the staircase continues to tg_t_low_K. Running the two halves at
+# different rates puts a rate discontinuity in the middle of one trajectory, and glass density
+# is rate-dependent -- ~1.1% per DECADE, measured over 21 archived multi-rate sweeps across 8
+# chemistries. Matching them also makes a density-only run (which has no staircase) produce a
+# glass with the same thermal history as a Tg run's.
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_cooldown_rate_matches_the_classes_own_sweep_rate(cid):
+    import stage_params as sp
+    entry = RULES["classes"][cid]
+    # Deliberately NOT a skip-if-missing: this invariant is load-bearing (a mismatch means a
+    # run's density and its Tg describe glasses with different thermal histories), and when the
+    # rate key was renamed on 2026-09-04 a skip-guard here turned all 21 parametrisations into
+    # vacuous passes. An unconfigured rate is a failure, not a skip.
+    expected = entry.get("tg_rate_K_per_ns")
+    assert expected, f"{cid} configures no tg_rate_K_per_ns"
+    dt = entry.get("dt_fs", 1.0)
+    dT = entry.get("cool_block_dT_K") or 25.0
+    hold = sp.rate_matched_cool_block_hold_steps(entry, dt, dT)
+    executed = dT / (hold * dt * 1e-06)
+    assert abs(executed - expected) < 0.6, (
+        f"{cid}: cool_block executes {executed:.1f} K/ns against a sweep at {expected} K/ns"
+    )
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_no_class_pins_cool_block_hold_steps(cid):
+    """PACR (400,000) and PKTN (300,000) pinned it until 2026-09-01, both to slow cooling and
+    clear UNDER_ANNEALED_COOLING, and both notes recorded themselves as unvalidated hypotheses.
+    Neither could have worked -- halving the rate buys ~0.33% of density against 3-9% shortfalls
+    -- and the gate they answered is now advisory. A pin here silently desynchronises the
+    cooldown from the staircase, so it has to be a deliberate act with a note, not a leftover."""
+    entry = RULES["classes"][cid]
+    assert "cool_block_hold_steps" not in entry, (
+        f"{cid} pins cool_block_hold_steps, overriding the sweep-rate match"
+    )
+
+
+def test_the_sweep_rate_is_shared_with_do_thermal():
+    """do_thermal picks the sweep rate and _resolve_cool_params picks the cooldown rate. They
+    are the same descent, so they read the same function -- this is the guard against the two
+    re-deriving it and drifting."""
+    import stage_params as sp
+    import run_campaign as rc
+    assert rc.tg_rate is sp.tg_rate
+
+
+# ─── the Tg FIT window is an analysis bound, not a start temperature ──────────────
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_the_fit_window_brackets_the_md_tg_and_sits_below_the_melt_hold(cid):
+    """The sweep descends from the melt hold and every bin is simulated and reported; the fit
+    sees only bins at or below tg_fit_top_K.
+
+    That bound exists because extract_thermal's curve_fit is UNWEIGHTED. On synthetic bilinear
+    curves with a realistic melt-branch quadratic, fitting the whole 100-700 K descent biases Tg
+    by -15 to -36 K, against -1 to -3 K over the sized window -- the melt branch simply
+    out-numbers the transition. It must still contain the MD transition, or the fit has nothing
+    to find.
+    """
+    import stage_params as sp
+    entry = RULES["classes"][cid]
+    for name, smis in (entry.get("member_smiles") or {}).items():
+        if not smis:
+            continue
+        sched = _sched(cid, smiles=smis[0])
+        tg, top = sched["tg_K"], sched["tg_fit_top_K"]
+        if not isinstance(tg, (int, float)) or top is None:
+            continue
+        md_tg = tg + sp.MD_TG_OFFSET_K
+        assert sched["tg_t_low_K"] < md_tg < top, (
+            f"{cid}/{name}: fit window {sched['tg_t_low_K']}-{top} misses MD Tg {md_tg:.0f}")
+        assert top <= sched["T_melt_hold_K"] + 1e-9, (
+            f"{cid}/{name}: fit top {top} is above the melt hold {sched['T_melt_hold_K']} — "
+            "there are no bins up there to fit")
+
+
+def test_an_untrustworthy_tg_fits_the_whole_descent():
+    """No trustworthy Tg means nothing to size a window around, so the bound is None and the
+    fit sees every bin -- the pre-existing behaviour, not a silent narrowing."""
+    assert _sched("PKTN")["tg_fit_top_K"] is None
+
+
+# ─── melt-hold durations are uniform + adaptive, never per class ──────────────────
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_no_class_pins_a_melt_hold_duration(cid):
+    """The 21 values that used to sit here were a 1:1 rename of t_equil_ns (commit 6bd7f58):
+    hand-set constants correlating with raw Tg (r=0.79) but not at all with T_melt_hold_K - Tg
+    (r=0.03), which is what actually governs melt dynamics -- PIMN and PSFO differed 8 vs 20 ns
+    at Tg 488 vs 493. They are replaced by one uniform default plus the adaptive extend loop,
+    which measures each run's own relaxation time. Re-pin per class ONLY on measured melt data,
+    and prefer a DP-scaling form over constants."""
+    e = RULES["classes"][cid]
+    for key in ("melt_hold_min_steps", "nvt_melt_min_steps",
+                "melt_hold_cap_steps", "nvt_melt_cap_steps"):
+        assert key not in e, (
+            f"{cid} pins {key} -- melt-hold duration is uniform + adaptive; see "
+            "_melt_hold_durations_note in polymer_rules.json")
+
+
+@pytest.mark.parametrize("cid", sorted(RULES["classes"]))
+def test_the_melt_holds_resolve_to_the_uniform_defaults(cid):
+    """5 ns of structural relaxation, 2 ns of density sampling, and a ceiling at 3x each.
+
+    The NVT hold gets the larger share because that is where chain relaxation happens and C(t)
+    decorrelation is the slowest quantity the melt gate resolves; the terminal NPT only samples
+    a plateau on an already-relaxed structure. Resolved concretely (not deferred to the
+    generator) precisely so the ceiling can be derived from the first block."""
+    import stage_params as sp
+    e = RULES["classes"][cid]
+    dt = e.get("dt_fs", 1.0)
+    args = SimpleNamespace(smiles=None, exp_tg_K=None, final_T_K=None, T_equil_K=None,
+                           T_anneal_high_K=None, dt_fs=None, data_path=None, work_dir=None,
+                           run_name="X", lammps_flags=None, gpu_ids=None, mpi_ranks=None,
+                           engine=None, velocity_seed=None, nchain=None, emc_params_path=None)
+    p = sp.resolve_stage_params("equil", args, e)
+    assert p["nvt_melt_min_steps"] * dt / 1e6 == pytest.approx(5.0)
+    assert p["melt_hold_min_steps"] * dt / 1e6 == pytest.approx(2.0)
+    assert p["nvt_melt_cap_steps"] == 3 * p["nvt_melt_min_steps"]
+    assert p["melt_hold_cap_steps"] == 3 * p["melt_hold_min_steps"]
+    # The structural hold is never the shorter of the two.
+    assert p["nvt_melt_min_steps"] >= p["melt_hold_min_steps"]
+
+
+def test_every_class_resolves_a_slow_deformation_leg():
+    """A missing K_deform_rate_slow_inv_s is not inert: _submit_deform skips the slow leg, so
+    extract_bulk_modulus_deform reports no rate_sensitivity, so DEFORM_RATE_SENSITIVE can
+    never fire. PDIE/PHYC/PSIL/PURA had no slow rate at all -- exactly the rubbery classes
+    where a 1e8 1/s strain rate is most likely to read stiff."""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "orchestration" / "scripts"))
+    from rules_common import (K_DEFORM_SLOW_RATE_DIVISOR, load_rules,
+                              resolve_slow_deform_rate)
+
+    for class_id, entry in load_rules()["classes"].items():
+        slow = resolve_slow_deform_rate(entry)
+        assert slow is not None and slow > 0, f"{class_id} resolves no slow deformation rate"
+        # One decade below the class's OWN fast leg -- reproduces every declared value,
+        # PSTR's decade-lower pair included, rather than pinning a single number.
+        assert slow == pytest.approx(
+            float(entry["K_deform_rate_inv_s"]) / K_DEFORM_SLOW_RATE_DIVISOR), class_id

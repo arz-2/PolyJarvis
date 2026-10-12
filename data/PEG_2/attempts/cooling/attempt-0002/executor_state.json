@@ -1,0 +1,119 @@
+{
+  "artifacts": [
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/raw/cooling.json",
+      "sha256": "33bf73a45ab749692fb434616534b059462f439dc45587f4052d14a619aff0b8",
+      "size": 10873
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/raw/d05_block.md",
+      "sha256": "0246e33337611dbb0edca386ff496f3e779d13577ab070a064f91b5680fac7da",
+      "size": 2078
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/log.lammps",
+      "sha256": "2a3b71f3cd8d44e8ab650a6a68c113df29a82ab8aebc9ed6cb68e46233451e45",
+      "size": 2781
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/npt_1.rst",
+      "sha256": "f8f29186c94f0140909e5274f84e72b652e0d70500308dd0da702cd32f90c665",
+      "size": 6961910
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/npt_2.rst",
+      "sha256": "f461fef85a46fa61d88b05ba230bdc42834fead476fca019da68a7049aea7368",
+      "size": 6961910
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/npt_final.dump",
+      "sha256": "7ccb14fe80801ce708b3e1afc7938d9c0b50d3711169893b637ce4d066c0c722",
+      "size": 291313363
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/npt_final.in",
+      "sha256": "8995c11b0375e1f98bd8cf508738da4cea52a36dfe3f37c5399ab4ebe6396b49",
+      "size": 4440
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/npt_final.log",
+      "sha256": "a03660612f65be820a1e48324323bd8d87ddeb94ab8829632d3cd23c3af575f9",
+      "size": 185213
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/npt_final_last.dump",
+      "sha256": "3e3b1d90722dbd1e5bcf421af59ab170170ce75e8317620653a3199e71323a4e",
+      "size": 722447
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/npt_final_out.data",
+      "sha256": "5c6c5868e7604f6e353d3461e7405e02e694fcf084ac43341ecb0a43cc639d4f",
+      "size": 2330724
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/npt_final_out.restart",
+      "sha256": "0b2d23a3a17c612ea2e2bae9643ef579059478904cb031bbc14777be7d6f2c0d",
+      "size": 6961638
+    },
+    {
+      "path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/npt_final_run.log",
+      "sha256": "4d4af4a60f64022566f6c65cb71bf8c0d865069a5462db64e9d7e6a9ccad412f",
+      "size": 183619
+    }
+  ],
+  "attempt_id": "attempt-0002",
+  "findings": [],
+  "finished_at": "2026-09-13T13:01:07.291889+00:00",
+  "input_hash": "8acf76c49703909c9a09982673ee26f86fb56dead9fd0d11d5cc8224c235c59f",
+  "outputs": {
+    "cool_verdict": "PASS",
+    "cooling_json_path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/raw/cooling.json",
+    "density_gcm3": 1.060025,
+    "extend_history": [],
+    "npt_prod_data_path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/npt_final_out.data",
+    "npt_prod_dump_path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/npt_final.dump",
+    "npt_prod_log_path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/npt_final.log",
+    "npt_prod_restart_path": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/npt_final_out.restart",
+    "stage_checkpoints": {
+      "npt_final": "/home/alexzhao/PolyJarvis/data/PEG_2/attempts/cooling/attempt-0002/work/npt_final/npt_final_out.data"
+    }
+  },
+  "parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 500.0,
+    "T_melt_hold_K": 500.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 625.0,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      3000,
+      7000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "cooling_continuation_attempt": 1,
+    "cooling_continuation_ns": 0.5,
+    "cooling_extend_base_stage": "npt_final",
+    "cooling_extend_ensemble": "npt",
+    "ct_min_decay_melt": 0.2,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.61,
+    "dp_typical": 114,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "stage8_min_steps": 2000000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20
+  },
+  "stage": "cooling",
+  "status": "accepted"
+}

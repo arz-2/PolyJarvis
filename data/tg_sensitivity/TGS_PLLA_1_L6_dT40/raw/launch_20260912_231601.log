@@ -1,0 +1,361 @@
+INFO: mpi_ranks not given — derived 1 from hardware_policy[pcff] (engine=kokkos)
+INFO: gpu_ids not given — derived "0" from hardware_policy[pcff]; claim free GPU(s) with orchestration/scripts/hardware_runtime.py
+/home/arz2/PolyJarvis_v2/mcp-servers/.venv/lib/python3.12/site-packages/pydantic_settings/sources/utils.py:47: IncompleteFieldDefinitionWarning: Field 'lifespan' has an incomplete definition: its annotation contains an unresolved forward reference, so settings sources may fail to correctly resolve its value. Call `model_rebuild()` on the model where the field is defined, once all the referenced types are defined.
+  warnings.warn(
+2026-09-12 23:16:02,623 [LAMMPS-ENGINE] INFO Loaded 212 runs from /home/arz2/PolyJarvis_v2/data/_engine/run_state.json
+[wait] tg sweep T=620.0K (ext 0): watching d379b7de
+2026-09-12 23:16:12,621 [LAMMPS-ENGINE] INFO [d379b7de] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-12 23:16:12,621 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/d379b7de_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_d379b7de
+cd /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=2 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T620_e0.in >> /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/d379b7de_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"d379b7de","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_d379b7de.json
+else
+  echo '{"run_id":"d379b7de","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_d379b7de.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_d379b7de
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/d379b7de_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/d379b7de_run.sh </dev/null & disown; echo $!
+2026-09-12 23:16:42,652 [LAMMPS-ENGINE] INFO [d379b7de] nohup PID=unknown
+2026-09-12 23:48:02,726 [LAMMPS-ENGINE] INFO [d379b7de] LAMMPS completed successfully
+[wait] tg sweep T=580.0K (ext 0): watching fa7d5418
+2026-09-12 23:48:13,179 [LAMMPS-ENGINE] INFO [fa7d5418] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-12 23:48:13,179 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/fa7d5418_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_fa7d5418
+cd /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=2 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T580_e0.in >> /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/fa7d5418_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"fa7d5418","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_fa7d5418.json
+else
+  echo '{"run_id":"fa7d5418","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_fa7d5418.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_fa7d5418
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/fa7d5418_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/fa7d5418_run.sh </dev/null & disown; echo $!
+2026-09-12 23:48:43,206 [LAMMPS-ENGINE] INFO [fa7d5418] nohup PID=unknown
+2026-09-13 00:20:03,271 [LAMMPS-ENGINE] INFO [fa7d5418] LAMMPS completed successfully
+[wait] tg sweep T=540.0K (ext 0): watching 0bbdf3b1
+2026-09-13 00:20:13,767 [LAMMPS-ENGINE] INFO [0bbdf3b1] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-13 00:20:13,767 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/0bbdf3b1_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_0bbdf3b1
+cd /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=2 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T540_e0.in >> /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/0bbdf3b1_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"0bbdf3b1","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_0bbdf3b1.json
+else
+  echo '{"run_id":"0bbdf3b1","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_0bbdf3b1.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_0bbdf3b1
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/0bbdf3b1_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/0bbdf3b1_run.sh </dev/null & disown; echo $!
+2026-09-13 00:20:43,798 [LAMMPS-ENGINE] INFO [0bbdf3b1] nohup PID=unknown
+2026-09-13 00:51:53,880 [LAMMPS-ENGINE] INFO [0bbdf3b1] LAMMPS completed successfully
+[wait] tg sweep T=500.0K (ext 0): watching 490c5833
+2026-09-13 00:52:14,324 [LAMMPS-ENGINE] INFO [490c5833] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-13 00:52:14,324 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/490c5833_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_490c5833
+cd /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=2 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T500_e0.in >> /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/490c5833_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"490c5833","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_490c5833.json
+else
+  echo '{"run_id":"490c5833","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_490c5833.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_490c5833
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/490c5833_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/490c5833_run.sh </dev/null & disown; echo $!
+2026-09-13 00:52:44,355 [LAMMPS-ENGINE] INFO [490c5833] nohup PID=unknown
+2026-09-13 01:23:44,423 [LAMMPS-ENGINE] INFO [490c5833] LAMMPS completed successfully
+[wait] tg sweep T=460.0K (ext 0): watching 2600b2ff
+2026-09-13 01:23:44,823 [LAMMPS-ENGINE] INFO [2600b2ff] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-13 01:23:44,823 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/2600b2ff_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_2600b2ff
+cd /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=2 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T460_e0.in >> /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/2600b2ff_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"2600b2ff","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_2600b2ff.json
+else
+  echo '{"run_id":"2600b2ff","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_2600b2ff.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_2600b2ff
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/2600b2ff_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/2600b2ff_run.sh </dev/null & disown; echo $!
+2026-09-13 01:24:14,855 [LAMMPS-ENGINE] INFO [2600b2ff] nohup PID=unknown
+2026-09-13 01:55:14,987 [LAMMPS-ENGINE] INFO [2600b2ff] LAMMPS completed successfully
+[wait] tg sweep T=420.0K (ext 0): watching f2dd43f0
+2026-09-13 01:55:15,479 [LAMMPS-ENGINE] INFO [f2dd43f0] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-13 01:55:15,480 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/f2dd43f0_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_f2dd43f0
+cd /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=2 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T420_e0.in >> /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/f2dd43f0_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"f2dd43f0","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_f2dd43f0.json
+else
+  echo '{"run_id":"f2dd43f0","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_f2dd43f0.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_f2dd43f0
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/f2dd43f0_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/f2dd43f0_run.sh </dev/null & disown; echo $!
+2026-09-13 01:55:45,510 [LAMMPS-ENGINE] INFO [f2dd43f0] nohup PID=unknown
+2026-09-13 02:26:25,595 [LAMMPS-ENGINE] INFO [f2dd43f0] LAMMPS completed successfully
+[wait] tg sweep T=380.0K (ext 0): watching 140705fa
+2026-09-13 02:26:46,052 [LAMMPS-ENGINE] INFO [140705fa] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-13 02:26:46,052 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/140705fa_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_140705fa
+cd /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=2 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T380_e0.in >> /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/140705fa_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"140705fa","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_140705fa.json
+else
+  echo '{"run_id":"140705fa","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_140705fa.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_140705fa
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/140705fa_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/140705fa_run.sh </dev/null & disown; echo $!
+2026-09-13 02:27:16,083 [LAMMPS-ENGINE] INFO [140705fa] nohup PID=unknown
+2026-09-13 02:57:56,166 [LAMMPS-ENGINE] INFO [140705fa] LAMMPS completed successfully
+[wait] tg sweep T=340.0K (ext 0): watching 5b37cd6d
+2026-09-13 02:58:16,598 [LAMMPS-ENGINE] INFO [5b37cd6d] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-13 02:58:16,598 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/5b37cd6d_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_5b37cd6d
+cd /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=2 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T340_e0.in >> /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/5b37cd6d_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"5b37cd6d","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_5b37cd6d.json
+else
+  echo '{"run_id":"5b37cd6d","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_5b37cd6d.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_5b37cd6d
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/5b37cd6d_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/5b37cd6d_run.sh </dev/null & disown; echo $!
+2026-09-13 02:58:46,629 [LAMMPS-ENGINE] INFO [5b37cd6d] nohup PID=unknown
+2026-09-13 03:29:16,795 [LAMMPS-ENGINE] INFO [5b37cd6d] LAMMPS completed successfully
+[wait] tg sweep T=300.0K (ext 0): watching 5d20c908
+2026-09-13 03:29:17,230 [LAMMPS-ENGINE] INFO [5d20c908] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-13 03:29:17,231 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/5d20c908_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_5d20c908
+cd /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=2 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T300_e0.in >> /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/5d20c908_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"5d20c908","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_5d20c908.json
+else
+  echo '{"run_id":"5d20c908","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_5d20c908.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_5d20c908
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/5d20c908_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/5d20c908_run.sh </dev/null & disown; echo $!
+2026-09-13 03:29:47,261 [LAMMPS-ENGINE] INFO [5d20c908] nohup PID=unknown
+2026-09-13 04:00:17,415 [LAMMPS-ENGINE] INFO [5d20c908] LAMMPS completed successfully
+[wait] tg sweep T=260.0K (ext 0): watching 9555620b
+2026-09-13 04:00:17,878 [LAMMPS-ENGINE] INFO [9555620b] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-13 04:00:17,878 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/9555620b_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_9555620b
+cd /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=2 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T260_e0.in >> /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/9555620b_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"9555620b","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_9555620b.json
+else
+  echo '{"run_id":"9555620b","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_9555620b.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_9555620b
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/9555620b_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/9555620b_run.sh </dev/null & disown; echo $!
+2026-09-13 04:00:47,909 [LAMMPS-ENGINE] INFO [9555620b] nohup PID=unknown
+2026-09-13 04:31:07,986 [LAMMPS-ENGINE] INFO [9555620b] LAMMPS completed successfully
+[wait] tg sweep T=220.0K (ext 0): watching 56670b77
+2026-09-13 04:31:18,504 [LAMMPS-ENGINE] INFO [56670b77] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-13 04:31:18,504 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/56670b77_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_56670b77
+cd /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=2 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T220_e0.in >> /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/56670b77_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"56670b77","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_56670b77.json
+else
+  echo '{"run_id":"56670b77","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_56670b77.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_56670b77
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/56670b77_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/56670b77_run.sh </dev/null & disown; echo $!
+2026-09-13 04:31:48,536 [LAMMPS-ENGINE] INFO [56670b77] nohup PID=unknown
+2026-09-13 05:02:08,628 [LAMMPS-ENGINE] INFO [56670b77] LAMMPS completed successfully
+[wait] tg sweep T=180.0K (ext 0): watching 8b525235
+2026-09-13 05:02:19,068 [LAMMPS-ENGINE] INFO [8b525235] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-13 05:02:19,068 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/8b525235_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_8b525235
+cd /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=2 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T180_e0.in >> /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/8b525235_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"8b525235","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_8b525235.json
+else
+  echo '{"run_id":"8b525235","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_8b525235.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_8b525235
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/8b525235_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/8b525235_run.sh </dev/null & disown; echo $!
+2026-09-13 05:02:49,081 [LAMMPS-ENGINE] INFO [8b525235] nohup PID=unknown
+2026-09-13 05:32:49,192 [LAMMPS-ENGINE] INFO [8b525235] LAMMPS completed successfully
+[wait] tg sweep T=140.0K (ext 0): watching b526cb7d
+2026-09-13 05:32:49,734 [LAMMPS-ENGINE] INFO [b526cb7d] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-13 05:32:49,734 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/b526cb7d_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_b526cb7d
+cd /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=2 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T140_e0.in >> /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/b526cb7d_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"b526cb7d","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_b526cb7d.json
+else
+  echo '{"run_id":"b526cb7d","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_b526cb7d.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_b526cb7d
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/b526cb7d_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/b526cb7d_run.sh </dev/null & disown; echo $!
+2026-09-13 05:33:19,766 [LAMMPS-ENGINE] INFO [b526cb7d] nohup PID=unknown
+2026-09-13 06:02:59,843 [LAMMPS-ENGINE] INFO [b526cb7d] LAMMPS completed successfully
+[wait] tg sweep T=100K (ext 0): watching ab37135f
+2026-09-13 06:03:20,322 [LAMMPS-ENGINE] INFO [ab37135f] Launching LAMMPS via nohup wrapper (engine=kokkos): /home/arz2/lammps-install-kokkos/bin/lmp
+2026-09-13 06:03:20,322 [LAMMPS-ENGINE] INFO Running: mkdir -p /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100 && cat > /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/ab37135f_run.sh << 'POLYJARVIS_EOF'
+#!/bin/bash
+export CUDA_VISIBLE_DEVICES=2
+export PATH=/usr/bin:$PATH
+export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+unset OPAL_PREFIX
+mkdir -p /tmp/polyjarvis/sentinels
+echo $$ > /tmp/polyjarvis/sentinels/pid_ab37135f
+cd /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100
+env CUDA_VISIBLE_DEVICES=2 /home/arz2/lammps-install-kokkos/bin/lmp -k on g 1 -sf kk -pk kokkos -in /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_step_T100_e0.in >> /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/ab37135f_wrapper.stdout 2>&1
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo '{"run_id":"ab37135f","status":"completed","work_dir":"/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100"}' > /tmp/polyjarvis/sentinels/done_ab37135f.json
+else
+  echo '{"run_id":"ab37135f","status":"failed","exit_code":"'$RC'"}' > /tmp/polyjarvis/sentinels/done_ab37135f.json
+fi
+rm -f /tmp/polyjarvis/sentinels/pid_ab37135f
+
+POLYJARVIS_EOF
+chmod +x /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/ab37135f_run.sh && setsid nohup bash /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/ab37135f_run.sh </dev/null & disown; echo $!
+2026-09-13 06:03:50,354 [LAMMPS-ENGINE] INFO [ab37135f] nohup PID=unknown
+2026-09-13 06:33:10,440 [LAMMPS-ENGINE] INFO [ab37135f] LAMMPS completed successfully
+2026-09-13 06:33:20,589 [LAMMPS-ENGINE] INFO Running thermal extraction via CLI: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/extract_thermal.py --log_file /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_sweep.log --output_dir /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/raw --equilibration_fraction 0.5 --temp_col Temp --density_col Density --enthalpy_col Enthalpy --graphs_dir /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/graphs --per_t_dump_file /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/per_t_structs.dump --tg_data_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data --backbone_types 1 2 3 6 7
+2026-09-13 06:33:20,589 [LAMMPS-ENGINE] INFO Running: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/extract_thermal.py --log_file /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/tg_sweep.log --output_dir /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/raw --equilibration_fraction 0.5 --temp_col Temp --density_col Density --enthalpy_col Enthalpy --graphs_dir /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/graphs --per_t_dump_file /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/work/tg_sweep_r100/per_t_structs.dump --tg_data_file /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/work/npt_melt_hold/npt_melt_hold_out.data --backbone_types 1 2 3 6 7
+2026-09-13 06:33:25,811 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_043aa1ed.json
+Wrote /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/summary/attempt-0001/raw/exp_lookup.json
+  match=class_representative (medium), polymer='Poly(lactic acid)' (ids=[826])
+  Tg: [326.0, 327.1] K  median=326.6 K  n=2  filter=all_clean
+2026-09-13 06:33:32,708 [LAMMPS-ENGINE] INFO Running generate_run_summary via CLI: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/generate_run_summary.py --output_dir /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/summary/attempt-0001/raw --run_name tg_sensitivity/TGS_PLLA_1_L6_dT40 --smiles '*[C@@H](C)C(=O)O*' --polymer_class PEST --ff 'pcff' --charge_method 'bond-increment' --dp 70 --n_chains 10 --d01 'pcff' --d02 'bond-increment' --d03 'pppm' --d04 'DP=70, 10 chains' --d05 'PASS' --d06 'EXCELLENT' --graphs_dir /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/graphs --n_replicates 1 --tg_path /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/raw/thermal.json --equilibration_path /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/raw/equilibration.json --melt_equilibration_path /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/raw/equilibration.json --byproducts_spec /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/summary/attempt-0001/raw/byproducts_spec.json
+2026-09-13 06:33:32,709 [LAMMPS-ENGINE] INFO Running: python /home/arz2/PolyJarvis_v2/mcp-servers/mcp-lammps-engine/analysis_scripts/generate_run_summary.py --output_dir /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/summary/attempt-0001/raw --run_name tg_sensitivity/TGS_PLLA_1_L6_dT40 --smiles '*[C@@H](C)C(=O)O*' --polymer_class PEST --ff 'pcff' --charge_method 'bond-increment' --dp 70 --n_chains 10 --d01 'pcff' --d02 'bond-increment' --d03 'pppm' --d04 'DP=70, 10 chains' --d05 'PASS' --d06 'EXCELLENT' --graphs_dir /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/graphs --n_replicates 1 --tg_path /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/thermal/attempt-0001/raw/thermal.json --equilibration_path /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/raw/equilibration.json --melt_equilibration_path /home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/raw/equilibration.json --byproducts_spec /home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/attempts/summary/attempt-0001/raw/byproducts_spec.json
+2026-09-13 06:33:33,047 [LAMMPS-ENGINE] INFO Sentinel written: /tmp/polyjarvis/sentinels/done_99e70d8e.json
+{
+  "status": "accepted",
+  "run_name": "tg_sensitivity/TGS_PLLA_1_L6_dT40",
+  "state_path": "/home/arz2/PolyJarvis_v2/data/tg_sensitivity/TGS_PLLA_1_L6_dT40/workflow_state.json",
+  "accepted_attempts": {
+    "build": "attempt-0001",
+    "equilibration": "attempt-0002",
+    "thermal": "attempt-0001",
+    "summary": "attempt-0001"
+  }
+}

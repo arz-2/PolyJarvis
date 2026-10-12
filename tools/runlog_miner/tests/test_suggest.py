@@ -39,7 +39,7 @@ def _pcbn_run(name, density=None, tstart=None, anneal=False, finite_size=False):
 
 _RULES = {"classes": {"PCBN": {
     "density_initial_gcm3": 0.60,
-    "tg_t_high_K": 700,
+    "md_tg_ceiling_K": 700,
     "eq_annealing_cycles": 5,
     "dp_typical": 40,
 }}}
@@ -55,7 +55,7 @@ def test_extract_density_and_tstart_signals():
     sig = extract_signals(_pcbn_run("R", density=0.55, tstart=750))
     fields = {(s.field, s.value) for s in sig}
     assert ("density_initial_gcm3", 0.55) in fields
-    assert ("tg_t_high_K", 750.0) in fields
+    assert ("md_tg_ceiling_K", 750.0) in fields
 
 
 def test_failed_recovery_yields_no_signal():
@@ -104,8 +104,8 @@ def test_propose_diff_changes_only_suggested_fields(tmp_path):
     diff = propose_diff(rules_path, suggestions)
     assert '-      "density_initial_gcm3": 0.6,' in diff
     assert '+      "density_initial_gcm3": 0.545,' in diff
-    assert '-      "tg_t_high_K": 700,' in diff
-    assert '+      "tg_t_high_K": 750,' in diff
+    assert '-      "md_tg_ceiling_K": 700,' in diff
+    assert '+      "md_tg_ceiling_K": 750,' in diff
     # untouched field may appear as diff context, but never as a +/- change line
     changed = [l for l in diff.splitlines()
                if l[:1] in "+-" and not l.startswith(("+++", "---"))]

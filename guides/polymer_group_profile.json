@@ -1,0 +1,202 @@
+{
+  "_metadata": {
+    "description": "RadonPy's own PoLyInfo class SMARTS and priority order, mirrored for ONE purpose: locating which functional groups a repeat unit contains and where. It is NEVER used to assign polymer_class -- that label comes from calling poly.polyinfo_classifier directly. Keeping a second taxonomy here is exactly what this file must not become.",
+    "mirrors": {
+      "file": "radonpy/core/poly.py",
+      "function": "polyinfo_classifier",
+      "regenerate": "tools/class_profile/gen_polymer_group_profile.py (mol-builder env)",
+      "verified_by": "tests/test_polymer_group_profile_mirrors_radonpy.py"
+    },
+    "tiers": {
+      "1": "matched on extract_mainchain -> make_cyclicpolymer(n=4); backbone-only by construction",
+      "2": "styrene/acryl, matched with the [14C] mainchain isotope tagging polyinfo_classifier applies to its own working copy",
+      "element_count": "no SMARTS; RadonPy decides these by element/bond counting"
+    }
+  },
+  "groups": {
+    "PURT": {
+      "class_id": 11,
+      "priority_rank": 1,
+      "smarts_var": "urethane",
+      "smarts": [
+        "*-NC(=[O,S])[O,S]-*"
+      ],
+      "tier": 1
+    },
+    "PURA": {
+      "class_id": 12,
+      "priority_rank": 2,
+      "smarts_var": "urea",
+      "smarts": [
+        "*-NC(=[O,S])N-*"
+      ],
+      "tier": 1
+    },
+    "PIMD": {
+      "class_id": 13,
+      "priority_rank": 3,
+      "smarts_var": "imide",
+      "smarts": [
+        "[X3&C,X3&c](=[O,S])[X3&N,X3&n][X3&C,X3&c](=[O,S])"
+      ],
+      "tier": 1
+    },
+    "PANH": {
+      "class_id": 14,
+      "priority_rank": 4,
+      "smarts_var": "anhyd",
+      "smarts": [
+        "*-C(=[O,S])[O,S]C(=[O,S])-*"
+      ],
+      "tier": 1
+    },
+    "PCBN": {
+      "class_id": 15,
+      "priority_rank": 5,
+      "smarts_var": "carbonate",
+      "smarts": [
+        "*-[O,S]C(=[O,S])[O,S]-*"
+      ],
+      "tier": 1
+    },
+    "PEST": {
+      "class_id": 9,
+      "priority_rank": 6,
+      "smarts_var": "ester",
+      "smarts": [
+        "[!$(C(=[O,S]))]-[O,S]C(=[O,S])-[!N&!O&!S]"
+      ],
+      "tier": 1
+    },
+    "PAMD": {
+      "class_id": 10,
+      "priority_rank": 7,
+      "smarts_var": "amide",
+      "smarts": [
+        "[!$(C(=[O,S]))]-NC(=[O,S])-[!N&!O&!S]"
+      ],
+      "tier": 1
+    },
+    "PSIL": {
+      "class_id": 17,
+      "priority_rank": 8,
+      "smarts_var": "silane",
+      "smarts": [
+        "*-[X4&Si]-*"
+      ],
+      "tier": 1
+    },
+    "PPHS": {
+      "class_id": 18,
+      "priority_rank": 9,
+      "smarts_var": "phosphazene",
+      "smarts": [
+        "*-N=P-*"
+      ],
+      "tier": 1
+    },
+    "PKTN": {
+      "class_id": 19,
+      "priority_rank": 10,
+      "smarts_var": "ketone",
+      "smarts": [
+        "[!N&!O&!S]-C(=[O,S])-[!N&!O&!S]"
+      ],
+      "tier": 1
+    },
+    "PSFO": {
+      "class_id": 20,
+      "priority_rank": 11,
+      "smarts_var": "sulfon",
+      "smarts": [
+        "*-[X4&S](=O)(=O)-*",
+        "*-[X3&S](=O)-*"
+      ],
+      "tier": 1
+    },
+    "POXI": {
+      "class_id": 7,
+      "priority_rank": 12,
+      "smarts_var": "ether",
+      "smarts": [
+        "[!$(C(=[O,S]))&!$([X4&S](=O)(=O))&!Si][X2&O,X2&o][!$(C(=[O,S]))&!$([X4&S](=O)(=O))&!Si]"
+      ],
+      "tier": 1
+    },
+    "PSUL": {
+      "class_id": 8,
+      "priority_rank": 13,
+      "smarts_var": "thioether",
+      "smarts": [
+        "[!$(C(=[O,S]))&!Si][X2&S,X2&s][!$(C(=[O,S]))&!Si]"
+      ],
+      "tier": 1
+    },
+    "PIMN": {
+      "class_id": 16,
+      "priority_rank": 14,
+      "smarts_var": "amine",
+      "smarts": [
+        "[X3&N,X2&N,X4&N,X3&n,X2&n;!$([N,n][C,c](=[O,S]));!$(N=P)]"
+      ],
+      "tier": 1
+    },
+    "PPNL": {
+      "class_id": 21,
+      "priority_rank": 15,
+      "smarts_var": "phenylene",
+      "smarts": [
+        "*-c1[c,n][c,n][c,n]([c,n]c1)-*",
+        "*-c1[c,n][c,n]([c,n][c,n]c1)-*",
+        "*-c1[c,n]([c,n][c,n][c,n]c1)-*"
+      ],
+      "tier": 1
+    },
+    "PSTR": {
+      "class_id": 2,
+      "priority_rank": 16,
+      "smarts_var": "styrene",
+      "smarts": [
+        "*-[14C]([14C]-*)c1[c,n][c,n][c,n][c,n][c,n]1"
+      ],
+      "tier": 2
+    },
+    "PACR": {
+      "class_id": 4,
+      "priority_rank": 17,
+      "smarts_var": "acryl",
+      "smarts": [
+        "*-[14C]([14C]-*)C(=[O,S])-[O,S,N,n]"
+      ],
+      "tier": 2
+    },
+    "PHAL": {
+      "class_id": 5,
+      "priority_rank": 18,
+      "smarts_var": null,
+      "smarts": null,
+      "tier": "element_count"
+    },
+    "PDIE": {
+      "class_id": 6,
+      "priority_rank": 19,
+      "smarts_var": null,
+      "smarts": null,
+      "tier": "element_count"
+    },
+    "PHYC": {
+      "class_id": 1,
+      "priority_rank": 20,
+      "smarts_var": null,
+      "smarts": null,
+      "tier": "element_count"
+    },
+    "PVNL": {
+      "class_id": 3,
+      "priority_rank": 21,
+      "smarts_var": null,
+      "smarts": null,
+      "tier": "element_count"
+    }
+  }
+}

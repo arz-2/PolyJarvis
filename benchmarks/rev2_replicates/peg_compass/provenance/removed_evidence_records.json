@@ -1,0 +1,56 @@
+[
+  {
+    "schema_version": 1,
+    "record_id": "b42ecccd0721",
+    "field": "forcefield",
+    "polymer_class": "POXI",
+    "polymer_names": [],
+    "smiles": [
+      "*CCO*"
+    ],
+    "claim": "PolyJarvis validated pcff for forcefield on POXI (*CCO*) in run PEG_COMPASS_2; validated properties: ['bulk_modulus', 'density', 'tg'].",
+    "value": {
+      "recommendation": "pcff"
+    },
+    "doi": "internal-run:PEG_COMPASS_2",
+    "url": null,
+    "title": "PolyJarvis internal run PEG_COMPASS_2 (in-pipeline validation)",
+    "year": 2026,
+    "doi_verified": true,
+    "trust_tier": "internal_validated_run",
+    "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+    "provenance": {
+      "origin": "internal_run",
+      "source_run": "PEG_COMPASS_2",
+      "migrated_from": null,
+      "added_at": "2026-09-15T11:21:00Z"
+    }
+  },
+  {
+    "schema_version": 1,
+    "record_id": "eb1099b2f9de",
+    "field": "cooling_rate",
+    "polymer_class": "POXI",
+    "polymer_names": [],
+    "smiles": [
+      "*CCO*"
+    ],
+    "claim": "PolyJarvis validated Tg using cooling rate 100 K/ns for POXI (*CCO*) in run PEG_COMPASS_2.",
+    "value": {
+      "rate_K_per_ns": 100
+    },
+    "doi": "internal-run:PEG_COMPASS_2",
+    "url": null,
+    "title": "PolyJarvis internal run PEG_COMPASS_2 (in-pipeline validation)",
+    "year": 2026,
+    "doi_verified": true,
+    "trust_tier": "internal_validated_run",
+    "relevance": "First-party evidence: validated in this exact build/FF/gate pipeline, not cited from an external study under different conditions.",
+    "provenance": {
+      "origin": "internal_run",
+      "source_run": "PEG_COMPASS_2",
+      "migrated_from": null,
+      "added_at": "2026-09-15T11:21:00Z"
+    }
+  }
+]

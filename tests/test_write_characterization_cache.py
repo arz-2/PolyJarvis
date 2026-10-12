@@ -1,0 +1,301 @@
+"""write_characterization_cache.py freezes a completed campaign's actually-executed protocol
+into guides/system_characterization_cache.json, keyed by canonical SMILES. These tests never
+touch the real cache file -- every case passes an explicit cache_path under tmp_path.
+
+rules_common.canonicalize shells into a conda env, so it's monkeypatched to identity here,
+matching the pattern established in tests/test_select_system_size.py.
+"""
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
+
+import rules_common
+import track_registry
+import write_characterization_cache as wcc  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _identity_canonicalize(monkeypatch):
+    monkeypatch.setattr(rules_common, "canonicalize", lambda smi, *a, **k: smi)
+
+
+def _write(path: Path, obj):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(obj))
+
+
+def _make_run(tmp_path, run_name="RUN1", *, properties=("density", "tg", "bulk_modulus"),
+              stage_status=None, effective_parameters=None, remedy_history=None,
+              accepted_attempt="attempt-0001", write_summary=True, smiles="*CC*",
+              stage_outputs=None):
+    run_dir = tmp_path / "data" / run_name
+    plan = {
+        "smiles": smiles,
+        "polymer_class": "PHYC",
+        "properties": list(properties),
+        "decisions": [
+            {"id": "D-01_ff", "choice": "trappe-ua"},
+            {"id": "D-08_hardware", "choice": {"engine": "kokkos", "mpi_ranks": 1}},
+        ],
+        "planned_stages": [{"stage": "build", "track": "foundation", "success_criteria": {}}],
+    }
+    _write(run_dir / "raw" / "run_plan.json", plan)
+
+    # "cooling", not "equilibration", is what proves `density` now: it is the stage whose gate
+    # adjudicates the cell at final_T_K (track_registry's density observable).
+    default_status = {"equilibration": "accepted", "cooling": "accepted",
+                      "thermal": "accepted", "mechanical": "accepted", "summary": "accepted"}
+    if stage_status:
+        default_status.update(stage_status)
+    stages = {name: {"status": status} for name, status in default_status.items()}
+    # Every accepted stage gets a real manifest, as WorkflowEngine._finish_attempt writes one:
+    # the writer reads the accepted attempt's gate verdict, not just the stage status.
+    outputs_by_stage = {"thermal": {"tg_gate_verdict": "TG_REPORTABLE"},
+                        "mechanical": {"bm_gate_verdict": "BM_REPORTABLE"}}
+    outputs_by_stage.update(stage_outputs or {})
+    for name, record in stages.items():
+        if record["status"] != "accepted":
+            continue
+        manifest = run_dir / "attempts" / name / accepted_attempt / "executor_state.json"
+        _write(manifest, {"status": "accepted", "outputs": outputs_by_stage.get(name, {})})
+        record["accepted_attempt"] = accepted_attempt
+        record["attempts"] = [{"attempt_id": accepted_attempt, "manifest": str(manifest)}]
+
+    workflow_state = {
+        "stages": stages,
+        "effective_parameters": effective_parameters if effective_parameters is not None else {
+            "preferred_ff": "trappe-ua", "cutoff_A": 14.0, "dt_fs": 1.0, "T_workflow_K": 300.0,
+        },
+    }
+    if remedy_history is not None:
+        workflow_state["remedy_history"] = remedy_history
+    _write(run_dir / "workflow_state.json", workflow_state)
+
+    if write_summary:
+        results = {"tg": {"value_K": 220.6}, "density": {"value_g_cm3": 0.86},
+                  "bulk_modulus": {"value_GPa": 1.85}}
+        _write(run_dir / "attempts" / "summary" / accepted_attempt / "raw" / "run_summary.json",
+              {"results": results})
+    return run_dir, plan, workflow_state
+
+
+def test_full_stage_acceptance_validates_all_requested_properties(tmp_path):
+    _make_run(tmp_path, "RUN1")
+    cache_path = tmp_path / "cache.json"
+    entry = wcc.write_characterization_cache("RUN1", repo_root=tmp_path, cache_path=cache_path)
+    assert entry is not None
+    assert entry["protocol_validated"] is True
+    assert entry["validated_properties"] == ["bulk_modulus", "density", "tg"]
+    assert entry["simulated_properties"]["tg"]["value_K"] == 220.6
+    on_disk = json.loads(cache_path.read_text())
+    assert on_disk["*CC*"] == entry
+
+
+def test_partial_stage_acceptance_excludes_unaccepted_property(tmp_path):
+    _make_run(tmp_path, "RUN2", stage_status={"thermal": "remedy_required"})
+    cache_path = tmp_path / "cache.json"
+    entry = wcc.write_characterization_cache("RUN2", repo_root=tmp_path, cache_path=cache_path)
+    assert entry["protocol_validated"] is True
+    assert entry["validated_properties"] == ["bulk_modulus", "density"]
+    assert "tg" not in entry["validated_properties"]
+
+
+@pytest.mark.parametrize("thermal_outputs", [
+    {"tg_gate_verdict": "TG_REVIEW"},
+    {"tg_gate_verdict": "TG_REVIEW",
+     "gate_verdict_advisory": {"code": "TG_REVIEW", "would_have_blocked": True}},
+    {"tg_gate_verdict": "TG_REVIEW", "tg_not_reportable": {"verdict": "TG_REVIEW"}},
+    {"tg_gate_verdict": "TG_NOT_REPORTABLE",
+     "recovery_caveat": {"code": "TG_NOT_REPORTABLE", "reportable": False}},
+])
+def test_an_accepted_stage_whose_gate_did_not_pass_is_not_validated(tmp_path, thermal_outputs):
+    """aPS_3 and iPMMA_1 (2026-09-11/13) froze tg as validated with TG_REVIEW: the stage was
+    accepted -- by the advisory switch, and by an operator -- without its gate passing."""
+    _make_run(tmp_path, "RUNV", stage_outputs={"thermal": thermal_outputs})
+    entry = wcc.write_characterization_cache("RUNV", repo_root=tmp_path,
+                                             cache_path=tmp_path / "cache.json")
+    assert entry["validated_properties"] == ["bulk_modulus", "density"]
+
+
+def test_a_bm_fallback_needs_its_deform_verdict_to_pass(tmp_path):
+    _make_run(tmp_path, "RUNB", stage_outputs={"mechanical": {
+        "bm_gate_verdict": "BM_FALLBACK_DEFORM", "deform_gate_verdict": "DEFORM_INADMISSIBLE"}})
+    entry = wcc.write_characterization_cache("RUNB", repo_root=tmp_path,
+                                             cache_path=tmp_path / "cache.json")
+    assert "bulk_modulus" not in entry["validated_properties"]
+
+
+def test_an_unreadable_accepted_manifest_fails_closed(tmp_path):
+    run_dir, _, _ = _make_run(tmp_path, "RUNM")
+    (run_dir / "attempts" / "thermal" / "attempt-0001" / "executor_state.json").unlink()
+    entry = wcc.write_characterization_cache("RUNM", repo_root=tmp_path,
+                                             cache_path=tmp_path / "cache.json")
+    assert "tg" not in entry["validated_properties"]
+
+
+def test_freezes_effective_parameters_not_plan_decided_params(tmp_path):
+    """The plan's own decided_params never even appears in run_plan.json here (this fixture
+    omits it) -- the frozen protocol must come from workflow_state.effective_parameters, which
+    is decided_params AS AMENDED by any mid-run remedy, not the plan's stale original."""
+    remedy_history = [{"remedy_id": "melt_hold_extend", "application": 1,
+                       "finding": {"stage": "equilibration"}}]
+    _make_run(tmp_path, "RUN3",
+             effective_parameters={"anneal_cap_steps": 4000000, "T_workflow_K": 300.0},
+             remedy_history=remedy_history)
+    cache_path = tmp_path / "cache.json"
+    entry = wcc.write_characterization_cache("RUN3", repo_root=tmp_path, cache_path=cache_path)
+    assert entry["protocol"]["decided_params"]["anneal_cap_steps"] == 4000000
+    assert "melt_hold_extend" in entry["notes"]
+    assert "equilibration" in entry["notes"]
+
+
+def test_t_workflow_k_is_frozen_despite_not_being_in_snapshot_keys(tmp_path):
+    from make_deterministic_plan import SNAPSHOT_KEYS
+    assert "T_workflow_K" not in SNAPSHOT_KEYS
+    _make_run(tmp_path, "RUN4", effective_parameters={"T_workflow_K": 450.0})
+    cache_path = tmp_path / "cache.json"
+    entry = wcc.write_characterization_cache("RUN4", repo_root=tmp_path, cache_path=cache_path)
+    assert entry["protocol"]["decided_params"]["T_workflow_K"] == 450.0
+
+
+def test_d08_hardware_decision_excluded_from_frozen_decisions(tmp_path):
+    _make_run(tmp_path, "RUN5")
+    cache_path = tmp_path / "cache.json"
+    entry = wcc.write_characterization_cache("RUN5", repo_root=tmp_path, cache_path=cache_path)
+    ids = [d["id"] for d in entry["protocol"]["decisions"]]
+    assert "D-08_hardware" not in ids
+    assert "D-01_ff" in ids
+
+
+def test_merge_preserves_unrelated_legacy_fields(tmp_path):
+    cache_path = tmp_path / "cache.json"
+    cache_path.write_text(json.dumps({
+        "*CC*": {"probe_tau_relax_reliable": True, "note": "hand-written legacy note"},
+    }))
+    _make_run(tmp_path, "RUN6")
+    entry = wcc.write_characterization_cache("RUN6", repo_root=tmp_path, cache_path=cache_path)
+    assert entry["probe_tau_relax_reliable"] is True
+    assert entry["note"] == "hand-written legacy note"
+    assert entry["protocol_validated"] is True
+
+
+def test_requires_guard_blocks_protocol_validated(tmp_path):
+    cache_path = tmp_path / "cache.json"
+    cache_path.write_text(json.dumps({
+        "*CC*": {"requires_cis_lock": True, "note": "EMC ignores SMILES stereo for this SMILES"},
+    }))
+    _make_run(tmp_path, "RUN7")
+    entry = wcc.write_characterization_cache("RUN7", repo_root=tmp_path, cache_path=cache_path)
+    assert entry["protocol_validated"] is False
+    assert "requires_cis_lock" in entry["notes"]
+    assert "protocol" not in entry  # never freeze a protocol block behind a live guard
+
+
+def test_missing_smiles_writes_nothing(tmp_path):
+    _make_run(tmp_path, "RUN8", smiles=None)
+    cache_path = tmp_path / "cache.json"
+    entry = wcc.write_characterization_cache("RUN8", repo_root=tmp_path, cache_path=cache_path)
+    assert entry is None
+    assert not cache_path.exists()
+
+
+def test_canonicalization_failure_writes_nothing(tmp_path, monkeypatch):
+    def _boom(smi, *a, **k):
+        raise RuntimeError("RDKit could not parse SMILES")
+    monkeypatch.setattr(rules_common, "canonicalize", _boom)
+    _make_run(tmp_path, "RUN9")
+    cache_path = tmp_path / "cache.json"
+    entry = wcc.write_characterization_cache("RUN9", repo_root=tmp_path, cache_path=cache_path)
+    assert entry is None
+    assert not cache_path.exists()
+
+
+def test_missing_run_plan_writes_nothing(tmp_path):
+    cache_path = tmp_path / "cache.json"
+    entry = wcc.write_characterization_cache("NEVER_RAN", repo_root=tmp_path, cache_path=cache_path)
+    assert entry is None
+
+
+def test_a_tg_sensitivity_leg_never_freezes_its_perturbed_protocol(tmp_path):
+    run_dir, plan, _ = _make_run(tmp_path, "tg_sensitivity/TGS_PLLA_1_L3_r50", properties=("tg",))
+    plan["tg_sensitivity"] = {"leg": "L3", "anchor": "PLLA_1"}
+    _write(run_dir / "raw" / "run_plan.json", plan)
+    cache_path = tmp_path / "cache.json"
+
+    entry = wcc.write_characterization_cache("tg_sensitivity/TGS_PLLA_1_L3_r50",
+                                             repo_root=tmp_path, cache_path=cache_path)
+
+    assert entry is None
+    assert not cache_path.exists()
+
+
+def test_no_live_cache_entry_names_a_stage_the_registry_does_not_know():
+    """Every frozen protocol in the real cache must be replayable by THIS checkout.
+
+    This used to assert `live_cache == {}` -- a smoke test that a one-off bulk invalidation had
+    been executed after the equilibration redesigns renamed stages and reshaped decided_params.
+    That assertion expired the moment the cache did its job: the rev2 campaign validated PEEK_1,
+    PSU_1 and PEG_1 on 2026-09-12 and froze their protocols, so an empty-file assertion would now
+    fail forever on a system working exactly as designed.
+
+    What actually needed protecting is unchanged, and is asserted directly instead: a frozen
+    protocol naming a stage the registry no longer knows would be replayed into a plan
+    validate_run_plan rejects as STRUCTURAL, and because _try_cache has already committed the run
+    to plan_mode="deterministic" by then, that surfaces as PLAN_VALIDATION_FAILED rather than a
+    graceful fall-through -- a locked SMILES becoming permanently unrunnable. _try_cache treats
+    an unknown stage name as a cache MISS (tested directly in
+    test_make_deterministic_plan_from_cache.py); this is the companion check on the live file.
+    """
+    repo_root = Path(__file__).resolve().parent.parent
+    live_cache = json.loads((repo_root / "guides" / "system_characterization_cache.json").read_text())
+    known = set(track_registry.STAGE_TRACK)
+    for smiles, entry in live_cache.items():
+        frozen = {st.get("stage") for st in
+                  ((entry.get("protocol") or {}).get("planned_stages") or [])}
+        unknown = frozen - known
+        assert not unknown, (
+            f"cache entry {smiles!r} (from run {entry.get('source_run_name')!r}) names "
+            f"stage(s) {sorted(unknown)} that track_registry no longer knows -- it would "
+            f"replay into a plan validate_run_plan rejects. Invalidate the entry.")
+
+
+def test_a_replicate_does_not_overwrite_the_run_that_validated_the_entry(tmp_path):
+    """First writer wins. A replicate replays the frozen protocol, so re-freezing cannot improve
+    it -- but it does overwrite source_run_name, validated_at and simulated_properties with
+    whichever replicate finished last. On 2026-09-13 that put PSU_2's Tg of 401.1 K, explicitly
+    annotated NOT REPORTABLE, into the entry PSU_1 had validated at 481.3 K."""
+    cache_path = tmp_path / "cache.json"
+    cache_path.write_text(json.dumps({"*CC*": {
+        "protocol_validated": True, "source_run_name": "PE_1",
+        "validated_properties": ["density", "tg", "bulk_modulus"],
+        "polymer_class": "PHYC",
+        "simulated_properties": {"tg": {"value_K": 234.2}},
+        "protocol": {"decided_params": {"preferred_ff": "trappe-ua"}, "decisions": [],
+                     "planned_stages": []},
+    }}))
+    _make_run(tmp_path, "PE_2", smiles="*CC*")
+
+    assert wcc.write_characterization_cache("PE_2", repo_root=tmp_path,
+                                            cache_path=cache_path) is None
+    entry = json.loads(cache_path.read_text())["*CC*"]
+    assert entry["source_run_name"] == "PE_1"
+    assert entry["simulated_properties"]["tg"]["value_K"] == 234.2
+
+
+def test_the_validating_run_can_still_refreeze_its_own_entry(tmp_path):
+    """The guard is first-writer-wins, not write-once: a repair or re-run of the SAME run must
+    still be able to update its own entry."""
+    cache_path = tmp_path / "cache.json"
+    cache_path.write_text(json.dumps({"*CC*": {
+        "protocol_validated": True, "source_run_name": "PE_1",
+        "validated_properties": ["density"], "polymer_class": "PHYC",
+        "protocol": {"decided_params": {}, "decisions": [], "planned_stages": []},
+    }}))
+    _make_run(tmp_path, "PE_1", smiles="*CC*")
+    assert wcc.write_characterization_cache("PE_1", repo_root=tmp_path,
+                                            cache_path=cache_path) is not None

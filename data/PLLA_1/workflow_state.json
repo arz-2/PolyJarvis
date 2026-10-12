@@ -1,0 +1,403 @@
+{
+  "active_finding": null,
+  "active_finding_retired_by_operator": {
+    "code": "PROCESS_FAILED",
+    "confidence": "high",
+    "details": {
+      "error": "Equilibration chain did not complete: {'status': 'failed', 'reason': 'PROCESS_DEAD_NO_SENTINEL', 'run_id': '80f3d1ef'}"
+    },
+    "remedy_id": null,
+    "retired_at": "2026-09-12T03:55:00.000000+00:00",
+    "retired_by": "operator (arz2) via Claude Code session f86d0b05",
+    "retired_why": "A superseded equilibration attempt whose chain died without writing its sentinel. A later attempt was accepted and all six stages are accepted, so this finding no longer describes the run.",
+    "severity": "blocking",
+    "stage": "equilibration"
+  },
+  "agent_escalations": [],
+  "agent_escalations_retired_by_operator": [
+    {
+      "at": "2026-09-08T23:39:58.070568+00:00",
+      "decision": {
+        "action": "stop",
+        "modifications": {},
+        "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] Host-level, not plan-level. PLLA_1's equilibration chain was killed mid-npt_densify_hold at step 419000 with healthy physics (T~300K, rho~1.23 g/cm3, no LAMMPS error, empty chain_80f3d1ef.log, no sentinel). Three sibling runs on the same host -- aPS_1, sPVC_1, iPMMA_1 -- all recorded PROCESS_FAILED within the same 19:34-19:36 window, so the cause is shared infrastructure, not this plan. The correct remedy (transient_retry) is already registered and was declined by its own preflight in recovery_log.jsonl: 'only 40.8 GB free on the run filesystem, below the 60 GB a resubmission needs'; free space has since fallen to 38 GB (96% full) while iPMMA_1 attempt-0002 runs against the same filesystem, so retry would be rejected identically and would spend escalation 2 of 2. No decided_params key in the contract controls dump volume or free disk (nchain would be an unevidenced scientific change and would not bridge 38 -> 60 GB). Unblock condition for a human: free >=60 GB on / with margin for concurrent attempts (~3.3 GB of dumps per equilibration attempt), and verify whether the outer driver's ~19:35 restart cycle -- all four launchers respawned on an identical 8-second stagger, each after its predecessor's poll loop stopped -- is itself terminating the chains; if so, disk alone will not hold. The run is resumable by construction from the accepted build stage via run_campaign.py --plan data/PLLA_1/raw/run_plan.json. Mechanism of the simultaneous kill is undetermined: dmesg and nvidia-smi were not accessible from this session."
+      },
+      "finding": {
+        "code": "PROCESS_FAILED",
+        "confidence": "high",
+        "details": {
+          "error": "Equilibration chain did not complete: {'status': 'failed', 'reason': 'PROCESS_DEAD_NO_SENTINEL', 'run_id': '80f3d1ef'}"
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "equilibration"
+      },
+      "manifest": "attempt-0001",
+      "retired_at": "2026-09-09T18:48:22.560153+00:00",
+      "retired_reason": "Host-level mass kill of 2026-09-08 19:34-19:36. All four campaigns (PLLA_1, aPS_1, sPVC_1, iPMMA_1) recorded PROCESS_FAILED in the same two-minute window; PLLA_1's chain died mid-npt_densify_hold at step 419000 with healthy physics (T~300 K, rho~1.23, no LAMMPS error, no sentinel). Environmental, not a plan defect -- the agent's own diagnosis says so."
+    },
+    {
+      "at": "2026-09-09T12:24:14.592206+00:00",
+      "decision": {
+        "action": "revise_plan",
+        "modifications": {
+          "nvt_melt_min_steps": 15000000
+        },
+        "rationale": "[recovery-agent diagnosis via claude-fable-5-1+claude-opus-5[1m]] Root cause: the melt is not chain-relaxed. C(t) on the 5 ns nvt_melt_hold trajectory decayed 11.5% (decay_fraction_at_end=0.115, trajectory_ps=4951) against PEST's curated ct_min_decay_melt=0.15; tau_relax=872660 ps from a KWW fit with beta=0.446. `ct` is the ONLY failing binding gate -- rg, p2, torsion, msid_gaussian, both drifts, both SEMs, n_eff (87), homogeneity (HOMOG_PASS) and finite size (SIZE_PASS) all pass. Nothing structural is wrong with this cell; it just has not been sampled long enough at fixed volume.\n\nWhy the ladder did not resolve it, and why this is not a repeat of a rung already spent: remedy_counters.total=0 -- continue_npt has never been applied. It was rejected outright by the override validator (recovery_log.jsonl 2026-09-09T12:16:15, \"npt_continuation_ns=17453.206 outside allowed range [0.01, 1000]\") because _continue_npt sizes from ns = tau * target_n_eff = 872.66 * 20. Two independent defects put it here: (1) that sizing formula, unlike the in-stage _size_extension (run_campaign.py:502-529, 1.5*tau clamped to cap headroom), is unbounded and out of range by 17x; (2) more decisively, _continue_npt hard-codes equilibration_extend_base_stage=\"npt_melt_hold\"/ensemble \"npt\" (workflow_engine.py:368-369), but `ct` is a member of CHAIN_CONVERGENCE_GATES (run_campaign.py:469), whose own routing at lines 1028-1033 sends chain-convergence failures to nvt_melt_hold/nvt -- and C(t) is measured on precisely the nvt_melt_hold dump (args.npt_prod_dump, run_campaign.py:947-950; the barostatted NPT trajectory is excluded on purpose per the comment at 936-941). Extending npt_melt_hold therefore cannot move this metric at all; run_campaign.py:474 names that case: \"Extending the wrong one burns time without touching the defect.\" Both divergences exist only because engine_owned_recovery bypasses the in-stage extend ladder at line 1007. ENGINE FIX FOR A HUMAN: route CHAIN_CONVERGENCE_GATES failures in _continue_npt to nvt_melt_hold/nvt and reuse _size_extension for sizing -- that would have permitted a ~10 ns NVT restart-continuation from the existing nvt_melt_hold_out.restart (~9 h) instead of the fresh chain this override costs.\n\nEconomics: remedy_economics.py could NOT be executed -- python3 invocation is permission-denied in this headless session (three attempts, including the exact command form in recover.md). Transcribing the script's Class B branch (remedy_economics.py:110-123) by reading it instead: a decay fraction has no SEM, so --sem is absent, residual_type resolves to \"unknown\" (line 93), which is not \"bias\", so the verdict is SPEND, reason verbatim: \"Class B convergence with a variance-limited residual: more sampling at the same state is exactly the remedy.\" That is the correct classification on the physics too -- C(t) decay is a monotonic function of trajectory length, not a noisy estimator of a fixed value.\n\nChosen lever and value: nvt_melt_min_steps = 15,000,000 (15 ns at dt_fs=1.0), up from the uniform 5 ns default (stage_params.py:655). 15e6 is exactly this class's own nvt_melt_cap_steps (3 x nvt_melt_min, stage_params.py:687) -- i.e. precisely where the in-stage adaptive ladder would have clamped had it not been bypassed, so this spends the policy's full sanctioned headroom in one rung and no more. Extrapolating the run's own KWW fit (tau=344864 ps, beta=0.446) to 15 ns gives decay=0.219, or 0.180 after scaling by the fit-vs-measured endpoint ratio (0.115/0.140) -- clear of the 0.15 floor with margin, whereas 10 ns lands at ~0.153 and is too marginal to be worth an attempt with zero escalations remaining.\n\nPre-flight checks done before recommending this key, per the \"decided_params can be decorative\" and PE1-cascade traps: (a) nvt_melt_min_steps IS mapped to \"equilibration\" in PARAMETER_STAGE (workflow_engine.py:88), so it invalidates equilibration only and does not fall through to \"build\" and discard the accepted build stage; (b) it genuinely reaches the deck -- resolve_stage_params -> p[\"nvt_melt_min_steps\"] -> run_campaign.py:579/588 -> server.py:2105 \"N_STEPS\": int(nvt_melt_min_steps) for the nvt_melt_hold template -- it is not bookkeeping-only; (c) the 60 GB free-disk preflight that declined escalation 1 is scoped to _transient_retry_blocked (workflow_engine.py:609-640) and does not gate a plan revision -- attempt-0002 launched and ran 12 h at ~38-40 GB free. nvt_melt_cap_steps is deliberately left derived (it re-derives to 45e6 and is never read under engine-owned recovery).\n\nRejected alternatives: ct_gate_reliable=false is the aromatic-backbone carve-out (PSFO/PKTN, server.py:3480) -- PEST is an aliphatic ester where C(t) is measurable, so disabling it would suppress a real signal; lowering ct_min_decay_melt below the curated PEST 0.15 games the gate rather than meeting it; retry is not available (the cause is not transient); stop guarantees the run dies now, and this override is a single well-evidenced key with a quantified prediction, so it strictly dominates.\n\nCost and residual risk, stated plainly for the human: this invalidates equilibration and re-runs the chain fresh from the accepted build (no continuation path is set). Measured from attempt-0002's Loop times: ~6.7 h for everything but the NVT hold, plus 15 ns at 3.27 ks/ns = ~13.6 h, so ~20 h wall on one GPU. Disk: the NVT dump is 456 MB/ns, so attempt-0003 will be ~9.5 GB against 39 GB free on a 96%-full filesystem shared with sibling campaigns -- if free space falls further, ENOSPC would kill it with no escalations left. Freeing space before this attempt starts is the one thing that most improves its odds."
+      },
+      "finding": {
+        "code": "EXTEND",
+        "confidence": "high",
+        "details": {
+          "advisory_gates": {
+            "msd_not_trapped": true,
+            "residual_stress": true
+          },
+          "applicable_clause": "require_melt",
+          "binding_gates": {
+            "ct": false,
+            "density_drift": true,
+            "density_homogeneity": true,
+            "density_sem": true,
+            "energy_drift": true,
+            "energy_sem": true,
+            "finite_size": true,
+            "msid_gaussian": true,
+            "n_eff_density": true,
+            "p2": true,
+            "rg": true,
+            "torsion": true
+          },
+          "cooling_extrapolation_reliable": null,
+          "cooling_verdict": null,
+          "density_value_binding": "n/a",
+          "failing_binding_gates": [
+            "ct"
+          ],
+          "finite_size": {
+            "L_min_A": 42.31,
+            "L_over_2Rg": 1.394,
+            "L_over_2cutoff": 2.227,
+            "L_over_Ree": 1.148,
+            "available": true,
+            "box_A": [
+              42.31,
+              42.31,
+              42.31
+            ],
+            "cutoff_A": 9.5,
+            "graded_box": "actual_equilibrated",
+            "min_image_evaluated": true,
+            "pass": true,
+            "ree_self_image_flag": false,
+            "self_image_advisory": false,
+            "verdict": "SIZE_PASS"
+          },
+          "finite_size_min_image_unarmed": false,
+          "finite_size_verdict": "SIZE_PASS",
+          "homogeneity_verdict": "HOMOG_PASS",
+          "regime": "melt",
+          "relaxation_time_ns": 872.6603,
+          "remedy": "extend_only=True, base_stage_name='npt_final', extend_ensemble='npt': extend_ns = max(1.5, 1.5*ct_tau_relax_ps/1000), else 1.5 ns, via restart-continuation at npt_prod_temp_K (npt_final always runs at final_T_K, default 300 K \u2014 never a re-melt). Cap 2 per gate.",
+          "remedy_confidence": "high",
+          "residual_stress": {
+            "available": true,
+            "dev_atm": {
+              "Pxx": -16.0,
+              "Pyy": 22.5,
+              "Pzz": -6.5
+            },
+            "max_abs_dev_atm": 22.5,
+            "mean_pressure_atm": -24.3,
+            "resolved": false,
+            "von_mises_atm": 34.8,
+            "z_max": 0.64
+          },
+          "saved_to": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/raw/equilibration.json",
+          "verdict": "EXTEND"
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "equilibration"
+      },
+      "manifest": "attempt-0002",
+      "retired_at": "2026-09-09T18:48:22.560153+00:00",
+      "retired_reason": "EXTEND on the `ct` gate, failing PEST's curated ct_min_decay_melt=0.15 (decay_fraction_at_end=0.115). That threshold was RETIRED on 2026-09-09 after measurement over the 36 round-1 campaigns showed it failing 35 of them, including every run whose density graded PASS at 0.0% error; `ct` is now advisory everywhere and chain_displacement (g3 >= Rg^2, Auhl) binds in its place. The decision was spent satisfying a criterion the platform now holds was never achievable."
+    }
+  ],
+  "created_at": "2026-09-08T22:28:48.935636+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 620.0,
+    "T_melt_hold_K": 620.0,
+    "T_workflow_K": 620.0,
+    "annealing_T_high_K": 700.0,
+    "backbone_types": [
+      1,
+      2,
+      3,
+      6,
+      7
+    ],
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.15,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.63,
+    "dp_typical": 70,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 686928993,
+    "experimental_density_gcm3": 1.248,
+    "experimental_tg_K": 331.0,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_min_steps_per_T": 200000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 561359054
+  },
+  "engine_version": "workflow-engine-v3",
+  "input_hash_restamp": [
+    {
+      "at": "2026-09-11",
+      "stages": [
+        "cooling",
+        "thermal",
+        "mechanical",
+        "summary"
+      ],
+      "why": "dump prune of 2026-09-11 removed intermediate trajectories from accepted manifests' artifact lists; those lists feed dependent stages' dependency_checksums, so every downstream input_hash moved. Verified prune-only: recomputing with the pre-prune lists reproduces the stored hash exactly. No parameter and no simulation output changed."
+    },
+    {
+      "at": "2026-09-12T23:06:11.027284+00:00",
+      "reason": "trajectory dumps of accepted attempts recompressed to .dump.gz (no re-execution, no re-analysis); artifact paths and sha256 changed, so dependency_checksums and every dependent stage input hash shifted",
+      "stages": {
+        "cooling": {
+          "after": "a9b85d2d0e41bc829515166870009b9055a0fd60a2723ea5241b379f0b233e79",
+          "before": "8a8070bf0022933910d7ac98b0261f29ba818eb020a91bd945626a1f693fcca7"
+        },
+        "mechanical": {
+          "after": "108b924e98717c4d89c7d1788364bfd9282994393755743534d3659844d564b0",
+          "before": "848d6b88d501c1c1b89bcc8a103cde90f0c634a6c2e68bd84275e8f0ecfe4357"
+        },
+        "summary": {
+          "after": "0be21d17212990ff287f03147af89e051a04b94fbaf6561c6bd690e83e9dddc4",
+          "before": "124cd270a69b446467233c38a0d35d6b582c79e6de5f62f678e82077ddcfbd6c"
+        },
+        "thermal": {
+          "after": "3f3822b49fa20bbb90829cfcf174428f6ac73c4bf971182c91bc0789da6fe53e",
+          "before": "13befd720c9d7d6e39c7d8f33876bef7c42b3a3accd59dbc8b979b84d5af3207"
+        }
+      }
+    }
+  ],
+  "operator_interventions": [
+    {
+      "at": "2026-09-09T18:48:22.560153+00:00",
+      "backup": "data/PLLA_1/workflow_state.pre_operator_repair_20260909.json",
+      "by": "operator (arz2) via Claude Code session f86d0b05",
+      "what": [
+        "agent_escalations 2 -> 0 (archived under agent_escalations_retired_by_operator)"
+      ],
+      "why": "Both escalations were spent on causes that no longer exist: one an external kill, one the since-retired ct gate. PLLA_1 is mid-cooling at 0/2, so a failing assessment gate would have gone terminal with no recourse. No stage status was touched -- only the counter. OPERATOR action, NOT an agent recovery."
+    }
+  ],
+  "plan_decided_params": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 620.0,
+    "T_melt_hold_K": 620.0,
+    "T_workflow_K": 620.0,
+    "annealing_T_high_K": 700.0,
+    "backbone_types": [
+      1,
+      2,
+      3,
+      6,
+      7
+    ],
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.15,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.63,
+    "dp_typical": 70,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "emc_seed": 686928993,
+    "experimental_density_gcm3": 1.248,
+    "experimental_tg_K": 331.0,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 600,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_min_steps_per_T": 200000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 20,
+    "velocity_seed": 561359054
+  },
+  "plan_hash": "2cc202b2ed95ba3fe9cbcc6a22c8e37dfe47c3fed75220473bdceefaba8aabe2",
+  "remedy_counters": {
+    "by_id": {
+      "transient_retry": 1
+    },
+    "by_route": {
+      "transient_retry:cooling": 1
+    },
+    "total": 1
+  },
+  "remedy_history": [
+    {
+      "application": 1,
+      "at": "2026-09-09T17:58:03.060970+00:00",
+      "finding": {
+        "code": "PROCESS_FAILED",
+        "confidence": "high",
+        "details": {
+          "error": "cool-check comprehensive analysis failed: {'run_id': '16cafd04', 'run_type': 'check_equilibration_comprehensive', 'status': 'failed', 'result': None, 'error': \"'NoneType' object is not iterable\", 'submitted_at': '2026-09-09T13:57:56.236971', 'completed_at': '2026-09-09T13:57:56.292241', 'meta': {'log_file': '/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0001/work/npt_final/npt_final.log', 'dump_file': '/home/arz2/PolyJarvis_v2/data/PLLA_1/lammps/cool/npt_final/npt_final.dump', 'output_dir': '/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0001/raw'}}"
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "cooling"
+      },
+      "remedy_id": "transient_retry"
+    }
+  ],
+  "run_name": "PLLA_1",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-08T22:30:49.263620+00:00",
+          "input_hash": "d01689b68f67572c8d13f32929d5f4fcd6132ab45656ea26aac32a7e0b75770d",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-08T22:28:48.936215+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "d01689b68f67572c8d13f32929d5f4fcd6132ab45656ea26aac32a7e0b75770d",
+      "status": "accepted"
+    },
+    "cooling": {
+      "accepted_attempt": "attempt-0002",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-09T17:58:03.024356+00:00",
+          "input_hash": "8a8070bf0022933910d7ac98b0261f29ba818eb020a91bd945626a1f693fcca7",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0001/executor_state.json",
+          "started_at": "2026-09-09T13:27:15.071361+00:00",
+          "status": "failed"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-09T22:30:56.146210+00:00",
+          "input_hash": "a9b85d2d0e41bc829515166870009b9055a0fd60a2723ea5241b379f0b233e79",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/cooling/attempt-0002/executor_state.json",
+          "started_at": "2026-09-09T17:58:15.179627+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "a9b85d2d0e41bc829515166870009b9055a0fd60a2723ea5241b379f0b233e79",
+      "stale_reason": "remedy transient_retry",
+      "status": "accepted"
+    },
+    "equilibration": {
+      "accepted_attempt": "attempt-0002",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-08T23:36:16.878270+00:00",
+          "input_hash": "d8abb22117dfbaeba57a9b70f5876f34b52902256b80c61104964057ec75308d",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-08T22:30:49.271383+00:00",
+          "status": "failed"
+        },
+        {
+          "attempt_id": "attempt-0002",
+          "finished_at": "2026-09-09T13:27:04.859975+00:00",
+          "input_hash": "d8abb22117dfbaeba57a9b70f5876f34b52902256b80c61104964057ec75308d",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/equilibration/attempt-0002/executor_state.json",
+          "started_at": "2026-09-09T00:12:39.640607+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "d8abb22117dfbaeba57a9b70f5876f34b52902256b80c61104964057ec75308d",
+      "status": "accepted"
+    },
+    "mechanical": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-10T08:31:57.462970+00:00",
+          "input_hash": "108b924e98717c4d89c7d1788364bfd9282994393755743534d3659844d564b0",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/mechanical/attempt-0001/executor_state.json",
+          "started_at": "2026-09-10T05:23:45.132104+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "108b924e98717c4d89c7d1788364bfd9282994393755743534d3659844d564b0",
+      "stale_reason": "remedy transient_retry",
+      "status": "accepted"
+    },
+    "summary": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-10T08:32:32.834821+00:00",
+          "input_hash": "0be21d17212990ff287f03147af89e051a04b94fbaf6561c6bd690e83e9dddc4",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/summary/attempt-0001/executor_state.json",
+          "started_at": "2026-09-10T08:32:14.133921+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "0be21d17212990ff287f03147af89e051a04b94fbaf6561c6bd690e83e9dddc4",
+      "stale_reason": "remedy transient_retry",
+      "status": "accepted"
+    },
+    "thermal": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-10T05:23:41.071894+00:00",
+          "input_hash": "3f3822b49fa20bbb90829cfcf174428f6ac73c4bf971182c91bc0789da6fe53e",
+          "manifest": "/home/arz2/PolyJarvis_v2/data/PLLA_1/attempts/thermal/attempt-0001/executor_state.json",
+          "started_at": "2026-09-09T22:31:06.378057+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "3f3822b49fa20bbb90829cfcf174428f6ac73c4bf971182c91bc0789da6fe53e",
+      "status": "accepted"
+    }
+  },
+  "status": "accepted",
+  "updated_at": "2026-09-12T23:06:11.194437+00:00"
+}

@@ -1,0 +1,18 @@
+{"event": "resume", "at": "2026-09-11T20:56:12.372162+00:00", "at_node": "execute", "node": "entry_resolve"}
+{"event": "cost_admitted", "at": "2026-09-11T20:56:12.372738+00:00", "gpu_hours": 5.1215, "ceiling": 40.0, "unpriced": ["equil", "murnaghan"], "note": "total_gpu_hours is a LOWER bound; unpriced stages are excluded", "node": "cost_guard_post"}
+{"event": "stage_progress", "stage": "build", "status": "running", "attempts": 1, "at": "2026-09-11T20:56:32.359698+00:00"}
+{"event": "stage_progress", "stage": "cooling", "status": "pending", "attempts": 0, "at": "2026-09-11T20:56:32.359743+00:00"}
+{"event": "stage_progress", "stage": "equilibration", "status": "pending", "attempts": 0, "at": "2026-09-11T20:56:32.359756+00:00"}
+{"event": "stage_progress", "stage": "mechanical", "status": "pending", "attempts": 0, "at": "2026-09-11T20:56:32.359768+00:00"}
+{"event": "stage_progress", "stage": "summary", "status": "pending", "attempts": 0, "at": "2026-09-11T20:56:32.359777+00:00"}
+{"event": "stage_progress", "stage": "thermal", "status": "pending", "attempts": 0, "at": "2026-09-11T20:56:32.359789+00:00"}
+{"event": "stage_progress", "stage": "build", "status": "accepted", "attempts": 1, "at": "2026-09-11T20:58:32.361276+00:00"}
+{"event": "stage_progress", "stage": "equilibration", "status": "running", "attempts": 1, "at": "2026-09-11T20:58:32.361321+00:00"}
+{"event": "stage_progress", "stage": "cooling", "status": "running", "attempts": 1, "at": "2026-09-12T03:18:52.648852+00:00"}
+{"event": "stage_progress", "stage": "equilibration", "status": "accepted", "attempts": 1, "at": "2026-09-12T03:18:52.648917+00:00"}
+{"event": "stage_progress", "stage": "cooling", "status": "accepted", "attempts": 1, "at": "2026-09-12T06:07:32.768019+00:00"}
+{"event": "stage_progress", "stage": "thermal", "status": "running", "attempts": 1, "at": "2026-09-12T06:07:32.768070+00:00"}
+{"event": "stage_progress", "stage": "mechanical", "status": "running", "attempts": 1, "at": "2026-09-12T09:31:12.928065+00:00"}
+{"event": "stage_progress", "stage": "thermal", "status": "accepted", "attempts": 1, "at": "2026-09-12T09:31:12.928133+00:00"}
+{"event": "execute", "at": "2026-09-12T11:12:28.428222+00:00", "status": "complete", "stage": null, "finding": null, "resumed": false, "node": "execute"}
+{"event": "done", "status": "failed", "exit_code": 3, "run_name": "PSU_1", "polymer_class": "PSFO", "class_source": "radonpy_polyinfo", "plan_path": "/home/alexzhao/PolyJarvis/data/PSU_1/raw/run_plan.json", "confidence": "medium", "plan_mode": "reasoned", "gpu_hours": 5.1215, "unpriced": ["equil", "murnaghan"], "critic_verdict": "agrees", "stage": null, "finding": null, "detail": "", "resumable": false}

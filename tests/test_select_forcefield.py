@@ -16,12 +16,11 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "orchestration" / "scripts"))
 
-import emc_fields  # noqa: E402
-import ff_capability  # noqa: E402
-from select_forcefield import LINEAGE  # noqa: E402
+import forcefield as sf  # noqa: E402
+from forcefield import LINEAGE  # noqa: E402
 from validate_run_plan import _forcefield_findings  # noqa: E402
 
-EMC = Path.home() / "emc"
+EMC = Path(sf.EMC_ROOT)  # the tree the code under test reads, not a guess at it
 needs_emc = pytest.mark.skipif(not EMC.exists(), reason="no installed EMC field tree")
 
 
@@ -29,7 +28,7 @@ needs_emc = pytest.mark.skipif(not EMC.exists(), reason="no installed EMC field 
 
 def test_every_registered_field_has_a_lineage():
     """A field with no lineage would silently count as its own, inflating the spread."""
-    missing = sorted(set(ff_capability.FIELDS) - set(LINEAGE))
+    missing = sorted(set(sf.FIELDS) - set(LINEAGE))
     assert not missing, f"fields missing from LINEAGE: {missing}"
 
 
@@ -43,14 +42,46 @@ def test_opls_and_class2_are_distinct_lineages():
     assert LINEAGE["opls/2024/opls-aa"] != LINEAGE["pcff"]
 
 
+# --- case-insensitive default matching --------------------------------------------
+
+def _fake_field(candidate=True):
+    return {"candidate": candidate, "integrates": candidate, "types_smiles": candidate,
+            "typing_error": None, "cell_dir": None}
+
+
+def test_every_class_prior_is_a_canonical_field_name():
+    """polymer_rules.json stored display casing ("GAFF2_mod", "Dreiding") against FIELDS'
+    lowercase keys, so select_forcefield needed a case-insensitive rescue and
+    ENUM_OVERRIDES["preferred_ff"] rejected 4 of the 6 values in real use. The values are now
+    canonical at the source; pin that so neither workaround has to come back."""
+    classes = sf.load_rules()["classes"]
+    off = {cid: e.get("ff_accuracy_prior") for cid, e in classes.items()
+           if e.get("ff_accuracy_prior") not in sf.FIELDS}
+    assert not off, f"ff_accuracy_prior must be a forcefield.FIELDS key verbatim: {off}"
+
+
+def test_class_prior_is_chosen_when_admissible(monkeypatch):
+    """An admissible class prior is chosen at high confidence and proposes no override."""
+    fake_cap = {"fields": {"gaff2_mod": _fake_field(), "gaff": _fake_field(),
+                          "gaff2": _fake_field(), "dreiding": _fake_field()}}
+    monkeypatch.setattr(sf, "assess_all", lambda *a, **k: fake_cap)
+
+    result = sf.select_forcefield("PURA", "*NC(=O)N*")
+    assert result["decision"]["choice"] == "gaff2_mod"
+    assert result["decision"]["confidence"] == "high"
+    assert result["decided_params_override"] == {}
+    assert "'gaff2_mod'" in result["decision"]["evidence"][-1]["claim"]
+
+
 # --- validator -------------------------------------------------------------------
 
 def _plan(**kw):
     d = {"id": "D-01_ff", "choice": kw.get("choice", "pcff"),
          "admissible": kw.get("admissible", ["pcff"]),
-         "provenance_flags": kw.get("flags", {})}
-    return {"decisions": [d], "decided_params": {"preferred_ff": kw.get("dp", "pcff")},
-            "uncertainties": kw.get("uncertainties", [])}
+         "provenance_flags": kw.get("flags", {}),
+         # acknowledgements live on the row they qualify, not in a plan-wide list
+         "acknowledgements": {k: "acknowledged" for k in kw.get("acks", ())}}
+    return {"decisions": [d], "decided_params": {"preferred_ff": kw.get("dp", "pcff")}}
 
 
 def test_choice_outside_the_measured_admissible_set_is_structural():
@@ -81,7 +112,7 @@ def test_acknowledged_provenance_flag_clears():
     """PSIL builds only because of a local patch -- the flag states the uncertainty,
     it does not veto the only field the class has."""
     f = _forcefield_findings(_plan(flags={"LOCAL_PATCH": 7},
-                                   uncertainties=[{"name": "ff_parameter_provenance"}]))
+                                   acks=("ff_parameter_provenance",)))
     assert f == []
 
 
@@ -100,7 +131,7 @@ def test_plan_without_a_d01_row_is_unaffected():
 def test_manifest_lists_a_stock_baseline_for_every_patched_file():
     """Diffs alone are not enough: after a reinstall + --apply there is no .bak left to
     diff against, and --patched-rows would lose its reference."""
-    m = emc_fields.load_manifest()
+    m = sf.load_manifest()
     for field, spec in m["fields"].items():
         for basename, f in spec["files"].items():
             assert (REPO_ROOT / f["stock"]).exists(), f"{field}/{basename} has no baseline"
@@ -110,25 +141,25 @@ def test_manifest_lists_a_stock_baseline_for_every_patched_file():
 
 @needs_emc
 def test_verify_matches_the_installed_tree():
-    r = emc_fields.verify(emc_fields.load_manifest())
+    r = sf.verify(sf.load_manifest())
     assert r["ok"], json.dumps(r, indent=2)
 
 
 @needs_emc
 def test_verify_detects_drift(tmp_path):
-    m = emc_fields.load_manifest()
+    m = sf.load_manifest()
     root = tmp_path / "emc" / "field" / "opls" / "2024"
     root.mkdir(parents=True)
     src = EMC / "field" / "opls" / "2024"
     for name in ("opls-aa.define", "opls-aa.top", "opls-aa.prm"):
         (root / name).write_bytes((src / name).read_bytes())
     (root / "opls-aa.prm").write_text((root / "opls-aa.prm").read_text() + "\n")
-    assert not emc_fields.verify(m, str(tmp_path / "emc"))["ok"]
+    assert not sf.verify(m, str(tmp_path / "emc"))["ok"]
 
 
 @needs_emc
 def test_patched_rows_reports_the_locally_authored_parameters():
-    rows = emc_fields.patched_rows(emc_fields.load_manifest(), "opls/2024/opls-aa")
+    rows = sf.patched_rows(sf.load_manifest(), "opls/2024/opls-aa")
     assert rows["n_rows"] > 0
     assert "si4" in rows["typing_rules"]
     # the silanol terminal-cap torsions are the reason this record exists

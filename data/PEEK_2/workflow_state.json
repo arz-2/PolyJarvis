@@ -1,0 +1,437 @@
+{
+  "active_finding": null,
+  "agent_escalations": [],
+  "agent_escalations_archived": [
+    {
+      "at": "2026-09-13T05:09:33.304881+00:00",
+      "decision": {
+        "action": "stop",
+        "modifications": {},
+        "rationale": "[recovery-agent diagnosis via claude-opus-5[1m]] TG_REVIEW / tg_gate_cause=breakpoint_ambiguity at 100 K/ns, reported by extract_thermal as 69.7 K (> 20 K). That is the larger of the breakpoint spread (69.7 K, 11 splits within 10% of the best SSR) and 2 x sigma (2 x 19.6 K). Tg_K=572.4 K, Tg_alternative_K=519.1 K. The bilinear fit is GOOD (R\u00b2=0.9841), and all 27 temperatures passed per-T sampling. workflow_state.json shows no remedy applied (remedy_counters.total=0, no agent_escalations). The tg_breakpoint remedy declined: halving tg_t_step_K 20 to 10 at 100 K/ns gives 100000 steps/T, below PKTN's tg_min_steps_per_T=200000 (the 1.00x-floor case documented in workflow_engine._tg_review).\n\nRoot cause is the pre-registered outcome in guides/polymer_rules.json PKTN _tg_slope_gate_note (line 1862). On 2026-09-01 the rigid-aromatic cold-start artifact was 'fixed' by starting the sweep from the melt-cooled cell, which re-armed the method-gap gate. The note says the next PEEK run TESTS that fix: 'If the >20 K gap ... returns, the diagnosis was wrong and the cause is not the cold start -- restore tg_slope_gate_fallback=\"slowest_rate\" rather than widening the gate.' PEEK_2 did start from the melt (tg_start_cell.outcome=MELT_HOLD_START, T_start 770 K, tg_melt_start_density_consistent=true), and the gap returned at 69.7 K. The remedy the class note prescribes is a class-config change (restore a polymer_rules.json key). Separately, method_gap_exempt is hardcoded False in stage_params.py:876. Neither is a decided_params override, so this needs a human.\n\nThe only in-contract lever is lowering tg_rate_K_per_ns (e.g. 50). Priced on this run's wall times, it is poor value. EXTRA_INVALIDATION re-runs cooling (3.0 h) plus thermal (5.6 h), roughly doubled to about 17 h. The memory record for PEEK4 (PKTN/PCFF) shows seed-to-seed MD Tg scatter of 496-563 K across 9 GOOD/EXCELLENT sweeps, the same size as this 69.7 K spread. So one slower sweep is unlikely to bring the spread under 20 K. The density staircase shows flat pairs (710/690, 590/570, 510/490 K), consistent with noise rather than an under-resolved grid. remedy_economics.py could not be run (the Bash call needed approval in this headless session), so no SPEND verdict exists to justify the rung.\n\nHuman options: (1) restore tg_slope_gate_fallback='slowest_rate' for PKTN/PSFO and decide whether to re-plumb method_gap_exempt; (2) accept and annotate MD Tg ~520-570 K with the documented PCFF aromatic-ketone overprediction (exp 418 K); (3) deliberately spend a 50 K/ns cooling + sweep rung (~17 h)."
+      },
+      "finding": {
+        "code": "TG_REVIEW",
+        "confidence": "high",
+        "details": {
+          "gate_output": {
+            "is_glassy": true,
+            "per_rate": [
+              {
+                "Tg_K": 572.4,
+                "fit_quality": "GOOD",
+                "output_dir": "/home/alexzhao/PolyJarvis/data/PEEK_2/attempts/thermal/attempt-0001/raw",
+                "r_squared": 0.9841,
+                "rate": 100.0,
+                "tg_gate_cause": "breakpoint_ambiguity",
+                "tg_gate_verdict": "TG_REVIEW",
+                "tg_melt_start_density_consistent": true,
+                "tg_per_t_sampling": [
+                  {
+                    "T_K": 770.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.0310916527363185,
+                    "n_eff": 11,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 750.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.042200819402985,
+                    "n_eff": 22,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 730.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.058264012437811,
+                    "n_eff": 22,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 710.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.0785488980099502,
+                    "n_eff": 18,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 690.0,
+                    "extensions_used": 1,
+                    "mean_density_gcm3": 1.0787351885572138,
+                    "n_eff": 56,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 670.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.0922903368159205,
+                    "n_eff": 26,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 650.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.093379868159204,
+                    "n_eff": 16,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 630.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.100945948756219,
+                    "n_eff": 50,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 610.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.120984196517413,
+                    "n_eff": 23,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 590.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1252366592039802,
+                    "n_eff": 60,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 570.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1253964542288557,
+                    "n_eff": 59,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 550.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.144112771641791,
+                    "n_eff": 11,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 530.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1476465766169153,
+                    "n_eff": 54,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 510.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1575158631840796,
+                    "n_eff": 69,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 490.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.157943837313433,
+                    "n_eff": 72,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 470.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1668233890547264,
+                    "n_eff": 25,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 450.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1760198646766171,
+                    "n_eff": 37,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 430.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.183922513432836,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 410.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1842795069651741,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 390.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1888180472636816,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 370.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1940706880597016,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 350.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1950917258706468,
+                    "n_eff": 50,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 330.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.1992237726368158,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 310.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.2038682288557214,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 290.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.2082032353233831,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 270.0,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.2141428502487561,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  },
+                  {
+                    "T_K": 250,
+                    "extensions_used": 0,
+                    "mean_density_gcm3": 1.2167146243781095,
+                    "n_eff": 402,
+                    "outcome": "PASS",
+                    "stable": true
+                  }
+                ],
+                "tg_start_cell": {
+                  "T_start_K": 770.0,
+                  "outcome": "MELT_HOLD_START",
+                  "start_data_path": "/home/alexzhao/PolyJarvis/data/PEEK_2/attempts/equilibration/attempt-0001/work/npt_melt_hold/npt_melt_hold_out.data"
+                },
+                "velocity_seed": 898589
+              }
+            ],
+            "tg_gate_cause": "breakpoint_ambiguity",
+            "tg_gate_verdict": "TG_REVIEW"
+          }
+        },
+        "remedy_id": null,
+        "severity": "blocking",
+        "stage": "thermal"
+      },
+      "manifest": "attempt-0001"
+    }
+  ],
+  "created_at": "2026-09-12T14:18:56.041364+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 770.0,
+    "T_melt_hold_K": 770.0,
+    "T_workflow_K": 770.0,
+    "annealing_T_high_K": 850.0,
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.66,
+    "dp_typical": 18,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 750,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_min_steps_per_T": 200000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 250,
+    "tg_t_step_K": 20
+  },
+  "engine_version": "workflow-engine-v3",
+  "plan_decided_params": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 770.0,
+    "T_melt_hold_K": 770.0,
+    "T_workflow_K": 770.0,
+    "annealing_T_high_K": 850.0,
+    "bm_temperature_K": 300.0,
+    "charge_method": "bond-increment",
+    "ct_min_decay_melt": 0.1,
+    "cutoff_A": 9.5,
+    "density_initial_gcm3": 0.66,
+    "dp_typical": 18,
+    "dt_fs": 1.0,
+    "electrostatics": "pppm",
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 750,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "pcff",
+    "tg_min_steps_per_T": 200000,
+    "tg_rate_K_per_ns": 100,
+    "tg_t_low_K": 250,
+    "tg_t_step_K": 20
+  },
+  "plan_hash": "a96f37f7a875d3e57dd024f5a8b52c153df8a5c1eabe94541a03011fc3d3e0e6",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {},
+    "total": 0
+  },
+  "run_name": "PEEK_2",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T14:20:26.272095+00:00",
+          "input_hash": "641a2ef42c943a732c0bb55b9b058e9785a670527550b5cae5601f7b9c0a9cae",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEEK_2/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T14:18:56.041890+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "641a2ef42c943a732c0bb55b9b058e9785a670527550b5cae5601f7b9c0a9cae",
+      "status": "accepted"
+    },
+    "cooling": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T23:29:41.531125+00:00",
+          "input_hash": "a80c65af86ece39bc2a76f32c5d51f101f46ba2de4ea3e277f3c4ffff88998b9",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEEK_2/attempts/cooling/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T20:31:23.219652+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "a80c65af86ece39bc2a76f32c5d51f101f46ba2de4ea3e277f3c4ffff88998b9",
+      "status": "accepted"
+    },
+    "equilibration": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-12T20:31:20.309681+00:00",
+          "input_hash": "411e976cc7a24d1dd9ce4558a80781484d6a9317b055224a249a0de73bdbcfee",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEEK_2/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T14:20:26.275221+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "411e976cc7a24d1dd9ce4558a80781484d6a9317b055224a249a0de73bdbcfee",
+      "status": "accepted"
+    },
+    "mechanical": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T16:02:34.478551+00:00",
+          "input_hash": "6bd26990d586eda180a5df044da012af28f7357793efefe918f5ad50073ace9a",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEEK_2/attempts/mechanical/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T14:30:53.473131+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "6bd26990d586eda180a5df044da012af28f7357793efefe918f5ad50073ace9a",
+      "status": "accepted"
+    },
+    "summary": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T16:02:46.803727+00:00",
+          "input_hash": "5014cd070e651b3003108a3f8f6e92a3d1e489203922879f48d8561b009174de",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEEK_2/attempts/summary/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T16:02:39.612713+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "5014cd070e651b3003108a3f8f6e92a3d1e489203922879f48d8561b009174de",
+      "status": "accepted"
+    },
+    "thermal": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-13T05:07:52.208194+00:00",
+          "input_hash": "be339d2039e7a021424fe5d978ee99dd0271af2c50df86f18ec39a546a643b5f",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PEEK_2/attempts/thermal/attempt-0001/executor_state.json",
+          "started_at": "2026-09-12T23:29:44.411292+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "be339d2039e7a021424fe5d978ee99dd0271af2c50df86f18ec39a546a643b5f",
+      "operator_acceptance": {
+        "PRE_REGISTERED_TEST_FAILED": "guides/polymer_rules.json classes.PKTN._tg_slope_gate_note pre-registered this exact outcome: the 2026-09-01 root fix (start the sweep from the melt-cooled cell instead of reheating the 300 K glass) retired tg_slope_gate_fallback='slowest_rate' and re-armed the method-gap gate, stating 'the next PEEK/PSU run therefore TESTS the fix rather than assuming it. If the >20 K gap or the inverted Tg-vs-rate trend returns, the diagnosis was wrong and the cause is not the cold start -- restore tg_slope_gate_fallback=\"slowest_rate\" rather than widening the gate.' PEEK_2 DID start from the melt (tg_start_cell.outcome=MELT_HOLD_START, T_start 770 K, tg_melt_start_density_consistent=true) and the gap returned at 69.7 K. The cold-start diagnosis is therefore disproven for this class.",
+        "annotated_range_K": "520-570",
+        "breakpoint_spread_K": 69.7,
+        "but_it_is_seed_dependent": "PEEK_1 (552.3 +/- 8.3 K, GOOD) and PEEK_3 (507.3 +/- 6.9 K, EXCELLENT) both returned TG_REPORTABLE on the identical frozen protocol; only PEEK_2 tripped the gate. The stored PEEK4 record shows seed-to-seed MD Tg scatter of 496-563 K across 9 GOOD/EXCELLENT sweeps -- the same magnitude as this 69.7 K spread. Read together, this is trajectory noise on a DP=18 rigid aromatic cell rather than a systematic artifact, which is what makes the prescribed class-config change a judgement call rather than an automatic consequence.",
+        "class_change_DEFERRED": "Operator, 2026-09-13: tg_slope_gate_fallback is NOT being restored now. It is a polymer_rules.json class key, not a decided_params override, so changing it mid-campaign would alter PKTN's protocol while PEEK_3 had already run -- the replicates would no longer share one protocol, which is the single thing this campaign may not trade away. Also unresolved: method_gap_exempt is hardcoded False at stage_params.py:876.",
+        "decision": "Thermal ACCEPTED so mechanical and summary still run and PEEK_2 contributes density and bulk modulus, which the Tg fit does not affect. PEEK_2's Tg is EXCLUDED from the replicate statistics; PKTN's Tg comes from PEEK_1 (552.3 K) and PEEK_3 (507.3 K).",
+        "fit_method": "bilinear_curvefit",
+        "fit_quality": "GOOD",
+        "gate": "TG_REVIEW / breakpoint_ambiguity",
+        "levers_declined": "tg_breakpoint declines by construction: halving tg_t_step_K 20->10 at 100 K/ns gives 100000 steps/T against PKTN's tg_min_steps_per_T=200000. The only in-contract lever, tg_rate_K_per_ns 100->50, carries EXTRA_INVALIDATION to cooling: 3.0 h cooling + 5.6 h thermal, roughly doubled to ~17 h, and PEEK4's recorded seed scatter is already this size, so one slower sweep is unlikely to bring the spread under 20 K. remedy_economics.py could not be run (the Bash call needed approval in the headless session), so no SPEND verdict exists; the arithmetic was done by hand and points to STOP_ANNOTATE.",
+        "r_squared": 0.9841,
+        "tg_K_alternative": 519.1,
+        "tg_K_primary": 572.4,
+        "tg_reportable": false,
+        "tg_uncertainty_K": 19.6,
+        "why_not_reportable": "The review figure is the BREAKPOINT SPREAD (69.7 K over 11 splits within 10% of the best SSR), not 2*sigma (39.2 K) -- the opposite of PSU_2, whose spread was 0.0 and whose review figure was entirely 2*sigma. The bilinear fit itself is GOOD (R2=0.9841) and all 27 temperatures passed per-T sampling; what is multi-modal is where the breakpoint sits. n_T_steps_p2_flag=0 and n_T_steps_rg_cv_flag=0, so this is not ordering."
+      },
+      "status": "accepted"
+    }
+  },
+  "status": "accepted",
+  "updated_at": "2026-09-13T16:02:46.805662+00:00"
+}

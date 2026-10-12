@@ -1,0 +1,191 @@
+{
+  "schema_version": "2.0",
+  "run_name": "PSU_1",
+  "polymer_class": "PSFO",
+  "smiles": "*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1",
+  "goal": "Predict bulk_modulus, density, tg for PSFO (*Oc1ccc(C(C)(C)c2ccc(Oc3ccc(S(=O)(=O)c4ccc(*)cc4)cc3)cc2)cc1)",
+  "properties": [
+    "bulk_modulus",
+    "density",
+    "tg"
+  ],
+  "plan_mode": "scaffold",
+  "confidence": "low",
+  "dominant_uncertainty": "scientific_review_pending",
+  "decisions": [
+    {
+      "id": "D-01_ff",
+      "choice": "pcff",
+      "criteria_evaluated": [
+        "literature_support",
+        "parameter_coverage",
+        "validation_data",
+        "computational_cost"
+      ],
+      "evidence": [
+        {
+          "claim": "polymer_rules.json:classes.PSFO carries no ff_justification_doi; 'pcff' is the class prior and the strongest support on file is the class's own first cited source. PCFF via EMC. Sun1994 (CFF93/PCFF) is the FF's general origin; no class-specific PCFF MD validation paper for polysulfone has been located. A dedicated literature search found no PCFF- or COMPASS-vs-experiment density/Tg number for polysulfone, polyethersulfone, or a small-molecule diaryl-sulfone analog. PolyJarvis's own measured -4.0% to -4.3% density deficit and +2-8% Tg overestimate are internal measurements only, neither literature-corroborated nor contradicted. No field-override recommended; this is a genuine open validation gap.",
+          "origin": "autofill",
+          "criterion": "literature_support",
+          "resolver": "polymer_rules.json:classes.PSFO.citations[0]",
+          "source_doi": "10.1038/s41524-022-00906-4",
+          "citation": "Hayashi, Y. et al. RadonPy: Automated Physical Property Calculation using All-atom Classical Molecular Dynamics Simulations for Polymer Informatics. npj Comput. Mater. 2022, 8, 222."
+        },
+        {
+          "claim": "High-throughput GAFF2 polymer MD; 1 ns NVT anneal 300\u2192700 K; 10 chains ~10,000 atoms; LAMMPS; systematic Tg and density for 1070+ polymers. Primary reference for nchain, dp, and forcefield defaults.",
+          "origin": "autofill",
+          "criterion": "validation_data",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Hayashi2022]",
+          "source_doi": "10.1038/s41524-022-00906-4",
+          "citation": "Hayashi, Y. et al. RadonPy: Automated Physical Property Calculation using All-atom Classical Molecular Dynamics Simulations for Polymer Informatics. npj Comput. Mater. 2022, 8, 222."
+        },
+        {
+          "claim": "OPLS3e GPU-based Tg for 315 polymers; validates electrostatics impact on polar vs apolar polymers. lj/cut acceptable only when backbone charge < 0.1 e.",
+          "origin": "autofill",
+          "criterion": "validation_data",
+          "resolver": "polymer_rules.json:_metadata.primary_sources[Afzal2021]",
+          "source_doi": "10.1021/acsapm.0c00524",
+          "citation": "Afzal, M. A. F. et al. High-Throughput Molecular Dynamics Simulations and Validation of Thermophysical Properties of Polymers for Various Applications. ACS Appl. Polym. Mater. 2021, 3, 2, 620\u2013630."
+        },
+        {
+          "criterion": "parameter_coverage",
+          "claim": "NOT MEASURED for this SMILES. No EMC trial build was run, so coverage is asserted from polymer_rules.json:classes.PSFO.ff_accuracy_prior='pcff' only; whether 'pcff' can type THIS repeat unit is unverified until the build stage runs. The moiety screen ran and matched no rule, so no trial build was triggered. That narrows the risk and measures nothing: the rules cover 77% of the measured failures (guides/ff_moiety_rules.json), so this SMILES is UNSCREENED for the rest, not cleared.",
+          "origin": "autofill",
+          "resolver": "polymer_rules.json:classes.PSFO.ff_accuracy_prior"
+        },
+        {
+          "criterion": "computational_cost",
+          "claim": "pcff-family cell of 6480 atoms (53104.3 g/mol): estimate_ns_per_day at this run's 6480-atom estimate: 27.10611653991393 ns/day (high confidence). electrostatics=pppm, cutoff_A=9.5.",
+          "origin": "autofill",
+          "resolver": "select_hardware.select_hardware"
+        }
+      ],
+      "alternatives": [],
+      "resolved_by": "polymer_rules.json:classes.PSFO.ff_accuracy_prior",
+      "alternatives_note": "NONE ENUMERATED DETERMINISTICALLY -- polymer_rules.json:classes.PSFO has no forcefield_alternatives, and this layer will not invent one. The moiety probe names what actually types this SMILES; the literature critic may name a candidate on the evidence.",
+      "acknowledgements": {},
+      "critique": {
+        "status": "pending_scientific_review",
+        "rounds": 0,
+        "findings": []
+      }
+    }
+  ],
+  "system_size": {
+    "dp_typical": 12,
+    "nchain": 10,
+    "resolved_by": "select_system_size.solve_system_size",
+    "reasons": [
+      "resolved to {'dp_typical': 12, 'nchain': 10} by select_system_size.solve_system_size() -- rigidity DP recommendation (backbone_rotatable_fraction=0.37, backbone_ring_fraction=0.80, longest_rigid_backbone_run=4 atoms -> stiff; DP_MW=12) does not exceed the existing recommendation 12"
+    ],
+    "acknowledgements": {}
+  },
+  "hardware": {
+    "engine": "kokkos",
+    "mpi_ranks": 1,
+    "gpu_per_run": 1,
+    "ff_family": "pcff"
+  },
+  "overrides": {
+    "experimental_density_gcm3": 1.235,
+    "bm_pressures_atm": [
+      -1000,
+      0,
+      1500,
+      3000,
+      5000
+    ]
+  },
+  "decided_params": {
+    "preferred_builder": "emc",
+    "cutoff_A": 9.5,
+    "dt_fs": 1.0,
+    "density_initial_gcm3": 0.62,
+    "T_equil_K": 700.0,
+    "annealing_T_high_K": 780.0,
+    "md_tg_ceiling_K": 750,
+    "tg_t_low_K": 250,
+    "tg_t_step_K": 20,
+    "tg_rate_K_per_ns": 100,
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "ct_min_decay_melt": 0.1,
+    "final_T_K": 300.0,
+    "bm_temperature_K": 300.0,
+    "preferred_ff": "pcff",
+    "charge_method": "bond-increment",
+    "electrostatics": "pppm",
+    "dp_typical": 12,
+    "nchain": 10,
+    "T_workflow_K": 700.0,
+    "T_melt_hold_K": 700.0
+  },
+  "planned_stages": [
+    {
+      "stage": "build",
+      "track": "foundation",
+      "success_criteria": {
+        "data_file_written": true
+      }
+    },
+    {
+      "stage": "equil",
+      "track": "foundation",
+      "success_criteria": {
+        "check_equilibration_comprehensive.overall_pass": true
+      }
+    },
+    {
+      "stage": "equil-check",
+      "track": "foundation",
+      "success_criteria": {
+        "equil_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "cool",
+      "track": "cooling",
+      "success_criteria": {
+        "chain_submitted": true
+      }
+    },
+    {
+      "stage": "cool-check",
+      "track": "cooling",
+      "success_criteria": {
+        "cool_verdict": "PASS"
+      }
+    },
+    {
+      "stage": "tg",
+      "track": "thermal",
+      "success_criteria": {
+        "bilinear_fit_r_squared_min": 0.8,
+        "t_range_brackets_exp_tg": 463
+      }
+    },
+    {
+      "stage": "analyze-tg",
+      "track": "thermal",
+      "success_criteria": {}
+    },
+    {
+      "stage": "murnaghan",
+      "track": "mechanical",
+      "success_criteria": {
+        "chain_submitted": true
+      },
+      "fallback": "deform"
+    },
+    {
+      "stage": "analyze-bm",
+      "track": "mechanical",
+      "success_criteria": {}
+    },
+    {
+      "stage": "run-summary",
+      "track": "summary",
+      "success_criteria": {}
+    }
+  ]
+}

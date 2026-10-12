@@ -1,0 +1,115 @@
+{
+  "agent_escalations": [],
+  "created_at": "2026-09-13T03:43:03.490352+00:00",
+  "effective_parameters": {
+    "K_deform_rate_inv_s": 100000000.0,
+    "K_deform_rate_slow_inv_s": 10000000.0,
+    "T_equil_K": 550.0,
+    "T_melt_hold_K": 550.0,
+    "T_workflow_K": 300.0,
+    "annealing_T_high_K": 620.0,
+    "bm_pressures_atm": [
+      1,
+      1000,
+      2500,
+      5000,
+      10000,
+      15000
+    ],
+    "bm_temperature_K": 300.0,
+    "charge_method": "embedded",
+    "ct_min_decay_melt": 0.25,
+    "cutoff_A": 14.0,
+    "density_initial_gcm3": 0.65,
+    "dp_typical": 179,
+    "dt_fs": 2.0,
+    "electrostatics": "lj_cut",
+    "exp_K_max_GPa": 2,
+    "exp_K_min_GPa": 1.5,
+    "experimental_density_gcm3": 0.855,
+    "experimental_tg_K": 195,
+    "final_T_K": 300.0,
+    "md_tg_ceiling_K": 450,
+    "nchain": 10,
+    "preferred_builder": "emc",
+    "preferred_ff": "trappe-ua",
+    "stage8_min_steps": 2500000,
+    "tg_min_steps_per_T": 250000,
+    "tg_rate_K_per_ns": 20,
+    "tg_t_low_K": 100,
+    "tg_t_step_K": 40
+  },
+  "engine_version": "workflow-engine-v3",
+  "plan_hash": "91cacc58462cdc17f0d613c62a0b6ea605d1314cad3fd3822eea781f8479cc5f",
+  "remedy_counters": {
+    "by_id": {},
+    "by_route": {},
+    "total": 0
+  },
+  "run_name": "tg_sensitivity/TGS_PE_1_L5_dT40",
+  "schema_version": 1,
+  "stages": {
+    "build": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-11T20:55:42.727420+00:00",
+          "input_hash": "1a028f41581b5e05bf0746555d82732d947e40fc7ef23b76e2e188a2d2df0d15",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/build/attempt-0001/executor_state.json",
+          "started_at": "2026-09-11T20:55:12.609483+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "1a028f41581b5e05bf0746555d82732d947e40fc7ef23b76e2e188a2d2df0d15",
+      "status": "accepted"
+    },
+    "equilibration": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-11T21:52:14.963071+00:00",
+          "input_hash": "fcf822de1b23ce3fbbe0f9551221ab2b5f363cbb8b3eab6a32ea9fa5cdcc7db4",
+          "manifest": "/home/alexzhao/PolyJarvis/data/PE_1/attempts/equilibration/attempt-0001/executor_state.json",
+          "started_at": "2026-09-11T20:55:42.729796+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "fcf822de1b23ce3fbbe0f9551221ab2b5f363cbb8b3eab6a32ea9fa5cdcc7db4",
+      "status": "accepted"
+    },
+    "summary": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-14T00:31:39.717293+00:00",
+          "input_hash": "f2b82b2c4e86d3179c234e8e64994f9f28a9b6e600aa2808084b6bf83270748c",
+          "manifest": "/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L5_dT40/attempts/summary/attempt-0001/executor_state.json",
+          "started_at": "2026-09-14T00:31:36.804200+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "f2b82b2c4e86d3179c234e8e64994f9f28a9b6e600aa2808084b6bf83270748c",
+      "status": "accepted"
+    },
+    "thermal": {
+      "accepted_attempt": "attempt-0001",
+      "attempts": [
+        {
+          "attempt_id": "attempt-0001",
+          "finished_at": "2026-09-14T00:31:35.938282+00:00",
+          "input_hash": "2cad10958f5d6a60a38c6578455ea46c8f6f13a40758f279388729cc7e586ade",
+          "manifest": "/home/alexzhao/PolyJarvis/data/tg_sensitivity/TGS_PE_1_L5_dT40/attempts/thermal/attempt-0001/executor_state.json",
+          "started_at": "2026-09-13T22:35:12.407117+00:00",
+          "status": "accepted"
+        }
+      ],
+      "input_hash": "2cad10958f5d6a60a38c6578455ea46c8f6f13a40758f279388729cc7e586ade",
+      "status": "accepted"
+    }
+  },
+  "status": "accepted",
+  "updated_at": "2026-09-14T00:31:39.718422+00:00"
+}

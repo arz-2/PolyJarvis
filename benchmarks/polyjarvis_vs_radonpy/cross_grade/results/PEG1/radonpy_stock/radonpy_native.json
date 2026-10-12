@@ -1,0 +1,131 @@
+{
+  "log": "/home/arz2/PolyJarvis_v2/benchmarks/polyjarvis_vs_radonpy/preserved_artifacts/PEG1/radonpy/PEG1/eq3.log",
+  "units": "real",
+  "rows_in_log": 5001,
+  "rows_graded": 5001,
+  "tail_rows": null,
+  "width": 2000,
+  "window_fully_defined": true,
+  "criteria": {
+    "totene": {
+      "status": "PASS",
+      "value": 27.352429185045125,
+      "threshold": 74.099095571702,
+      "column": "TotEng",
+      "mean": 148198.191143404,
+      "crit": 0.0005,
+      "rule": "sma_sd > |mean|*crit",
+      "stored_by_radonpy": 27.352429185045125,
+      "reproduces_stored": true
+    },
+    "kinene": {
+      "status": "PASS",
+      "value": 2.5418544732326733,
+      "threshold": 15.164092530136601,
+      "column": "KinEng",
+      "mean": 30328.1850602732,
+      "crit": 0.0005,
+      "rule": "sma_sd > |mean|*crit",
+      "stored_by_radonpy": 2.5418544732326733,
+      "reproduces_stored": true
+    },
+    "ebond": {
+      "status": "PASS",
+      "value": 2.1192618991910437,
+      "threshold": 6.7596815963840005,
+      "column": "E_bond",
+      "mean": 6759.681596384,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit",
+      "stored_by_radonpy": 2.1192618991910437,
+      "reproduces_stored": true
+    },
+    "eangle": {
+      "status": "PASS",
+      "value": 13.19693933381286,
+      "threshold": 24.220263017309605,
+      "column": "E_angle",
+      "mean": 24220.263017309604,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit",
+      "stored_by_radonpy": 13.19693933381286,
+      "reproduces_stored": true
+    },
+    "edihed": {
+      "status": "PASS",
+      "value": 25.70372501466762,
+      "threshold": 50.716829476084,
+      "column": "E_dihed",
+      "mean": 25358.414738042,
+      "crit": 0.002,
+      "rule": "sma_sd > |mean|*crit",
+      "stored_by_radonpy": 25.70372501466762,
+      "reproduces_stored": true
+    },
+    "evdw": {
+      "status": "PASS",
+      "value": 11.387906639503024,
+      "threshold": 30.0,
+      "column": "E_vdwl",
+      "mean": -17640.3403697872,
+      "crit": 30.0,
+      "rule": "sma_sd > crit",
+      "stored_by_radonpy": 11.387906639503024,
+      "reproduces_stored": true
+    },
+    "ecoul": {
+      "status": "NOT_GATED",
+      "value": 7.537376229315674,
+      "threshold": null,
+      "column": "E_coul",
+      "mean": 195270.29076456,
+      "crit": null,
+      "rule": "sma_sd > crit",
+      "stored_by_radonpy": 7.537376229315674,
+      "reproduces_stored": true
+    },
+    "elong": {
+      "status": "PASS",
+      "value": 0.695755329734498,
+      "threshold": 116.098303598944,
+      "column": "E_long",
+      "mean": -116098.303598944,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit",
+      "stored_by_radonpy": 0.695755329734498,
+      "reproduces_stored": true
+    },
+    "dens": {
+      "status": "PASS",
+      "value": 0.00035634866931173596,
+      "threshold": 0.0011037909451,
+      "column": "Density",
+      "mean": 1.1037909451,
+      "crit": 0.001,
+      "rule": "sma_sd > |mean|*crit",
+      "stored_by_radonpy": 0.00035634866931173596,
+      "reproduces_stored": true
+    },
+    "rg": {
+      "status": "FAIL",
+      "value": 0.20590680321145272,
+      "threshold": 0.19189443019999985,
+      "source": "stored by RadonPy's own run (eq_conv_data.csv Rg_sd_max, eq_prop_data.csv Rg); its rg.profile was not preserved",
+      "crit": 0.01,
+      "rule": "sd_max > mean_mean*crit",
+      "sd_max_over_mean_pct": 1.0730212596418178
+    }
+  },
+  "verdict": "FAIL",
+  "failing": [
+    "rg"
+  ],
+  "not_evaluated": [],
+  "radonpy_check_eq_returned": true,
+  "radonpy_check_eq_passes_an_unevaluable_window": false,
+  "radonpy_check_eq_agrees": true,
+  "radonpy_check_eq_skipped_rg": true,
+  "radonpy_warnings": [
+    "RadonPy warning: Can not obtain the data of radius of gyration. Skip to check the Rg convergence."
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "polymer": "PTFE",
+  "smiles": "*C(F)(F)C(*)(F)F",
+  "status": "complete",
+  "error": null,
+  "work_dir": "/home/arz2/PolyJarvis_v2/benchmarks/polyjarvis_vs_radonpy/data/PTFE/radonpy/PTFE",
+  "phases": [
+    {
+      "phase": "qm",
+      "started_at": "2026-09-14T04:20:40.902130+00:00",
+      "finished_at": "2026-09-14T04:24:37.289351+00:00",
+      "returncode": 0,
+      "log": "/home/arz2/PolyJarvis_v2/benchmarks/polyjarvis_vs_radonpy/data/PTFE/radonpy/qm.log"
+    }
+  ],
+  "deviations_from_stock": {
+    "PYTHONPATH": "/home/arz2/RadonPy",
+    "RadonPy_MPI": 14,
+    "RadonPy_GPU": 1
+  }
+}

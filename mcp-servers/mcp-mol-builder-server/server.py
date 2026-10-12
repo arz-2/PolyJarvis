@@ -11,9 +11,7 @@ All expensive operations can run in background.
 import sys
 import os
 import threading
-import queue
 import uuid
-import time
 from datetime import datetime
 from enum import Enum
 from pathlib import Path as _Path
@@ -31,8 +29,6 @@ if _radonpy_path:
     sys.path.insert(0, _radonpy_path)
 
 import tempfile
-import json
-from pathlib import Path
 from typing import Optional, Literal
 from mcp.server.fastmcp import FastMCP
 import logging
@@ -44,7 +40,7 @@ logging.basicConfig(
     stream=__import__("sys").stderr,
 )
 logger = logging.getLogger("mol_builder_mcp")
-# Also log to file so we can confirm subprocess launch even from Claude Code
+# Also log to file so detached subprocess launches remain observable.
 _fh = logging.FileHandler("/tmp/mol-builder-startup.log", mode='a')
 _fh.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
 logger.addHandler(_fh)
@@ -52,12 +48,12 @@ logger.info("Mol-Builder MCP Server starting...")
 
 # Heavy libs loaded in a background thread so the MCP handshake completes fast
 np = pd = optimize = stats = plt = Chem = utils = calc = poly = None
-GAFF2_mod = GAFF2 = GAFF = qm = Analyze = None
+GAFF2_mod = GAFF2 = GAFF = Dreiding = qm = Analyze = None
 _libs_ready = threading.Event()
 
 def _load_heavy_libs():
     global np, pd, optimize, stats, plt, Chem, utils, calc, poly
-    global GAFF2_mod, GAFF2, GAFF, qm, Analyze
+    global GAFF2_mod, GAFF2, GAFF, Dreiding, qm, Analyze
     import numpy as _np
     import pandas as _pd
     from scipy import optimize as _opt, stats as _stats
@@ -68,11 +64,13 @@ def _load_heavy_libs():
     from radonpy.ff.gaff2_mod import GAFF2_mod as _GAFF2_mod
     from radonpy.ff.gaff2 import GAFF2 as _GAFF2
     from radonpy.ff.gaff import GAFF as _GAFF
+    from radonpy.ff.dreiding import Dreiding as _Dreiding
     from radonpy.sim import qm as _qm
     from radonpy.sim.lammps import Analyze as _Analyze
     np = _np; pd = _pd; optimize = _opt; stats = _stats; plt = _plt; Chem = _Chem
     utils = _utils; calc = _calc; poly = _poly
-    GAFF2_mod = _GAFF2_mod; GAFF2 = _GAFF2; GAFF = _GAFF; qm = _qm; Analyze = _Analyze
+    GAFF2_mod = _GAFF2_mod; GAFF2 = _GAFF2; GAFF = _GAFF; Dreiding = _Dreiding
+    qm = _qm; Analyze = _Analyze
     _libs_ready.set()
     logger.info("Heavy libs loaded in background")
 
@@ -451,6 +449,8 @@ def _run_copolymerize(mol_files, copoly_type, n, ratios, tacticity, nchain, work
         ff_obj = GAFF2()
     elif forcefield == "GAFF2_mod":
         ff_obj = GAFF2_mod()
+    elif forcefield == "Dreiding":
+        ff_obj = Dreiding()
 
     chain_files = []
     ff_failed = []
@@ -729,7 +729,7 @@ def submit_copolymerize_job(
     ratios: Optional[list[float]] = None,
     tacticity: Literal["isotactic", "syndiotactic", "atactic"] = "atactic",
     nchain: int = 10,
-    forcefield: Optional[Literal["GAFF", "GAFF2", "GAFF2_mod"]] = None,
+    forcefield: Optional[Literal["GAFF", "GAFF2", "GAFF2_mod", "Dreiding"]] = None,
     work_dir: str = "copolymerize"
 ) -> dict:
     """
@@ -898,8 +898,8 @@ def cancel_job(job_id: str) -> dict:
 # ============================================================================
 
 # PoLyInfo class ID → name/description lookup
-def _get_preferred_ff(smiles: str, class_name: str) -> dict:
-    """Authoritative FF/builder routing for a polymer class, from polymer_rules.json.
+def _get_ff_accuracy_prior(smiles: str, class_name: str) -> dict:
+    """Class-level FF/builder routing for a polymer class, from polymer_rules.json.
 
     Single source of truth: the routing fields are looked up from
     ``guides/polymer_rules.json`` (via the dependency-light ``ff_routing`` module)
@@ -915,11 +915,11 @@ def _get_preferred_ff(smiles: str, class_name: str) -> dict:
         _here = os.path.dirname(os.path.abspath(__file__))
         if _here not in sys.path:
             sys.path.insert(0, _here)
-        from ff_routing import get_preferred_ff
-        return get_preferred_ff(class_name)
+        from ff_routing import get_ff_accuracy_prior
+        return get_ff_accuracy_prior(class_name)
     except Exception as exc:  # never break classification on a routing-lookup failure
         return {
-            "preferred_ff": None,
+            "ff_accuracy_prior": None,
             "preferred_builder": None,
             "ff_confidence": "uncited",
             "ff_justification": f"routing lookup failed: {exc}",
@@ -974,7 +974,7 @@ def classify_polymer(smiles: str) -> dict:
 
     Returns:
         dict with class_id, class_name, description, flags (all 21 groups),
-        co_occurring_groups, any warnings, and the routing fields preferred_ff,
+        co_occurring_groups, any warnings, and the routing fields ff_accuracy_prior,
         preferred_builder, ff_confidence, ff_justification, ff_justification_doi
         (sourced from polymer_rules.json)
     """
@@ -1014,7 +1014,7 @@ def classify_polymer(smiles: str) -> dict:
                 "cis vs trans isomers can differ by ~60K in Tg."
             )
 
-        ff_routing = _get_preferred_ff(smiles, class_name)
+        ff_routing = _get_ff_accuracy_prior(smiles, class_name)
 
         return {
             "status": "success",
@@ -1024,7 +1024,7 @@ def classify_polymer(smiles: str) -> dict:
             "flags": flags,
             "co_occurring_groups": co_occurring,
             "warning": warning,
-            "preferred_ff": ff_routing["preferred_ff"],
+            "ff_accuracy_prior": ff_routing["ff_accuracy_prior"],
             "preferred_builder": ff_routing["preferred_builder"],
             "ff_confidence": ff_routing["ff_confidence"],
             "ff_justification": ff_routing["ff_justification"],
@@ -1078,7 +1078,7 @@ def build_molecule_from_smiles(smiles: str, add_hydrogens: bool = True) -> dict:
 @mcp.tool()
 def assign_forcefield(
     mol_file: str,
-    forcefield: Literal["GAFF", "GAFF2", "GAFF2_mod"] = "GAFF2_mod"
+    forcefield: Literal["GAFF", "GAFF2", "GAFF2_mod", "Dreiding"] = "GAFF2_mod"
 ) -> dict:
     """
     Assign force field parameters (fast, synchronous).
@@ -1100,6 +1100,8 @@ def assign_forcefield(
             ff = GAFF2()
         elif forcefield == "GAFF2_mod":
             ff = GAFF2_mod()
+        elif forcefield == "Dreiding":
+            ff = Dreiding()
         else:
             return {"error": f"Unknown force field: {forcefield}"}
         
